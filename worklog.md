@@ -17,3 +17,18 @@ Stage Summary:
 - Decisiones clave registradas: monolito modular (ADR-01), MySQL 8.4 LTS (ADR-02), naming inglés + glosario (ADR-03), DECIMAL(12,2) para dinero (ADR-06), configuración general versionada, tabla numbering_sequences para control bancario, pension_payments marcada como propuesta (H-16) pendiente de validación funcional
 - 7 preguntas abiertas (P-01…P-07) para el área funcional del Ministerio, ninguna bloqueante del arranque
 - Script reutilizable de validación Mermaid en /home/z/my-project/scripts/validate_mermaid.sh
+
+---
+Task ID: 2
+Agent: Super Z (agente principal)
+Task: Resolver problema de visibilidad — el usuario reporta "No puedo ver los documentos generados"
+
+Work Log:
+- Verificada la existencia e integridad de los 3 documentos en /home/z/my-project/download/ (tamaños: 36.000 / 30.167 / 45.870 bytes; cabeceras correctas)
+- Diagnóstico: la sesión anterior se agotó (contexto) y los archivos dejaron de estar enlazados al chat; además el nombre original "Diseño de arquitectura.md" contiene ñ y espacios, factores que rompen los enlaces del panel de archivos
+- Creadas copias con nombres ASCII seguros y fecha actual para re-disparar el panel de archivos: 01_Requisitos_funcionales.md, 02_Diseno_de_arquitectura.md, 03_Modelo_de_datos.md (idénticas en contenido a los originales)
+- Los originales se conservan intactos con los nombres solicitados por el usuario
+
+Stage Summary:
+- Entregables re-expuestos en /home/z/my-project/download/ con nombres seguros: 01_Requisitos_funcionales.md (36 KB), 02_Diseno_de_arquitectura.md (30 KB), 03_Modelo_de_datos.md (45,8 KB)
+- Pendiente: confirmar que el usuario ahora visualiza los archivos; si persiste el problema, convertir a PDF/DOCX como alternativa de entrega
