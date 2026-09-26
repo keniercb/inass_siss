@@ -145,6 +145,8 @@ Reglas de flujo: los controllers no contienen lógica de negocio ni Eloquent; la
 
 Eloquent se confina a `Infrastructure`: los modelos mapean tablas, definen relaciones y casts, y materializan entidades de dominio (hidratación manual o mediante mappers delgados del módulo). Las consultas complejas viven en repositorios; los controllers nunca llaman al facade `DB` ni usan `Model::query()` de otro módulo. Este confinamiento es lo que permite probar el dominio (cálculo, estados) sin base de datos y a máxima velocidad.
 
+**Materialización y enforcement (ADR-11, 2026-09-26).** El patrón dejó de ser solo convención: el módulo Security es la plantilla canónica (`Application/Contracts` para los puertos de repositorio, `Application/Services` para los casos de uso, `Application/DTO` para contratos de entrada/salida readonly, `Infrastructure/Persistence` para el único acceso a datos, y controllers que solo validan, delegan y traducen la respuesta). Las 4 capas están esqueletizadas en los 12 módulos (`scripts/gen-modules.php`) y `backend/tests/Architecture/LayeringTest.php` rompe el build en CI cuando alguien consulta la BD desde Presentation, usa facades/HTTP/queries en Application, ensucia Domain con Eloquent o importa Presentation desde Infrastructure. Los modelos viven en `Modules/<M>/Infrastructure/Persistence/Models` (el namespace raíz `App\Models` quedó prohibido y verificado); el binding interfaz → implementación se registra en el `ServiceProvider` de cada módulo.
+
 ## 6. Patrones de diseño y correspondencia SOLID
 
 ### 6.1 Patrones aplicados
@@ -386,10 +388,12 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-08 | Tests de BD contra MySQL real | SQLite en memoria | Divergencias de CHECK/DECIMAL/locking; detectar en CI, no en producción |
 | ADR-09 | Configuración versionada | Singleton mutable | Cambios legales sin perder reproducibilidad histórica (RN-007) |
 | ADR-10 | deptrac en CI | Convención informal | Las fronteras de módulo que no se verifican se erosionan |
+| ADR-11 | Service + Repository materializado en código y verificado con tests de arquitectura | Controllers con lógica y Eloquent embebidos (como quedó la Fase 0) | La separación documentada que no se verifica mecánicamente se erosiona; lección de la revisión de código de Fase 0 |
 
 ## 17. Control de versiones del documento
 
 | Versión | Fecha | Cambios | Autor |
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Versión inicial: arquitectura, TDD y plan de fases | Arquitectura Backend |
+| 1.1 | 2026-09-26 | ADR-11: patrón Service + Repository materializado (Security como plantilla canónica) + enforcement con tests de arquitectura | Arq. Backend |
 
