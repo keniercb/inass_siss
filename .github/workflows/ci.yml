@@ -100,7 +100,7 @@ jobs:
         run: vendor/bin/pest --coverage --min=80
 
       - name: Shared module coverage gate (>= 95 %)
-        run: vendor/bin/pest app/Modules/Shared --coverage --min=95
+        run: vendor/bin/pest -c phpunit.shared.xml --coverage --min=95
 
       - name: Docker build
         run: docker build -t sgp-backend:ci .

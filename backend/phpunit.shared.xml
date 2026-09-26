@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <!--
+        Dedicated configuration for the Shared module coverage gate
+        (Fase 0 DoD: >= 95 %). The source scope is limited to the module so
+        the threshold measures exactly the kernel code, not the whole app.
+    -->
+    <testsuites>
+        <testsuite name="Shared">
+            <directory>app/Modules/Shared/Tests</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app/Modules/Shared</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1" force="false"/>
+        <env name="DB_PORT" value="13306" force="false"/>
+        <env name="DB_DATABASE" value="sgp_test" force="false"/>
+        <env name="DB_USERNAME" value="sgp" force="false"/>
+        <env name="DB_PASSWORD" value="sgp_local_dev" force="false"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+    </php>
+</phpunit>
