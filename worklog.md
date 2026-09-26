@@ -363,3 +363,22 @@ Stage Summary:
 - El puerto Shared SequenceGeneratorInterface queda resuelto por el primer adapter puro de infraestructura del proyecto; Fase 3 (números de expediente) y Fase 5 (control bancario) solo type-hint el puerto
 - La plantilla «sesión dedicada + bloqueo de una fila» es reutilizable para futuros contadores transaccionales
 - Sprint 2 COMPLETO (catálogos + configuración versionada + secuencias); siguiente: sprint 3 — personas, RBAC y bitácora
+
+---
+Task ID: 12-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de las secuencias centralizadas RN-009 — PR #8, CI y merge a main
+
+Work Log:
+- QA final re-validada en /home/z/dev-wt antes del push: Pint 172 files PASS, PHPStan 8 0 errores (100 archivos), deptrac 0 violaciones/0 uncovered, Pest 226 tests/718 aserciones/0 fallos (82 warnings ambientales preexistentes) y suite Shared 76/121 (gate >= 95 %)
+- feat/SGP-7-sequences-rn009 (tip 1e707e3, 3 commits atómicos: feature + docs ADR-17 + worklog Task 12) empujado a origin; PR #8 creado por API: https://github.com/keniercb/inass_siss/pull/8
+- CI del PR #8: SUCCESS — job "Quality gate (PHP 8.3)" completo sobre el pull_request de 1e707e3 (incluida la concurrencia real de 8 procesos contra MySQL 8.4 del runner y ambos gates de cobertura)
+- PR #8 squash-mergeeado a main como d4b7b3b con mensaje de alcance completo; push-run de main sobre d4b7b3b: SUCCESS
+- main local sincronizado (reset a origin/main); worktree dev-wt y rama remota eliminados
+
+Stage Summary:
+- ADR-17 CERRADO EN MAIN: RN-009/RF-PAG-006 operativos de extremo a extremo — numeración centralizada con SELECT ... FOR UPDATE sobre sesión dedicada, commit independiente del negocio (número quemado jamás reutilizado) y prueba de concurrencia real de 8 procesos (40/40 valores exactos) corriendo en cada CI
+- FASE 1 SPRINT 2 COMPLETO: catálogos (PR #6) + configuración versionada RN-007 (PR #7) + secuencias RN-009 (PR #8)
+- El puerto Shared SequenceGeneratorInterface queda listo para consumo: Fase 3 (número de expediente) y Fase 5 (control bancario)
+- Siguiente: Sprint 3 — personas (RF-PER-*), RBAC (ADR-05, spatie) y bitácora (RF-AUD-*)
+- Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
