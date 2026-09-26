@@ -210,3 +210,42 @@ Stage Summary:
 - ADR-13 CERRADO EN MAIN: /api/documentation (UI Swagger) y /api/docs (spec OpenAPI 3) operativos; la documentación vive con el código y CI la verifica (ApiDocsTest)
 - El sandbox local quedó verificando por HTTP real la UI completa (assets + try-it-out de login contra MySQL 13306)
 - Fase 1 dispondrá de documentación automática desde el primer endpoint nuevo
+
+---
+Task ID: 9
+Agent: Super Z (agente principal)
+Task: Agregar campos de auditoría a la tabla users (H-09 / RF-AUD-004) — trío de trazabilidad + estampado automático del actor
+
+Work Log:
+- Convención tomada del Modelo de datos (autoría + columnas comunes): created_by/updated_by BIGINT UNSIGNED NULL FK → users (autoreferencial, restrictOnDelete) + deleted_at (soft delete)
+- TDD: 13 tests escritos primero (rojo: clases inexistentes); Shared/Tests/Unit/AuditableObserverTest (6 unit con fakes en memoria, sin BD) + Security/Tests/Feature/AuditFieldsTest (7 feature: columnas, estampado con actingAs en guard web y sanctum, contexto anónimo, soft delete → login 401, wiring del contrato)
+- Migración 2026_09_26_111916_add_audit_fields_to_users_table: FKs autoreferenciales restrictOnDelete + deleted_at; down() explícito (dropForeign + dropColumn)
+- Maquinaria genérica en Shared (nadie puede importar Security por deptrac, todos pueden importar Shared): Contracts/CurrentUserProviderInterface (puerto del actor) + Support/AuditableObserver (creating: estampa created_by si es null; updating: restampa updated_by; preserva autores explícitos de seeders/imports; el contexto anónimo/CLI nunca borra historia)
+- Implementación del puerto en Security/Infrastructure/Authentication/AuthenticatedUserIdProvider (Auth::id() con fallback al guard sanctum — cubre sesión y API stateless); binding + User::observe(AuditableObserver::class) en SecurityServiceProvider (Laravel resuelve el observer vía contenedor → el puerto se inyecta, DIP)
+- Modelo User: SoftDeletes, fillable/casts ampliados, relaciones autoreferenciales creator()/updater(); contrato HTTP intacto (UserResource sin cambios, campos internos no expuestos)
+- QA local: Pint 74 files (auto-fix de FQCN en docblock), PHPStan 8 sin errores, deptrac 0 violaciones/0 uncovered, Pest 103/103 (179 aserciones) vs MySQL 8.4, suite Shared 74/74; cobertura local no medible (PHP estático sin driver) — gates 80/95 validados por CI
+- Docs: ADR-14 + nota "Estampado de auditoría" en 5.2 + v1.4 (cabecera y changelog) en AMBAS copias de arquitectura; entrada users del Modelo de datos actualizada (ambas copias, sincronizadas por sobrescritura tras diff)
+
+Stage Summary:
+- TRAZABILIDAD MATERIALZADA EN LA PRIMERA TABLA: users lleva created_by/updated_by (FK autoreferencial) + deleted_at; el actor autenticado se estampa automáticamente en cada alta/modificación
+- PLANTILLA FASE 1+: cualquier modelo de negocio adopta auditoría con (a) columnas en la migración, (b) created_by/updated_by en $fillable, (c) Model::observe(AuditableObserver::class) en el provider del módulo — el puerto ya está bindeado en el contenedor
+- Soft delete operativa: cuentas borradas excluidas de toda consulta Eloquent; login responde 401 (RF-SEG-001 blindado)
+- Contrato HTTP intacto: sin cambios de endpoints ni schemas expuestos
+
+---
+Task ID: 9-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de los campos de auditoría en users — PR #5, CI y merge a main
+
+Work Log:
+- Commit atómico 2a5c208 en feat/SGP-4-users-audit-fields (13 archivos, +467): código + migración + tests + docs (4 copias) + script scripts/audit-commit.sh (invocación única contra el daemon)
+- PR #5 creado con la plantilla del repo: https://github.com/keniercb/inass_siss/pull/5
+- CI del PR: SUCCESS — job "Quality gate (PHP 8.3)": Pint, PHPStan 8, deptrac, Pest vs MySQL 8.4 real, gates de cobertura (80 global / 95 Shared) y build Docker
+- PR #5 squash-mergeeado a main (dc977ed8) y main local sincronizado; rama local borrada
+- CI de main para dc977ed8: push run SUCCESS (Quality gate completo); la suite externa fly-io quedó en cola (integración de despliegue del usuario, fuera del scope del pipeline)
+- Falso positivo descartado (aprendizaje del sandbox): el pipeline de salida del sandbox elimina la secuencia "[m" como si fuera un código ANSI residual, lo que hizo ver "branches: ain]" en .github/workflows/ci.yml; verificado byte a byte (hex 5b6d61696e5d) que el blob dice "branches: [main]" desde d2ec491 — el trigger de push a main jamás estuvo roto. Regla práctica: ante "corrupciones" de archivos con corchetes, verificar con hexdump/python antes de actuar.
+
+Stage Summary:
+- ADR-14 CERRADO EN MAIN: trazabilidad con estampado automático operativa; patrón reutilizable por los 12 módulos desde la Fase 1
+- Incidencia menor recuperada: branch -f sobre main checkeado rechazado por git → resuelto con checkout + reset --hard origin/main
+- Fase 1 dispondrá de auditoría de autoría desde la primera migración de catálogos
