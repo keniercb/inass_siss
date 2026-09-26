@@ -117,3 +117,17 @@ Stage Summary:
 - Plantilla canónica en Security; 12 módulos esqueletizados con las 4 capas para Fase 1+
 - Contrato HTTP intacto (AuthTest sin cambios de comportamiento): refactor sin impacto funcional
 - PR #2: https://github.com/keniercb/inass_siss/pull/2
+
+---
+Task ID: 6-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del refactor Service + Repository — CI del PR y merge a main
+
+Work Log:
+- CI del PR #2 verde en ambos commits (5e27e60 codigo, 6f1254b docs): Pint, PHPStan 8, deptrac 0 violaciones, Pest 84 tests/141 assertions vs MySQL 8.4, cobertura global >= 80 %, gate Shared >= 95 %, Docker build OK
+- PR #2 squash-mergeeado a main (2b3bf2a) y main local sincronizado con el remoto
+
+Stage Summary:
+- PATRON SERVICE + REPOSITORY ADOPTADO Y VERIFICADO: plantilla canonica en Security (Application/Contracts + Services + DTO, Infrastructure/Persistence, controller delgado), enforcement automatico en CI (LayeringTest R0-R4), 12 modulos esqueletizados con las 4 capas
+- El patron es ahora obligatorio para todo desarrollo posterior (Fase 1 en adelante solo rellena la plantilla)
+- Sin cambios de contrato HTTP: refactor interno transparente para clientes
