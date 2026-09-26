@@ -5,7 +5,7 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Modelo de Datos |
-| Versión | 1.1 |
+| Versión | 1.2 |
 | Fecha | 2026-09-27 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Diseño de arquitectura.md` |
@@ -565,7 +565,7 @@ CHECK: `max_calc_percent >= base_calc_percent`. La fila "vigente" es la de mayor
 | scope | VARCHAR(40) | NO | UNIQUE | `bank_control`, `pension_case`, … |
 | next_value | BIGINT UNSIGNED | NO | — | Próximo número a emitir |
 
-Emisión: dentro de transacción, `SELECT ... FOR UPDATE`, incrementar, retornar. Huecos permitidos (RN-009).
+Emisión (ADR-17): dentro de una transacción sobre la sesión dedicada `sequences` (clon de la conexión por defecto en `SettingsServiceProvider`), `SELECT ... FOR UPDATE` sobre la fila del scope, entregar el valor leído y persistir `next_value + 1`; el commit es independiente de la transacción de negocio del llamador, por lo que un rollback posterior quema el número — huecos permitidos, reutilización jamás (RN-009). Los scopes se declaran en `SettingsSeeder` (`bank_control`, `pension_case`) con `firstOrCreate` idempotente que nunca rebobina una secuencia consumida; un scope no declarado lanza `Shared\Exceptions\UnknownSequenceException`. Sin soft delete ni columnas de autoría: estado transaccional, no historia de negocio.
 
 ### 5.4 `people` — Personas
 
@@ -978,6 +978,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Versión inicial: análisis de correcciones, glosario, ER, diccionario, índices, seeders | Arquitectura Backend |
 | 1.1 | 2026-09-27 | Entrada `general_settings` actualizada (ADR-16): `effective_from` UNIQUE en BD (RN-007/RN-008), columnas de autoría `created_by`/`updated_by`, versiones inmutables sin soft delete y `effective_to` derivado en lectura | Arq. Backend |
+| 1.2 | 2026-09-27 | Entrada `numbering_sequences` actualizada (ADR-17): emisión con `SELECT ... FOR UPDATE` sobre la sesión dedicada `sequences` con commit independiente del negocio (RN-009, jamás reutilizar), scopes declarados por `SettingsSeeder` idempotente y `UnknownSequenceException` para scopes no declarados | Arq. Backend |
 
 
 
