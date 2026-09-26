@@ -50,4 +50,23 @@ Work Log:
 Stage Summary:
 - Proyecto sincronizado en https://github.com/keniercb/inass_siss (rama main, pública)
 - Credenciales persistentes configuradas para futuros push/pull desde este servidor
-- Pendiente del usuario: ajuste de RF-CAL-004 (imagen algoritmo_pension.png nunca llegó al servidor — 2 intentos fallidos); recomendación de rotar el PAT por haberse compartido en el chat
+- Pendiente del Usuario: ajuste de RF-CAL-004 (imagen algoritmo_pension.png nunca llegó al servidor — 2 intentos fallidos); recomendación de rotar el PAT por haberse compartido en el chat
+
+---
+Task ID: 4
+Agent: Super Z (agente principal)
+Task: Crear el plan de desarrollo por fases para la implementación del backend (entregable .md)
+
+Work Log:
+- Releídas las secciones fuente para consistencia: plan de fases (sección 15) y módulos (sección 4) de Diseño de arquitectura.md; los 66 RF con prioridades, 10 RNF, 10 RN y 7 preguntas abiertas de Requisitos funcionales.md; gobernanza/CI/despliegue (secciones 12.5, 13, 14) de arquitectura
+- Redactado 04_Plan_de_desarrollo.md (7.400 palabras, 143 ítems de checklist): 14 secciones — metadatos/propósito, lineamientos transversales, visión general con gantt Mermaid + flowchart de gates con contingencias, fases 0-7 con plantilla fija (objetivo, precondiciones, alcance RF, tareas por sprint, entregables, DoD, gate de salida, riesgos), gobernanza (ceremonias, cambios de alcance, bloqueos, métricas, riesgos), matriz de trazabilidad RF/RNF por fase y control de versiones
+- Fases mapeadas: 0 Arranque (S1) · 1 Fundamentos CAT/PER/SEG/AUD (S2-S3) · 2 Estructura org. y legal (S4) · 3 Expedientes (S5-S6) · 4 Motor de cálculo (S7-S8) · 5 Pensionados y pagos (S9-S10) · 6 Reportes/API/seguridad (S11-S12) · 7 UAT y despliegue (S13); 13 sprints = 26 semanas verificadas contra gantt
+- Generalizado scripts/validate_mermaid.sh para aceptar documento como argumento; validados los 2 diagramas del plan (gantt + flowchart): OK
+- Corregidos en revisión: errata "sistemaauditable" y recuento de prioridades (54 M / 10 S / 2 C = 66 RF)
+- Commit y push a keniercb/inass_siss del nuevo documento y del script generalizado
+
+Stage Summary:
+- Entregable: /home/z/my-project/download/04_Plan_de_desarrollo.md (7.400 palabras, 8 fases, 13 sprints, 8 gates, trazabilidad completa de 66 RF y 10 RNF)
+- Consistencia garantizada con los 3 documentos previos (mismas fases de la sección 15 de arquitectura, expandidas a nivel operativo)
+- Sigue pendiente el ajuste de RF-CAL-004 (algoritmo de pensiones no recibido)
+
