@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Tests\Feature;
 
-use App\Models\User;
+use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

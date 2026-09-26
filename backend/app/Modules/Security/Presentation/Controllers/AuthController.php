@@ -4,39 +4,46 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Presentation\Controllers;
 
-use App\Models\User;
+use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Security\Presentation\Requests\LoginRequest;
 use App\Modules\Security\Presentation\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 /**
- * Phase 0 authentication skeleton (RF-SEG-001).
+ * Authentication HTTP surface (RF-SEG-001).
  *
- * Issues Sanctum personal access tokens on login. The hardening pass
- * (brute-force lockout policies, password lifecycle, token scopes) belongs
- * to phase 6 and is tracked there; only basic rate limiting is active now.
+ * Deliberately thin (ADR-11): validation arrives through
+ * LoginRequest, the use cases live in AuthService and all data
+ * access sits behind the user repository port. This layer only
+ * translates service outcomes into the response envelope
+ * (RF-API-002) and nothing else.
  */
 final class AuthController
 {
+    public function __construct(
+        private readonly AuthService $auth,
+    ) {}
+
     public function login(LoginRequest $request): JsonResponse
     {
-        $user = User::where('email', $request->validated('email'))->first();
+        $result = $this->auth->login(
+            $request->validated('email'),
+            $request->validated('password'),
+        );
 
-        if ($user === null || ! Hash::check($request->validated('password'), $user->password)) {
+        if ($result === null) {
             return response()->json([
                 'message' => 'Invalid credentials.',
             ], 401);
         }
 
-        $token = $user->createToken('login');
-
         return response()->json([
             'data' => [
-                'token' => $token->plainTextToken,
+                'token' => $result->token,
                 'token_type' => 'Bearer',
-                'user' => new UserResource($user),
+                'user' => new UserResource($result->user),
             ],
         ]);
     }
@@ -55,7 +62,7 @@ final class AuthController
         $user = $request->user();
         assert($user instanceof User);
 
-        $user->currentAccessToken()->delete();
+        $this->auth->logout($user);
 
         return response()->json([
             'message' => 'Token revoked.',

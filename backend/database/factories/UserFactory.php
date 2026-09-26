@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
+use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -12,6 +12,15 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
+    /**
+     * The model the factory belongs to. Explicit because the model lives
+     * inside the Security module, not App\Models, so name-based discovery
+     * does not apply (ADR-11).
+     *
+     * @var class-string<User>
+     */
+    protected $model = User::class;
+
     /**
      * The current password being used by the factory.
      */

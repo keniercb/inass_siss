@@ -15,6 +15,10 @@
         <testsuite name="Modules">
             <directory>app/Modules</directory>
         </testsuite>
+        <!-- Layering conformance (ADR-11): Service + Repository pattern. -->
+        <testsuite name="Architecture">
+            <directory>tests/Architecture</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
