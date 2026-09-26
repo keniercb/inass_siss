@@ -32,3 +32,22 @@ Work Log:
 Stage Summary:
 - Entregables re-expuestos en /home/z/my-project/download/ con nombres seguros: 01_Requisitos_funcionales.md (36 KB), 02_Diseno_de_arquitectura.md (30 KB), 03_Modelo_de_datos.md (45,8 KB)
 - Pendiente: confirmar que el usuario ahora visualiza los archivos; si persiste el problema, convertir a PDF/DOCX como alternativa de entrega
+
+---
+Task ID: 3
+Agent: Super Z (agente principal)
+Task: Sincronizar el proyecto al repositorio GitHub indicado por el usuario (PAT ghp_…)
+
+Work Log:
+- Revisado el git local: rama main, árbol limpio, 3 commits, sin remoto configurado
+- Identificada la cuenta del usuario vía API: keniercb (CB Kenier), 18 repos públicos
+- Localizado el repo destino por timing: keniercb/inass_siss, público y vacío, creado minutos antes de la solicitud (sin ramas)
+- Verificado que .env no contiene secretos (solo ruta SQLite local) antes de subir
+- Configurado credential.helper store (~/.git-credentials, permisos 600) con el PAT y remoto origin con URL limpia (sin token embebido)
+- Ejecutado git push -u origin main: rama creada en remoto con tracking
+- Verificación vía API: raíz con .env, .gitignore, worklog.md, download/, scripts/, upload/; download/ con los 6 documentos .md + README; 3 commits en remoto
+
+Stage Summary:
+- Proyecto sincronizado en https://github.com/keniercb/inass_siss (rama main, pública)
+- Credenciales persistentes configuradas para futuros push/pull desde este servidor
+- Pendiente del usuario: ajuste de RF-CAL-004 (imagen algoritmo_pension.png nunca llegó al servidor — 2 intentos fallidos); recomendación de rotar el PAT por haberse compartido en el chat
