@@ -1,0 +1,107 @@
+# Module dependency rules for the SGP modular monolith (architecture doc,
+# section 4). deptrac fails the build when a module imports a type from a
+# module not listed in its ruleset (ADR-10).
+deptrac:
+  paths:
+    - app/Modules
+
+  layers:
+    - name: Shared
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Shared\\\\#'
+    - name: Catalogs
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Catalogs\\\\#'
+    - name: Settings
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Settings\\\\#'
+    - name: People
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\People\\\\#'
+    - name: Organizations
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Organizations\\\\#'
+    - name: LegalBasis
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\LegalBasis\\\\#'
+    - name: PensionCases
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\PensionCases\\\\#'
+    - name: PensionCalculation
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\PensionCalculation\\\\#'
+    - name: Pensioners
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Pensioners\\\\#'
+    - name: Payments
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Payments\\\\#'
+    - name: Security
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Security\\\\#'
+    - name: Reporting
+      collectors:
+        - type: classNameRegex
+          value: '#^App\\\\Modules\\\\Reporting\\\\#'
+
+  ruleset:
+    Shared: ~
+    Catalogs:
+      - Shared
+    Settings:
+      - Shared
+    People:
+      - Shared
+      - Catalogs
+    Organizations:
+      - Shared
+      - Catalogs
+      - People
+    LegalBasis:
+      - Shared
+      - Catalogs
+    PensionCases:
+      - Shared
+      - People
+      - Organizations
+      - Catalogs
+      - LegalBasis
+    PensionCalculation:
+      - Shared
+      - Settings
+      - PensionCases
+    Pensioners:
+      - Shared
+      - People
+      - Catalogs
+      - PensionCases
+    Payments:
+      - Shared
+      - Catalogs
+      - Pensioners
+    Security:
+      - Shared
+      - People
+    Reporting:
+      - Shared
+      - Catalogs
+      - Settings
+      - People
+      - Organizations
+      - LegalBasis
+      - PensionCases
+      - PensionCalculation
+      - Pensioners
+      - Payments
+      - Security

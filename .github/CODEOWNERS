@@ -1,0 +1,24 @@
+# Default owners during phase 0 (single developer). Per-module owners will
+# be assigned as the team grows (see CONTRIBUTING.md).
+
+# Whole repository
+* @keniercb
+
+# Module owners (assign real team members here)
+/backend/app/Modules/Shared/             @keniercb
+/backend/app/Modules/Catalogs/           @keniercb
+/backend/app/Modules/Settings/           @keniercb
+/backend/app/Modules/People/             @keniercb
+/backend/app/Modules/Organizations/      @keniercb
+/backend/app/Modules/LegalBasis/         @keniercb
+/backend/app/Modules/PensionCases/       @keniercb
+/backend/app/Modules/PensionCalculation/ @keniercb
+/backend/app/Modules/Pensioners/         @keniercb
+/backend/app/Modules/Payments/           @keniercb
+/backend/app/Modules/Security/           @keniercb
+/backend/app/Modules/Reporting/          @keniercb
+
+# Infrastructure
+/.github/        @keniercb
+/backend/Dockerfile          @keniercb
+/backend/docker-compose.yml  @keniercb
