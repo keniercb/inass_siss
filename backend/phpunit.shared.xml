@@ -18,6 +18,9 @@
         <include>
             <directory>app/Modules/Shared</directory>
         </include>
+        <exclude>
+            <directory>app/Modules/Shared/Tests</directory>
+        </exclude>
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
