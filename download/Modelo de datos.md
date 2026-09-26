@@ -5,8 +5,8 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Modelo de Datos |
-| Versión | 1.0 |
-| Fecha | 2026-09-22 |
+| Versión | 1.1 |
+| Fecha | 2026-09-27 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Diseño de arquitectura.md` |
 
@@ -553,9 +553,10 @@ Patrón común: PK surrogate + `name VARCHAR(80) NOT NULL UNIQUE` + los campos p
 | base_calc_percent | INT UNSIGNED | NO | — | Por ciento de cálculo base (0-100) |
 | max_calc_percent | INT UNSIGNED | NO | — | Por ciento máximo (≥ base) |
 | annual_increase_percent | INT UNSIGNED | NO | — | Por ciento de incremento anual por excedencia |
-| effective_from | DATE | NO | — | Entrada en vigor; sin solapamientos (validación de aplicación + test) |
+| effective_from | DATE | NO | UNIQUE | Entrada en vigor; UNIQUE en BD (ADR-16): fechas distintas particionan el tiempo sin solapamientos (RN-007/RN-008) |
+| created_by / updated_by | BIGINT UNSIGNED | SÍ | FK → users | Autoría (ADR-14) |
 
-CHECK: `max_calc_percent >= base_calc_percent`. La fila "vigente" es la de mayor `effective_from` ≤ fecha de cálculo.
+CHECK: `max_calc_percent >= base_calc_percent`. La fila "vigente" es la de mayor `effective_from` ≤ fecha de cálculo (resolver puro `EffectiveSettingsResolver`, ADR-16). Las versiones son inmutables — la corrección crea una vigencia nueva (RF-CAT-005) — y solo las vigencias futuras (`effective_from` posterior a hoy) pueden eliminarse; la FK `pension_cases.calculation_setting_id` reforzará la regla. `effective_to` es derivado en lectura (día anterior a la siguiente vigencia; null en la más reciente), nunca se almacena. Sin soft delete: la historia debe permanecer reproducible (RN-007).
 
 **`numbering_sequences`** — Secuencias centralizadas (reemplaza `ultimo control bancario` del modelo original, H-06).
 
@@ -976,6 +977,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 | Versión | Fecha | Cambios | Autor |
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Versión inicial: análisis de correcciones, glosario, ER, diccionario, índices, seeders | Arquitectura Backend |
+| 1.1 | 2026-09-27 | Entrada `general_settings` actualizada (ADR-16): `effective_from` UNIQUE en BD (RN-007/RN-008), columnas de autoría `created_by`/`updated_by`, versiones inmutables sin soft delete y `effective_to` derivado en lectura | Arq. Backend |
 
 
 

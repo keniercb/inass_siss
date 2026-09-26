@@ -296,3 +296,27 @@ Stage Summary:
 - Fase 1 Sprint 2 parte 1 completa; plantilla de catálogo escalable lista para los módulos de negocio
 - Siguiente: sprint 2 parte 2 — configuración versionada general_settings (RN-007) + numbering_sequences con bloqueo pesimista y test de concurrencia (RN-009); sprint 3: personas, RBAC y bitácora
 - Higiene del sandbox: PAT de desarrollo vigente — recordar al usuario rotarlo al cerrar la etapa de desarrollo
+---
+Task ID: 11
+Agent: Super Z (agente principal)
+Task: Arrancar RN-007 — configuración general versionada del módulo Settings (Sprint 2, parte 2): general_settings con vigencias sin solapamiento y resolución de la versión en vigor
+
+Work Log:
+- Sandbox reseteado a mitad de sesión (perdió PHP/composer/MySQL/vendor y el worktree qa-wt con su vendor): re-provisionado completo vía scripts/reprovision-sandbox.sh; el guion quedó corregido y auto-sanador (libaio descargado/extraído bien + start-mysql.sh se recrea si falta + admin por socket) para futuros resets
+- Desarrollo en worktree estable /home/z/dev-wt (inmune a los flips de HEAD del daemon) sobre feat/SGP-6-general-settings-rn007 desde origin/main
+- TDD según el plan S2: primero el dataset de vigencia/solapamiento — 9 tests unitarios del resolver en rojo (clases inexistentes) → implementación → verde
+- ADR-16 — vigencia implícita: UNIQUE(effective_from) en BD + resolver de dominio puro EffectiveSettingsResolver (primera lógica de dominio pura del proyecto) sobre la proyección EffectiveSettingCandidate (id + fecha); con la regla «mayor effective_from ≤ fecha» (fecha propia incluida), fechas distintas particionan el tiempo en vigencias disjuntas: RN-007 queda garantizada por constraint (filosofía RN-008) sin exclusion constraints que MySQL no tiene; sonda 422 semántica en el servicio y prueba hasta QueryException
+- Migración 2026_09_26_215817_create_general_settings_table: 7 parámetros UNSIGNED + effective_from DATE UNIQUE + CHECK max_calc_percent >= base_calc_percent + created_by/updated_by FK→users restrict; sin soft delete (la historia debe quedar reproducible); model GeneralSetting con immutable_date y auditoría ADR-14 por AuditableObserver registrado en SettingsServiceProvider
+- Contratos (ADR-11/12): GeneralSettingsRepositoryInterface (candidates/find/create/delete/effectiveFromExists/nextEffectiveFromMap/paginate) + GeneralSettingsServiceInterface (effectiveAt/create/list/get/delete) con EloquentGeneralSettingsRepository y GeneralSettingsService; «hoy» llega por el puerto Shared ClockInterface (nunca del sistema) y el borrado de versiones ya en vigor lanza VersionAlreadyEffectiveException (409)
+- effective_to derivado en lectura (día anterior a la siguiente vigencia; null en la más reciente): lo calcula el servicio con el mapa de next dates y lo adjunta al modelo — jamás se desnormaliza en tabla
+- Presentación: 3 FormRequests (rangos del modelo de datos, gte cross-field max ≥ base, date_format Y-m-d), GeneralSettingResource con OA\Schema, GeneralSettingsController delgado con 5 acciones OA (index/store/show/current/destroy) — SIN update: RF-CAT-005 manda inmutabilidad (la corrección crea vigencia nueva; PATCH responde 405 probado); /general-settings/current resuelve hoy (Clock) o la fecha ?at=; borrado solo de vigencias futuras
+- Rutas: current explícito antes del apiResource only([index, show, store, destroy]); tag Settings en ApiDoc
+- Tests feature (19): 401, alta con autoría estampada, rangos 422, max<base 422, effective_from duplicado 422 semántico, backstops de BD (UNIQUE + CHECK hasta QueryException), listado desc con effective_to derivado, detalle, resolución hoy + 6 dataset cases (antes/primera/entre/último día/primera de la más nueva/después), ?at malformado 422, inmutabilidad 405, borrado futuro/409/404; ApiDocsTest ampliado al contrato de las 3 rutas + schema GeneralSettingVersion
+- QA local en verde: Pint (162→163 files), PHPStan 8 (93 archivos, 0 errores — 11 hallazgos corregidos: getCollection() del contrato → items() tipado, nullsafe sobre no-nulos, docblock del data provider, narrowing con assertNotNull), deptrac 0 violaciones/0 uncovered, Pest 142 passed/677 aserciones/0 fallos (74 warnings ambientales preexistentes)
+- Docs: ADR-16 + párrafo en 5.2 + fila de endpoints + v1.6 (cabecera y changelog) en AMBAS copias de arquitectura; entrada general_settings del Modelo de datos actualizada en AMBAS copias (UNIQUE, autoría, inmutabilidad, effective_to derivado) y versión del documento normalizada 1.0 → 1.1
+
+Stage Summary:
+- RN-007 CERRADO EN CÓDIGO: la configuración general vigente es única por fecha garantizada por constraint de BD, la versión en vigor se resuelve por una acción de dominio pura y las versiones son inmutables con borrado solo de vigencias futuras
+- El módulo Settings estrenó sus cuatro capas con la primera lógica de dominio pura del proyecto; la plantilla de vigencia (resolver + candidates + derived effective_to) es reutilizable para las vigencias legales de LegalBasis (RF-LEG-002)
+- El contrato effectiveAt() es el punto de consumo del futuro motor de cálculo (Fase 3 congelará la versión resuelta vía calculation_setting_id)
+- Pendiente del sprint 2: numbering_sequences con bloqueo pesimista y test de concurrencia real (RN-009)

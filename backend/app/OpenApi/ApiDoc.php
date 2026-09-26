@@ -28,4 +28,5 @@ use OpenApi\Attributes as OA;
 )]
 #[OA\Tag(name: 'Auth', description: 'Autenticación y sesión (RF-SEG-001)')]
 #[OA\Tag(name: 'Catalogs', description: 'Catálogos uniformes, municipios y agencias (RF-CAT-001..006)')]
+#[OA\Tag(name: 'Settings', description: 'Configuración general versionada y futuras secuencias de numeración (RF-CAT-005, RN-007)')]
 final class ApiDoc {}
