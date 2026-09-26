@@ -43,6 +43,7 @@
         <env name="DB_USERNAME" value="sgp" force="false"/>
         <env name="DB_PASSWORD" value="sgp_local_dev" force="false"/>
         <env name="DB_URL" value=""/>
+        <env name="L5_SWAGGER_GENERATE_ALWAYS" value="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
