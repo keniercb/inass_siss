@@ -7,7 +7,11 @@ namespace App\Modules\Security;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
+use App\Modules\Security\Infrastructure\Persistence\Models\User;
+use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
+use App\Modules\Shared\Support\AuditableObserver;
 use Illuminate\Support\ServiceProvider;
 
 final class SecurityServiceProvider extends ServiceProvider
@@ -31,7 +35,21 @@ final class SecurityServiceProvider extends ServiceProvider
             UserRepositoryInterface::class,
             EloquentUserRepository::class,
         );
+
+        // Audit actor port (ADR-14): stamping needs to know who performs
+        // every write; the port is Shared so any module's observer can
+        // consume it without depending on Security (deptrac topology).
+        $this->app->bind(
+            CurrentUserProviderInterface::class,
+            AuthenticatedUserIdProvider::class,
+        );
     }
 
-    public function boot(): void {}
+    public function boot(): void
+    {
+        // Audit stamping (ADR-14): Laravel resolves the observer through
+        // the container on each model event, so the actor port above is
+        // injected transparently into every created_by/updated_by stamp.
+        User::observe(AuditableObserver::class);
+    }
 }

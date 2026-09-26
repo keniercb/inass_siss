@@ -766,7 +766,7 @@ Solapamientos y huecos se validan en la capa de dominio (RF-EXP-003); MySQL no l
 
 ### 5.9 Seguridad y auditoría
 
-**`users`** — Esquema Laravel estándar + `person_id BIGINT UNSIGNED NULL UNIQUE FK → people` (RF-SEG-004). Contraseñas con hash Argon2id.
+**`users`** — Esquema Laravel estándar + columnas de trazabilidad (implementadas, ADR-14): `created_by`/`updated_by` BIGINT UNSIGNED NULL FK → `users` (autoreferencial, `restrictOnDelete`) estampadas automáticamente por `AuditableObserver` según el actor autenticado, y `deleted_at` (soft delete; las cuentas borradas no pueden autenticarse). `person_id BIGINT UNSIGNED NULL UNIQUE FK → people` queda para la Fase 1 (RF-SEG-004). Contraseñas con hash Argon2id.
 
 **`activity_log`** — Esquema estándar de spatie/laravel-activitylog: `log_name`, `description`, `subject_type/subject_id` (morphs), `causer_type/causer_id` (morphs, típicamente `users`), `properties JSON` (diff de atributos), `created_at`. Tabla de solo inserción desde la aplicación (RN-010). Índice `(subject_type, subject_id, created_at)` y `(causer_type, causer_id, created_at)`.
 

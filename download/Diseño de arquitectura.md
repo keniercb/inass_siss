@@ -5,7 +5,7 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Diseño de Arquitectura |
-| Versión | 1.3 |
+| Versión | 1.4 |
 | Fecha | 2026-09-26 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Modelo de datos.md` |
@@ -148,6 +148,8 @@ Eloquent se confina a `Infrastructure`: los modelos mapean tablas, definen relac
 **Materialización y enforcement (ADR-11, 2026-09-26).** El patrón dejó de ser solo convención: el módulo Security es la plantilla canónica (`Application/Contracts` para los puertos de repositorio, `Application/Services` para los casos de uso, `Application/DTO` para contratos de entrada/salida readonly, `Infrastructure/Persistence` para el único acceso a datos, y controllers que solo validan, delegan y traducen la respuesta). Las 4 capas están esqueletizadas en los 12 módulos (`scripts/gen-modules.php`) y `backend/tests/Architecture/LayeringTest.php` rompe el build en CI cuando alguien consulta la BD desde Presentation, usa facades/HTTP/queries en Application, ensucia Domain con Eloquent o importa Presentation desde Infrastructure. Los modelos viven en `Modules/<M>/Infrastructure/Persistence/Models` (el namespace raíz `App\Models` quedó prohibido y verificado); el binding interfaz → implementación se registra en el `ServiceProvider` de cada módulo.
 
 **Contracts también para los servicios (ADR-12, 2026-09-26).** La misma disciplina se extendió a los casos de uso: cada clase de `Application/Services` expone su interfaz en `Application/Contracts` (`AuthServiceInterface` es la plantilla en Security), los controllers solo conocen esos contratos y el `ServiceProvider` del módulo resuelve el binding por defecto. `LayeringTest` lo blinda con dos reglas adicionales: R5 impide que Presentation importe servicios concretos y R6 rompe el build si aparece un servicio sin contrato, de modo que la frontera HTTP queda completamente invertida (DIP), los controllers se prueban con stubs del caso de uso y decoradores (auditoría, rate limiting, variantes en cola) pueden cablearse sin tocar una línea de código HTTP.
+
+**Estampado de auditoría (ADR-14, 2026-09-26).** El trío de trazabilidad del modelo de datos (`created_by`/`updated_by` FK autoreferencial con `restrictOnDelete` + `deleted_at`) aterrizó por primera vez en `users` con relleno automático: el observer genérico `Shared\Support\AuditableObserver` estampa el actor en cada `creating`/`updating` de cualquier modelo que declare las columnas en `$fillable` (los valores explícitos de seeders/importaciones se preservan y el contexto anónimo/CLI nunca borra historia), y Laravel lo resuelve vía contenedor para que el puerto `Shared\Contracts\CurrentUserProviderInterface` se inyecte sin que el código de negocio toque la sesión (DIP). La implementación vive en `Security\Infrastructure\Authentication\AuthenticatedUserIdProvider` (guard por defecto + fallback sanctum) porque solo Security toca la autenticación; al residir el puerto en Shared, cualquier módulo de la Fase 1+ adopta el patrón con una línea en su provider — `Model::observe(AuditableObserver::class)` — sin violar deptrac. Las cuentas con borrado lógico quedan excluidas de la autenticación (login 401) y de toda consulta Eloquent.
 
 ## 6. Patrones de diseño y correspondencia SOLID
 
@@ -405,6 +407,7 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-11 | Service + Repository materializado en código y verificado con tests de arquitectura | Controllers con lógica y Eloquent embebidos (como quedó la Fase 0) | La separación documentada que no se verifica mecánicamente se erosiona; lección de la revisión de código de Fase 0 |
 | ADR-12 | Contracts también para los servicios: Presentation consume Application solo vía interfaces | Inyectar la clase de servicio concreta en el controller | DIP completo en la frontera HTTP: controllers testeables con stubs del caso de uso y decoradores cableables sin tocar código HTTP; verificado por las reglas R5/R6 del LayeringTest |
 | ADR-13 | Documentación OpenAPI generada desde el código (atributos en Presentation + l5-swagger) | Spec YAML/JSON mantenido a mano o externo al repo | El spec manual se desincroniza de las rutas; el generado viaja con cada PR y el test de contrato rompe el build si falta un endpoint |
+| ADR-14 | Campos de auditoría con estampado automático: observer genérico en Shared + puerto `CurrentUserProviderInterface` (impl en Security) | Columnas sueltas rellenadas a mano en cada service | Trazabilidad uniforme (RF-AUD-*) desde la primera tabla (`users`): el actor se resuelve por DIP sin facades en Application y la plantilla queda lista para Fase 1+ con una línea de registro por módulo |
 
 ## 17. Control de versiones del documento
 
@@ -414,4 +417,5 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | 1.1 | 2026-09-26 | ADR-11: patrón Service + Repository materializado (Security como plantilla canónica) + enforcement con tests de arquitectura | Arq. Backend |
 | 1.2 | 2026-09-26 | ADR-12: contracts para las clases de servicio (`AuthServiceInterface` como plantilla) + reglas R5/R6 en LayeringTest | Arq. Backend |
 | 1.3 | 2026-09-26 | ADR-13: documentación interactiva de la API con OpenAPI/Swagger (spec desde atributos + test de contrato ApiDocsTest) | Arq. Backend |
+| 1.4 | 2026-09-26 | ADR-14: campos de auditoría en `users` (`created_by`/`updated_by` FK autoreferencial + `deleted_at`) con estampado automático (`AuditableObserver` en Shared + `CurrentUserProviderInterface`); entrada `users` actualizada en el Modelo de datos | Arq. Backend |
 
