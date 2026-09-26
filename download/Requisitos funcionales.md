@@ -467,6 +467,7 @@ Durante el análisis se identificaron puntos que requieren validación del área
 | P-05 | Formato del archivo de nómina electrónica exigido por cada agencia | Exportación (RF-PAG-004) | Generador de archivos con plantillas configurables |
 | P-06 | Catálogos oficiales definitivos (razas, niveles educacionales, categorías, tipos de pensión, regímenes vigentes) | Seeders y pruebas de aceptación | Seeders versionables en el repositorio, ajustables sin migraciones |
 | P-07 | Volumen real de datos históricos a migrar y fuente autorizada | Plan de fases 7 | Migración como proyecto aparte, acotada al inicio de UAT |
+| P-08 | Algoritmo oficial del dígito verificador del carnet de identidad (posición 11); no existe fuente pública verificable | Validación de identidad en People (RN-001) | Validación estructural completa implementada en la Fase 0; política de checksum intercambiable cuando el Ministerio confirme la regla |
 
 ## 8. Matriz de trazabilidad
 
