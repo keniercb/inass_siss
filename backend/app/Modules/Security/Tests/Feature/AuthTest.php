@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Tests\Feature;
 
+use App\Modules\Security\Application\Contracts\AuthServiceInterface;
+use App\Modules\Security\Application\Services\AuthService;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -42,6 +44,19 @@ final class AuthTest extends TestCase
             ->assertJsonPath('data.user.email', self::DEMO_EMAIL);
 
         $this->assertNotEmpty($response->json('data.token'));
+    }
+
+    /**
+     * Wiring check (ADR-12): the container must resolve the service
+     * contract to its default implementation, since controllers only
+     * know the interface.
+     */
+    public function test_the_auth_service_contract_resolves_the_default_implementation(): void
+    {
+        self::assertInstanceOf(
+            AuthService::class,
+            $this->app->make(AuthServiceInterface::class),
+        );
     }
 
     public function test_login_rejects_wrong_password(): void
