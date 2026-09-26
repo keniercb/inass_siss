@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             DemoUserSeeder::class,
             CubaGeographySeeder::class,
             CatalogsSeeder::class,
+            SettingsSeeder::class,
         ]);
     }
 }

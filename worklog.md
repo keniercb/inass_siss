@@ -340,3 +340,26 @@ Stage Summary:
 - Plantilla de vigencia reutilizable para LegalBasis (RF-LEG-002)
 - Siguiente: sprint 2 parte final — numbering_sequences con bloqueo pesimista y test de concurrencia real de 8 procesos (RN-009); sprint 3: personas, RBAC y bitácora
 - Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 12
+Agent: Super Z (agente principal)
+Task: Cerrar el Sprint 2 con S2.5 — numbering_sequences, adapter MySQL del puerto de secuencias con bloqueo pesimista y test de concurrencia real de 8 procesos (RN-009/RF-PAG-006)
+
+Work Log:
+- Arranque sobre main limpio (c71bfb4): el daemon volvió a aterrizar un commit suelto con mensaje UUID (ee78405, scripts/settings-commit.sh — helper local ya preservado en el directorio de trabajo); descartado con reset a origin/main tras verificar su contenido
+- Desarrollo en worktree estable /home/z/dev-wt sobre feat/SGP-7-sequences-rn009; vendor copiado del checkout principal (mismo commit base, sin red)
+- TDD según el plan S2.5: primero los tests en rojo (clases inexistentes): emisión secuencial, scope no declarado, rollback de negocio RN-009, comando sonda, concurrencia real de 8 procesos e idempotencia del seeder
+- ADR-17 — sesión dedicada «sequences»: el SettingsServiceProvider clona la conexión MySQL por defecto, de modo que MysqlSequenceGenerator emite con SELECT ... FOR UPDATE y persiste next_value+1 comprometiendo INDEPENDIENTE de la transacción de negocio del llamador: si el negocio revierte después de recibir el número, el número queda quemado (hueco aceptado por diseño) y jamás se reutiliza — exactamente «ni siquiera tras rollback de negocio» (RF-PAG-006); como cada emisión bloquea exactamente una fila, el deadlock entre emisiones es estructuralmente imposible
+- Los scopes se declaran por adelantado (SettingsSeeder: bank_control + pension_case, firstOrCreate idempotente que jamás rebobina una secuencia consumida); scope desconocido → UnknownSequenceException, colocada en Shared porque PensionCases (F3) y Payments (F5) consumen el puerto sin depender de Settings
+- Comando sonda sequences:emit {scope} --times=N: imprime cada número en su propia línea por STDOUT y falla limpio (exit 1) ante scope no declarado — es el proceso hijo del test de concurrencia y herramienta de operaciones
+- Prueba de concurrencia REAL (SequenceConcurrencyTest): 8 procesos PHP paralelos (Symfony Process sobre PHP_BINARY + artisan, heredando el entorno del runner) x 5 emisiones = 40 valores: aserción de conjunto exacto 1..40 sin duplicados ni huecos, next_value persistido = 41 y medición de tiempo a STDERR como evidencia (1.72 s local)
+- Tests de la excepción en la suite Shared (phpunit.shared.xml) para sostener el gate de cobertura >= 95 % del kernel
+- QA local en verde: Pint 172 files PASS, PHPStan 8 0 errores (100 archivos; corregidos: non-empty-string del comando, asserts redundantes de larastan, unión PendingCommand|int de artisan), deptrac 0 violaciones/0 uncovered, Pest 226 tests/718 aserciones/0 fallos (82 warnings ambientales del .env ausente, preexistentes), suite Shared 76/121
+- Docs: ADR-17 (narrativa + fila del sumario + changelog v1.7) en AMBAS copias de arquitectura; entrada numbering_sequences ampliada con la semántica de sesión dedicada/declare-first/excepción en AMBAS copias del Modelo de datos (v1.1 -> 1.2)
+
+Stage Summary:
+- RN-009/RF-PAG-006 CERRADOS EN CÓDIGO: numeración centralizada segura ante concurrencia real (40/40 valores exactos con 8 procesos), números jamás reutilizados (probado hasta el rollback de negocio) y scopes declarados con fallo ruidoso ante configuración desconocida
+- El puerto Shared SequenceGeneratorInterface queda resuelto por el primer adapter puro de infraestructura del proyecto; Fase 3 (números de expediente) y Fase 5 (control bancario) solo type-hint el puerto
+- La plantilla «sesión dedicada + bloqueo de una fila» es reutilizable para futuros contadores transaccionales
+- Sprint 2 COMPLETO (catálogos + configuración versionada + secuencias); siguiente: sprint 3 — personas, RBAC y bitácora
