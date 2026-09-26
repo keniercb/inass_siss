@@ -249,3 +249,30 @@ Stage Summary:
 - ADR-14 CERRADO EN MAIN: trazabilidad con estampado automático operativa; patrón reutilizable por los 12 módulos desde la Fase 1
 - Incidencia menor recuperada: branch -f sobre main checkeado rechazado por git → resuelto con checkout + reset --hard origin/main
 - Fase 1 dispondrá de auditoría de autoría desde la primera migración de catálogos
+
+---
+Task ID: 10
+Agent: Super Z (agente principal)
+Task: Arrancar la Fase 1 — Sprint 2, parte 1: catálogos (RF-CAT-001..004, RF-CAT-006) sobre el módulo Catalogs
+
+Work Log:
+- Sandbox reseteado otra vez: re-provisionado toolchain completo (PHP 8.3.32 estático, composer 2.10.3, vendor 93 paquetes, MySQL 8.4.6 minimal en 13306 con libaio/libncurses de debs Debian); persistido scripts/reprovision-sandbox.sh idempotente. PAT de GitHub perdido de nuevo (pedir al usuario para push)
+- Baseline de main en verde antes de tocar nada: 103 tests/179 aserciones, 0 fallos
+- Diseño ADR-15: 18 tablas de catálogo (16 uniformes + municipios + agencias) servidas por UN recurso genérico /api/v1/catalogs/{type} dirigido por CatalogRegistry (Application, fuente única de definiciones) + servicios dedicados para municipios (RF-CAT-002) y agencias (RN-04)
+- RN-04 garantizado en BD: UNIQUE(id, province_id) en municipalities + FK compuesta (municipality_id, province_id) en agencies — inserción incoherente imposible incluso saltándose la aplicación (testeado con QueryException)
+- 18 migraciones (16 generadas por scripts/gen-catalog-scaffold.php; municipios y agencias a mano): unicidades RN-008 por constraint, created_by/updated_by FK→users restrict, soft delete como desactivación lógica, CHECK months_per_year>0 en pension_regimes
+- Contratos (ADR-11/12): CatalogRepositoryInterface genérico (@template TValue) + EloquentCatalogRepository único para las 18 tablas; CatalogServiceInterface/MunicipalityServiceInterface/AgencyServiceInterface con implementaciones; bindings + observers ADR-14 iterando el registry en CatalogsServiceProvider
+- Semánticas separadas en el repositorio: find/findIncludingDeactivated (detalle resuelve desactivados; edición y referencias solo activos) y exists/existsAny (unicidad incluye desactivados como el índice UNIQUE de BD; referencias solo activas)
+- Presentación: 9 FormRequests (reglas dinámicas desde el registry, unicidad/immutabilidad en servicio para 422 semántico), 3 Resources definition-driven, 3 controllers delgados con OA attributes + componentes reutilizables Unauthorized/ValidationError
+- Seeders Cuba: CubaGeographySeeder (15 provincias + 168 municipios verificados contra el total oficial; Isla de la Juventud con province NULL manejada a mano — el UNIQUE compuesto con NULL nunca matchea al re-ejecutar) + CatalogsSeeder (24 OACE, clasificadores de referencia, P-06); DatabaseSeeder los encadena
+- Tests: 48 unit (registry) + 36 feature (CRUD de los 16 tipos, unicidades, código inmutable, desactivación bloqueada por referencias, RN-04, FK compuesta, seeders idempotentes 15/168) + ApiDocsTest ampliado
+- QA local verde: Pint, PHPStan nivel 8 (0 errores), deptrac 0 violaciones/0 uncovered, Pest 188 tests/581 aserciones 0 fallos (warnings ambientales preexistentes)
+- Verificación HTTP real (artisan serve): login → 15 provincias, 168 municipios con provincia anidada, Isla de la Juventud province null, spec OpenAPI con las 6 rutas nuevas
+- Docs: ADR-15 + nota en 5.2 + endpoints actualizados + v1.5 en AMBAS copias
+- Tres incidentes del daemon recuperados: (1) `git checkout -- .` tras recuperar la rama descartó la entrada 10 del worklog no confirmada; (2) un amend aterrizó sobre main al moverse HEAD entre invocaciones — main re-reseteado a origin/main y el worklog re-confirmado en la rama; (3) el mismo `checkout -- .` también había revertido a la versión de main cinco archivos rastreados (routes/api.php, CatalogsServiceProvider, DatabaseSeeder, ApiDoc, ApiDocsTest) que se commitearon en viejo y rompieron 29 tests — detectado con git worktree estable (/home/z/qa-wt, inmune a los flips), restaurados y re-verificados (188/188 en verde) en commit e5f521c
+
+Stage Summary:
+- FASE 1 ARRANCADA (Sprint 2.1-S2.4): CRUD de catálogos operativo con datos oficiales de Cuba sembrados, auditoría de autoría estampada desde la primera tabla de catálogo y contrato de documentación ampliado
+- Plantilla escalable: agregar un catálogo uniforme = una entrada en el registry + una migración + un modelo (el resto ya está cableado)
+- BLOQUEO EXTERNO: falta el PAT de GitHub (perdido con el reset del sandbox) para push/PR del branch feat/SGP-5-catalogos
+- Pendiente del sprint 2: configuración versionada general_settings (RN-007) + numbering_sequences con bloqueo pesimista y test de concurrencia (RN-009); sprint 3: personas, RBAC y bitácora

@@ -20,7 +20,29 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths'])->toHaveKey('/api/v1/auth/login')
             ->and($spec['paths'])->toHaveKey('/api/v1/auth/me')
             ->and($spec['paths'])->toHaveKey('/api/v1/auth/logout')
-            ->and($spec['paths']['/api/v1/auth/me']['get']['security'])->toBe([['sanctumAuth' => []]]);
+            ->and($spec['paths']['/api/v1/auth/me']['get']['security'])->toBe([['sanctumAuth' => []]])
+            // Catálogos (Fase 1): generic resource + dedicated resources.
+            ->and($spec['paths'])->toHaveKey('/api/v1/catalogs/{type}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/catalogs/{type}/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/municipalities')
+            ->and($spec['paths'])->toHaveKey('/api/v1/municipalities/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/agencies')
+            ->and($spec['paths'])->toHaveKey('/api/v1/agencies/{id}')
+            ->and($spec['paths']['/api/v1/catalogs/{type}']['get']['security'])->toBe([['sanctumAuth' => []]])
+            ->and($spec['paths']['/api/v1/catalogs/{type}'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/catalogs/{type}/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/municipalities']['get']['tags'])->toBe(['Catalogs']);
+    });
+
+    it('documents the catalog schemas and shared error components', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        expect($spec['components']['schemas']['CatalogItem']['properties']['name']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Municipality']['properties']['code']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Agency']['properties']['municipality']['type'])->toBe('object')
+            ->and($spec['components']['responses']['Unauthorized']['description'])->toBeString()
+            ->and($spec['components']['responses']['ValidationError']['description'])->toBeString()
+            ->and($spec['components']['schemas']['User']['properties']['email']['type'])->toBe('string');
     });
 
     it('documents the response envelope and error shapes', function () {
