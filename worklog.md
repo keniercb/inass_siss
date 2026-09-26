@@ -320,3 +320,23 @@ Stage Summary:
 - El módulo Settings estrenó sus cuatro capas con la primera lógica de dominio pura del proyecto; la plantilla de vigencia (resolver + candidates + derived effective_to) es reutilizable para las vigencias legales de LegalBasis (RF-LEG-002)
 - El contrato effectiveAt() es el punto de consumo del futuro motor de cálculo (Fase 3 congelará la versión resuelta vía calculation_setting_id)
 - Pendiente del sprint 2: numbering_sequences con bloqueo pesimista y test de concurrencia real (RN-009)
+
+---
+Task ID: 11-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de la configuración general versionada RN-007 — PR #7, CI y merge a main
+
+Work Log:
+- QA final re-validada antes del push en /home/z/dev-wt: Pint 162 files PASS, PHPStan 8 0 errores (93 archivos), deptrac 0 violaciones/0 uncovered, Pest 142 tests/677 aserciones 0 fallos (74 warnings ambientales preexistentes)
+- feat/SGP-6-general-settings-rn007 (tip 4875fc5, 36 archivos +1462/-26) empujado a origin; PR #7 creado por API: https://github.com/keniercb/inass_siss/pull/7
+- CI del PR #7: SUCCESS — job "Quality gate (PHP 8.3)" completo (pull_request run de 4875fc57)
+- PR #7 squash-mergeeado a main como 7748713e; push-run de main sobre 7748713e: SUCCESS
+- main local sincronizado (reset a origin/main) y verificado que la entrada Task 11 del worklog viajó en el squash
+- Segundo borrado de credenciales del sandbox a mitad de sesión (PAT re-restaurado desde el mensaje del usuario); reprovision-sandbox.sh corregido a auto-sanador y commiteado en la rama
+
+Stage Summary:
+- ADR-16 CERRADO EN MAIN: RN-007 operativa de extremo a extremo — vigencia única por fecha garantizada por constraint de BD, resolución por acción de dominio pura, versiones inmutables y borrado solo de vigencias futuras
+- El módulo Settings estrena las cuatro capas; el contrato effectiveAt() queda listo para que el motor de cálculo de la Fase 3 congele la versión (calculation_setting_id)
+- Plantilla de vigencia reutilizable para LegalBasis (RF-LEG-002)
+- Siguiente: sprint 2 parte final — numbering_sequences con bloqueo pesimista y test de concurrencia real de 8 procesos (RN-009); sprint 3: personas, RBAC y bitácora
+- Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
