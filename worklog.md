@@ -70,3 +70,20 @@ Stage Summary:
 - Consistencia garantizada con los 3 documentos previos (mismas fases de la sección 15 de arquitectura, expandidas a nivel operativo)
 - Sigue pendiente el ajuste de RF-CAL-004 (algoritmo de pensiones no recibido)
 
+
+---
+Task ID: 5-cierre
+Agent: Super Z (agente principal)
+Task: Cierre y verificación de la Fase 0 — CI verde, merge a main
+
+Work Log:
+- Incidente mayor recuperado: el daemon de auto-commit del sandbox cambia HEAD a main entre comandos; dos commits de fix se crearon sobre la línea equivocada y los branch -f subsiguientes dejaron la rama remota sin backend (solo docs). Recuperado d2ec491 (112 archivos) vía reflog, reconstruida la rama correcta y forzado el push
+- Tres iteraciones de CI: (1) tests/Unit sin rastrear por git → .gitkeep; (2) gate de cobertura Shared midiendo contra todo app/ → phpunit.shared.xml con scope del módulo; (3) los tests contaban en la cobertura → exclude de Tests/ del source scope. Run final: SUCCESS
+- PR #1 squash-merged a main (69f5083) con squash; CI de main: SUCCESS (Pint, PHPStan 8, deptrac 0 violaciones, Pest 75/75 vs MySQL 8.4, cobertura Shared >= 95 %, Docker build OK)
+- main local sincronizado con el remoto
+
+Stage Summary:
+- GATE 0 SUPERADO: pipeline verde desde el PR, login demo operativo (verificado por HTTP real: login 200, logout 200, me tras logout 401 JSON, /up 200), estructura modular y contratos Shared aprobados
+- Cobertura del módulo Shared en CI: Money 95,2 % / Period 96,4 % / SystemClock 100 % / CubanIdentityNumber alto
+- Único DoD pendiente: docker compose up verificado por 2 devs (requiere Docker, no disponible en sandbox) — queda como primera tarea del equipo
+- Fase 0 cerrada; pendiente revisión con el usuario y decisión de arranque de Fase 1
