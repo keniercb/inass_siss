@@ -155,3 +155,20 @@ Stage Summary:
 - CI blindado R0-R6: el build falla si un servicio nace sin contrato o un controller importa la clase concreta
 - Plantilla para Fase 1+: cada servicio nuevo = interfaz en Contracts + implementación en Services + bind en el provider + R5/R6 vigilan
 - BLOQUEO EXTERNO: el PAT de GitHub se perdió con el reset del sandbox (~/.git-credentials vacío); el commit está listo localmente en feat/SGP-2-service-contracts — pendiente push + PR a la espera del PAT del usuario
+
+---
+Task ID: 7-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del refactor Contracts-para-servicios — push, PR #3, CI y merge a main
+
+Work Log:
+- PAT nuevo del usuario configurado en ~/.git-credentials (credential.helper store, permisos 600)
+- Push de feat/SGP-2-service-contracts (c4d6a0b refactor + 96dc3d1 script de commit atómico) y PR #3 creado siguiendo la plantilla del repo
+- Incidente daemon recuperado antes del push: entre invocaciones revirtió HEAD a main y el commit del script aterrizó en main; cherry-pick a la rama + reset de main a f4804d0, todo en invocación única
+- CI del PR #3: SUCCESS — job "Quality gate (PHP 8.3)" con Pint, PHPStan 8, deptrac, Pest vs MySQL 8.4 real, gates de cobertura y build Docker
+- PR #3 squash-mergeeado a main (6eeadaeb) y main local sincronizado con el remoto
+
+Stage Summary:
+- ADR-12 CERRADO: services con contracts como patrón obligatorio; enforcement R0-R6 en CI; plantilla canónica para Fase 1+
+- Cero cambios de contrato HTTP: refactor interno transparente para clientes
+- Recomendación: rotar el PAT cuando el desarrollo deje de necesitarlo (quedó persistido para los push de este entorno)
