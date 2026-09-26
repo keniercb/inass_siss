@@ -172,3 +172,27 @@ Stage Summary:
 - ADR-12 CERRADO: services con contracts como patrón obligatorio; enforcement R0-R6 en CI; plantilla canónica para Fase 1+
 - Cero cambios de contrato HTTP: refactor interno transparente para clientes
 - Recomendación: rotar el PAT cuando el desarrollo deje de necesitarlo (quedó persistido para los push de este entorno)
+
+---
+Task ID: 8
+Agent: Super Z (agente principal)
+Task: Implementar la documentación de la API usando Swagger (ADR-13) — spec OpenAPI generado desde el código + UI interactiva
+
+Work Log:
+- TDD: tests/Feature/ApiDocsTest.php escrito primero (rojo: 3 fallos, rutas inexistentes); verdadero al final
+- Paquetes: darkaonline/l5-swagger 11.1 + zircote/swagger-php 6.11 + swagger-api/swagger-ui 5.33 (dep de l5-swagger)
+- Hallazgo clave: swagger-php 6 solo soporta ATRIBUTOS PHP (eliminó docblocks @OA) — primera versión con anotaciones falló la generación ("Required @OA\Info not found"); migrado a #[OA\Post], #[OA\Get], #[OA\Schema], #[OA\Info], #[OA\SecurityScheme], #[OA\Tag]
+- Rutas: UI en /api/documentation, spec JSON en /api/docs (config docs route movida de docs → api/docs para un solo namespace), assets bajo /api/docs/asset/*
+- Anotaciones: AuthController (login/me/logout con envelope RF-API-002 + errores 401/422 documentados), UserResource (schema User), app/OpenApi/ApiDoc.php (info global + securityScheme sanctumAuth HTTP Bearer + tag Auth) — metadatos globales fuera de las fronteras de módulos, como routes/api.php
+- Seguridad documentada: sanctumAuth (bearer) declarado a nivel de operación en me/logout
+- Config: L5_SWAGGER_GENERATE_ALWAYS=true en phpunit.xml y .env.example (dev/tests); en prod se desactiva y se genera en deploy (Fase 6)
+- Limpieza: vistas del paquete NO commiteadas (fallback a vendor), storage/api-docs/ gitignored (spec generado, no artefacto de repo)
+- Verificación HTTP real (artisan serve): spec 200 JSON con title/paths/security; UI 200 HTML con assets correctos; CSS/JS 200; try-it-out de login real contra MySQL → 200 con envelope idéntico al documentado; .env local (gitignored) creado para el sandbox con MySQL 13306
+- QA local verde: Pint 68 files (auto-fix de 2 issues del config publicado), PHPStan level 8 sin errores (atributos type-safe), deptrac 0 violaciones/0 uncovered, Pest 79 passed + 11 warnings ambientales preexistentes / 157 aserciones
+- Docs: ADR-13 + subsección 9.3 "Documentación interactiva" + versión 1.3 en AMBAS copias
+
+Stage Summary:
+- ADR-13 ENTREGADO: la API se autodocumenta — el spec OpenAPI 3 vive con el código (atributos en Presentation) y la UI Swagger sirve en /api/documentation
+- Contrato de documentación en CI: ApiDocsTest rompe el build si un endpoint publicado no aparece en el spec o la UI se rompe
+- Plantilla para Fase 1+: cada endpoint nuevo = atributos OA en la acción + schema en el Resource; ApiDocsTest obliga a mantenerlo
+- DoD de documentación listo para cuando lleguen más módulos; endurecimiento de la UI en producción queda en Fase 6

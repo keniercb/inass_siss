@@ -5,7 +5,7 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Diseño de Arquitectura |
-| Versión | 1.2 |
+| Versión | 1.3 |
 | Fecha | 2026-09-26 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Modelo de datos.md` |
@@ -252,6 +252,18 @@ Las escrituras que cruzan agregados ocurren en una transacción de base de datos
 | GET | `/api/v1/exports/{report}.csv` | `reports.export` | Exportaciones |
 | GET | `/api/v1/settings/general` | `settings.view` | Configuración vigente y versiones |
 
+### 9.3 Documentación interactiva (OpenAPI/Swagger)
+
+La documentación de la API no es un artefacto aparte: se genera desde el código con atributos OpenAPI (`zircote/swagger-php` 6) integrados en la capa Presentation de cada módulo (`#[OA\Post]` sobre la acción del controller, `#[OA\Schema]` sobre el Resource), de modo que el spec viaja con el endpoint que documenta y no puede quedar obsoleto en silencio (ADR-13). `darkaonline/l5-swagger` expone la UI y el JSON:
+
+- **UI interactiva**: `GET /api/documentation` — exploración y "Try it out" real contra la API.
+- **Spec OpenAPI 3**: `GET /api/docs` — consumible por generadores de clientes y por el futuro frontend del Ministerio.
+- **Esquema de seguridad**: `sanctumAuth` (HTTP Bearer) documentado a nivel de operación; los endpoints protegidos lo declaran y la UI solicita el token al probar.
+- El envelope RF-API-002 (`data`/`message`/422 con `errors` por campo) queda documentado con ejemplos en cada respuesta, incluidas las formas de error 401/422.
+- Los metadatos globales (info, tag `Auth`, security scheme) viven en `app/OpenApi/ApiDoc.php`, fuera de las fronteras de módulos, igual que `routes/api.php`.
+
+Blindaje: `tests/Feature/ApiDocsTest.php` es el contrato de la documentación — falla si un endpoint publicado no aparece en el spec, si el esquema de seguridad se pierde o si la UI deja de responder, por lo que "endpoint sin documentar" rompe el build igual que una capa violada. La regeneración del spec se controla con `L5_SWAGGER_GENERATE_ALWAYS` (true en desarrollo y tests; en producción se desactiva y se genera en el pipeline de despliegue — endurecimiento de la Fase 6).
+
 ## 10. Seguridad
 
 ### 10.1 Autenticación y RBAC
@@ -392,6 +404,7 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-10 | deptrac en CI | Convención informal | Las fronteras de módulo que no se verifican se erosionan |
 | ADR-11 | Service + Repository materializado en código y verificado con tests de arquitectura | Controllers con lógica y Eloquent embebidos (como quedó la Fase 0) | La separación documentada que no se verifica mecánicamente se erosiona; lección de la revisión de código de Fase 0 |
 | ADR-12 | Contracts también para los servicios: Presentation consume Application solo vía interfaces | Inyectar la clase de servicio concreta en el controller | DIP completo en la frontera HTTP: controllers testeables con stubs del caso de uso y decoradores cableables sin tocar código HTTP; verificado por las reglas R5/R6 del LayeringTest |
+| ADR-13 | Documentación OpenAPI generada desde el código (atributos en Presentation + l5-swagger) | Spec YAML/JSON mantenido a mano o externo al repo | El spec manual se desincroniza de las rutas; el generado viaja con cada PR y el test de contrato rompe el build si falta un endpoint |
 
 ## 17. Control de versiones del documento
 
@@ -400,4 +413,5 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | 1.0 | 2026-09-22 | Versión inicial: arquitectura, TDD y plan de fases | Arquitectura Backend |
 | 1.1 | 2026-09-26 | ADR-11: patrón Service + Repository materializado (Security como plantilla canónica) + enforcement con tests de arquitectura | Arq. Backend |
 | 1.2 | 2026-09-26 | ADR-12: contracts para las clases de servicio (`AuthServiceInterface` como plantilla) + reglas R5/R6 en LayeringTest | Arq. Backend |
+| 1.3 | 2026-09-26 | ADR-13: documentación interactiva de la API con OpenAPI/Swagger (spec desde atributos + test de contrato ApiDocsTest) | Arq. Backend |
 
