@@ -5,7 +5,7 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Diseño de Arquitectura |
-| Versión | 1.4 |
+| Versión | 1.5 |
 | Fecha | 2026-09-26 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Modelo de datos.md` |
@@ -151,6 +151,8 @@ Eloquent se confina a `Infrastructure`: los modelos mapean tablas, definen relac
 
 **Estampado de auditoría (ADR-14, 2026-09-26).** El trío de trazabilidad del modelo de datos (`created_by`/`updated_by` FK autoreferencial con `restrictOnDelete` + `deleted_at`) aterrizó por primera vez en `users` con relleno automático: el observer genérico `Shared\Support\AuditableObserver` estampa el actor en cada `creating`/`updating` de cualquier modelo que declare las columnas en `$fillable` (los valores explícitos de seeders/importaciones se preservan y el contexto anónimo/CLI nunca borra historia), y Laravel lo resuelve vía contenedor para que el puerto `Shared\Contracts\CurrentUserProviderInterface` se inyecte sin que el código de negocio toque la sesión (DIP). La implementación vive en `Security\Infrastructure\Authentication\AuthenticatedUserIdProvider` (guard por defecto + fallback sanctum) porque solo Security toca la autenticación; al residir el puerto en Shared, cualquier módulo de la Fase 1+ adopta el patrón con una línea en su provider — `Model::observe(AuditableObserver::class)` — sin violar deptrac. Las cuentas con borrado lógico quedan excluidas de la autenticación (login 401) y de toda consulta Eloquent.
 
+**Catálogos como recurso genérico (ADR-15, 2026-09-26).** Los 18 catálogos de la Fase 1 aterrizaron con un patrón de registry: `Catalogs\Application\CatalogRegistry` declara la definición inmutable de cada catálogo uniforme (modelo, columnas, reglas de validación, dependientes que bloquean la desactivación) y de ella beben las tres piezas — los FormRequests arman sus reglas, el `CatalogService` genérico ejecuta los invariantes (unicidad RN-008 anticipada al 422, código inmutable, desactivación lógica bloqueada por referencias activas) y el `EloquentCatalogRepository` resuelve el class-string del modelo. Un solo par de servicio/repositorio con contrato (ADR-11/12) cubre los 16 catálogos uniformes tras `/api/v1/catalogs/{type}`; municipios y agencias tienen servicios propios porque sus claves naturales y reglas difieren (clave compuesta provincia+municipio; coherencia RN-04 garantizada en BD por FK compuesta sobre `municipalities(id, province_id)`, además de la validación de servicio). Los 18 modelos extienden `CatalogModel` (soft delete como desactivación, estampado de autoría por `AuditableObserver` registrado en el provider iterando el registry) y deliberadamente no importan tipos de Security — el autor se expone como id y la bitácora humana llega con RF-AUD-001.
+
 ## 6. Patrones de diseño y correspondencia SOLID
 
 ### 6.1 Patrones aplicados
@@ -237,7 +239,9 @@ Las escrituras que cruzan agregados ocurren en una transacción de base de datos
 | Método | Ruta | Permiso | Descripción |
 |---|---|---|---|
 | POST | `/api/v1/auth/login` | público | Autenticación (rate limited) |
-| GET | `/api/v1/catalogs/{catalog}` | `catalogs.view` | Listado paginado de catálogo simple |
+| GET/POST/PATCH/DELETE | `/api/v1/catalogs/{type}` (+ `/{id}`) | `catalogs.view/manage` | CRUD de catálogos uniformes (recurso genérico ADR-15: 16 tipos) |
+| GET/POST/PATCH/DELETE | `/api/v1/municipalities` (+ `/{id}`) | `catalogs.view/manage` | CRUD de municipios con filtro por provincia (RF-CAT-002) |
+| GET/POST/PATCH/DELETE | `/api/v1/agencies` (+ `/{id}`) | `catalogs.view/manage` | CRUD de agencias bancarias con coherencia RN-04 (RF-CAT-003) |
 | GET/POST/PATCH | `/api/v1/people` (+ `/{id}`) | `people.*` | CRUD de personas |
 | GET | `/api/v1/people?identity=…` | `people.view` | Búsqueda por identidad |
 | GET/POST/PATCH | `/api/v1/entities`, `/api/v1/offices` | `organizations.*` | Estructura organizacional |
@@ -408,6 +412,7 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-12 | Contracts también para los servicios: Presentation consume Application solo vía interfaces | Inyectar la clase de servicio concreta en el controller | DIP completo en la frontera HTTP: controllers testeables con stubs del caso de uso y decoradores cableables sin tocar código HTTP; verificado por las reglas R5/R6 del LayeringTest |
 | ADR-13 | Documentación OpenAPI generada desde el código (atributos en Presentation + l5-swagger) | Spec YAML/JSON mantenido a mano o externo al repo | El spec manual se desincroniza de las rutas; el generado viaja con cada PR y el test de contrato rompe el build si falta un endpoint |
 | ADR-14 | Campos de auditoría con estampado automático: observer genérico en Shared + puerto `CurrentUserProviderInterface` (impl en Security) | Columnas sueltas rellenadas a mano en cada service | Trazabilidad uniforme (RF-AUD-*) desde la primera tabla (`users`): el actor se resuelve por DIP sin facades en Application y la plantilla queda lista para Fase 1+ con una línea de registro por módulo |
+| ADR-15 | Catálogos uniformes como recurso genérico `/api/v1/catalogs/{type}` dirigido por un registry de definiciones; municipios y agencias con servicios dedicados; coherencia RN-04 por FK compuesta en BD | Un controller+servicio+repositorio por catálogo (≈90 clases repetitivas) o endpoints por tabla | El registry es fuente única para validación, serialización y observadores: agregar un catálogo es una entrada de datos, no código nuevo; 18 tablas comparten 6 piezas de contratos |
 
 ## 17. Control de versiones del documento
 
@@ -418,4 +423,5 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | 1.2 | 2026-09-26 | ADR-12: contracts para las clases de servicio (`AuthServiceInterface` como plantilla) + reglas R5/R6 en LayeringTest | Arq. Backend |
 | 1.3 | 2026-09-26 | ADR-13: documentación interactiva de la API con OpenAPI/Swagger (spec desde atributos + test de contrato ApiDocsTest) | Arq. Backend |
 | 1.4 | 2026-09-26 | ADR-14: campos de auditoría en `users` (`created_by`/`updated_by` FK autoreferencial + `deleted_at`) con estampado automático (`AuditableObserver` en Shared + `CurrentUserProviderInterface`); entrada `users` actualizada en el Modelo de datos | Arq. Backend |
+| 1.5 | 2026-09-26 | ADR-15: catálogos de la Fase 1 (18 tablas, CRUD `/api/v1/catalogs/{type}` genérico + `/municipalities` + `/agencies`, seeders Cuba 15/168 idempotentes, FK compuesta RN-04); tabla de endpoints actualizada | Arq. Backend |
 
