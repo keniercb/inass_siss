@@ -131,3 +131,27 @@ Stage Summary:
 - PATRON SERVICE + REPOSITORY ADOPTADO Y VERIFICADO: plantilla canonica en Security (Application/Contracts + Services + DTO, Infrastructure/Persistence, controller delgado), enforcement automatico en CI (LayeringTest R0-R4), 12 modulos esqueletizados con las 4 capas
 - El patron es ahora obligatorio para todo desarrollo posterior (Fase 1 en adelante solo rellena la plantilla)
 - Sin cambios de contrato HTTP: refactor interno transparente para clientes
+
+---
+Task ID: 7
+Agent: Super Z (agente principal)
+Task: Implementar Contracts también para las clases services — completar ADR-11 para que los servicios expongan interfaces y Presentation dependa solo de abstracciones (DIP completo)
+
+Work Log:
+- Sandbox recreado (toolchain perdido): re-provisionado PHP 8.3.32 estático en ~/.local/bin, composer + vendor (90 paquetes), MySQL 8.4.6 portátil (archives) con libaio/libncurses extraídas en ~/.runtime/compat y script idempotente ~/.runtime/bin/start-mysql.sh; PHPStan turbo-ext deshabilitado localmente (vendor, gitignored) y --memory-limit=1G (limitaciones del PHP estático, no aplican en CI)
+- Ruido git neutralizado: core.fileMode=false (daemon cambió modos 644→755 de 213 archivos); local main reseteado a origin/main f4804d0 (commit del daemon 6947384 solo contenía scripts/close-task6.sh, nunca empujado al remoto)
+- Código en rama feat/SGP-2-service-contracts:
+  - Application/Contracts/AuthServiceInterface (login: ?LoginResult / logout: void) — puerto del caso de uso
+  - AuthService implements AuthServiceInterface (sin cambios de lógica: refactor transparente)
+  - SecurityServiceProvider: bind AuthServiceInterface → AuthService junto al de repositorio
+  - AuthController inyecta AuthServiceInterface (ya no la clase concreta)
+- Enforcement mecánico ampliado (LayeringTest): R5 = Presentation no puede importar Application\Services concretos; R6 = toda clase de Application/Services debe implementar una interfaz de su Application/Contracts (verificación por reflexión class_implements, tolerante a autoload)
+- Test de wiring: AuthTest::test_the_auth_service_contract_resolves_the_default_implementation (el contenedor resuelve el contrato a la implementación por defecto)
+- QA local verde: Pint 65 files PASS; PHPStan level 8 sin errores; deptrac 0 violaciones/0 uncovered; Pest 79 passed + 8 warnings PREEXISTENTES (reproducidos con git stash contra HEAD limpio: son ruido ambiental del sandbox, ya presentes en main mergeado con CI verde) / 144 aserciones — incluyen R5, R6 y binding
+- Docs: ADR-12 + nota "Contracts también para los servicios" en 5.2 + versión 1.2 (cabecera y changelog) en AMBAS copias del documento de arquitectura
+
+Stage Summary:
+- PATRÓN COMPLETO: repositorios Y servicios con contracts; Presentation 100 % dependiente de abstracciones; bindings centralizados en el ServiceProvider del módulo
+- CI blindado R0-R6: el build falla si un servicio nace sin contrato o un controller importa la clase concreta
+- Plantilla para Fase 1+: cada servicio nuevo = interfaz en Contracts + implementación en Services + bind en el provider + R5/R6 vigilan
+- BLOQUEO EXTERNO: el PAT de GitHub se perdió con el reset del sandbox (~/.git-credentials vacío); el commit está listo localmente en feat/SGP-2-service-contracts — pendiente push + PR a la espera del PAT del usuario

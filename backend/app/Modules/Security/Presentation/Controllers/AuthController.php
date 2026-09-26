@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Presentation\Controllers;
 
-use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Security\Presentation\Requests\LoginRequest;
 use App\Modules\Security\Presentation\Resources\UserResource;
@@ -14,16 +14,18 @@ use Illuminate\Http\Request;
 /**
  * Authentication HTTP surface (RF-SEG-001).
  *
- * Deliberately thin (ADR-11): validation arrives through
- * LoginRequest, the use cases live in AuthService and all data
- * access sits behind the user repository port. This layer only
- * translates service outcomes into the response envelope
- * (RF-API-002) and nothing else.
+ * Deliberately thin (ADR-11, ADR-12): validation arrives through
+ * LoginRequest, the use cases sit behind the AuthServiceInterface
+ * port and all data access lives in the repository behind it. This
+ * layer only translates service outcomes into the response envelope
+ * (RF-API-002) and nothing else; depending on the contract keeps the
+ * controller unit-testable with a stub and lets decorators be wired
+ * without touching HTTP code.
  */
 final class AuthController
 {
     public function __construct(
-        private readonly AuthService $auth,
+        private readonly AuthServiceInterface $auth,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse

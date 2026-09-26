@@ -24,6 +24,12 @@ use SplFileInfo;
  *     facades, no HTTP classes, no direct Eloquent queries.
  * R3  Domain stays pure: no Eloquent, no HTTP, no facades at all.
  * R4  Infrastructure never reaches back into Presentation.
+ * R5  Presentation consumes use cases through their contracts:
+ *     concrete Application\Services classes are banned there
+ *     (ADR-12).
+ * R6  Every Application service implements an interface from its
+ *     module's Application\Contracts namespace, so the pattern is
+ *     contractual, not conventional (ADR-12).
  */
 final class LayeringTest extends TestCase
 {
@@ -170,5 +176,73 @@ final class LayeringTest extends TestCase
         }
 
         self::assertSame([], $offenders, 'R4 violated: Infrastructure implements ports; it never imports Presentation.');
+    }
+
+    public function test_r5_presentation_consumes_services_through_contracts(): void
+    {
+        $offenders = [];
+
+        foreach ($this->moduleFiles() as [$module, $layer, $file, $contents]) {
+            if ($layer !== 'Presentation') {
+                continue;
+            }
+
+            if (str_contains($contents, 'use App\\Modules\\'.$module.'\\Application\\Services\\')) {
+                $offenders[] = $file->getPathname();
+            }
+        }
+
+        self::assertSame([], $offenders, 'R5 violated: Presentation must depend on service contracts from Application\Contracts, never on concrete Application services.');
+    }
+
+    public function test_r6_every_service_implements_a_module_contract(): void
+    {
+        $offenders = [];
+
+        foreach ($this->moduleFiles() as [$module, $layer, $file]) {
+            if ($layer !== 'Application') {
+                continue;
+            }
+
+            $relative = substr($file->getPathname(), strlen(self::MODULES_ROOT) + 1);
+            $segments = explode('/', $relative);
+
+            if (($segments[2] ?? '') !== 'Services') {
+                continue;
+            }
+
+            $class = 'App\\Modules\\'.$module.'\\Application\\Services\\'.$file->getBasename('.php');
+
+            if (! class_exists($class)) {
+                $offenders[] = $file->getPathname().' (class not autoloadable)';
+
+                continue;
+            }
+
+            $implemented = class_implements($class);
+
+            if (! is_array($implemented)) {
+                $offenders[] = $file->getPathname().' (interfaces could not be resolved)';
+
+                continue;
+            }
+
+            $contractNamespace = 'App\\Modules\\'.$module.'\\Application\\Contracts\\';
+            $hasPort = false;
+
+            foreach ($implemented as $interface) {
+                if (str_starts_with($interface, $contractNamespace)) {
+                    $hasPort = true;
+
+                    break;
+                }
+            }
+
+            if (! $hasPort) {
+                $offenders[] = $file->getPathname();
+            }
+        }
+
+        self::assertSame([], $offenders, "R6 violated: every Application service must implement a contract from its module's Application\\Contracts namespace (ADR-12).");
     }
 }

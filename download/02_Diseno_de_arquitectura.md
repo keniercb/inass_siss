@@ -5,8 +5,8 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Diseño de Arquitectura |
-| Versión | 1.0 |
-| Fecha | 2026-09-22 |
+| Versión | 1.2 |
+| Fecha | 2026-09-26 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Modelo de datos.md` |
 
@@ -146,6 +146,8 @@ Reglas de flujo: los controllers no contienen lógica de negocio ni Eloquent; la
 Eloquent se confina a `Infrastructure`: los modelos mapean tablas, definen relaciones y casts, y materializan entidades de dominio (hidratación manual o mediante mappers delgados del módulo). Las consultas complejas viven en repositorios; los controllers nunca llaman al facade `DB` ni usan `Model::query()` de otro módulo. Este confinamiento es lo que permite probar el dominio (cálculo, estados) sin base de datos y a máxima velocidad.
 
 **Materialización y enforcement (ADR-11, 2026-09-26).** El patrón dejó de ser solo convención: el módulo Security es la plantilla canónica (`Application/Contracts` para los puertos de repositorio, `Application/Services` para los casos de uso, `Application/DTO` para contratos de entrada/salida readonly, `Infrastructure/Persistence` para el único acceso a datos, y controllers que solo validan, delegan y traducen la respuesta). Las 4 capas están esqueletizadas en los 12 módulos (`scripts/gen-modules.php`) y `backend/tests/Architecture/LayeringTest.php` rompe el build en CI cuando alguien consulta la BD desde Presentation, usa facades/HTTP/queries en Application, ensucia Domain con Eloquent o importa Presentation desde Infrastructure. Los modelos viven en `Modules/<M>/Infrastructure/Persistence/Models` (el namespace raíz `App\Models` quedó prohibido y verificado); el binding interfaz → implementación se registra en el `ServiceProvider` de cada módulo.
+
+**Contracts también para los servicios (ADR-12, 2026-09-26).** La misma disciplina se extendió a los casos de uso: cada clase de `Application/Services` expone su interfaz en `Application/Contracts` (`AuthServiceInterface` es la plantilla en Security), los controllers solo conocen esos contratos y el `ServiceProvider` del módulo resuelve el binding por defecto. `LayeringTest` lo blinda con dos reglas adicionales: R5 impide que Presentation importe servicios concretos y R6 rompe el build si aparece un servicio sin contrato, de modo que la frontera HTTP queda completamente invertida (DIP), los controllers se prueban con stubs del caso de uso y decoradores (auditoría, rate limiting, variantes en cola) pueden cablearse sin tocar una línea de código HTTP.
 
 ## 6. Patrones de diseño y correspondencia SOLID
 
@@ -389,6 +391,7 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-09 | Configuración versionada | Singleton mutable | Cambios legales sin perder reproducibilidad histórica (RN-007) |
 | ADR-10 | deptrac en CI | Convención informal | Las fronteras de módulo que no se verifican se erosionan |
 | ADR-11 | Service + Repository materializado en código y verificado con tests de arquitectura | Controllers con lógica y Eloquent embebidos (como quedó la Fase 0) | La separación documentada que no se verifica mecánicamente se erosiona; lección de la revisión de código de Fase 0 |
+| ADR-12 | Contracts también para los servicios: Presentation consume Application solo vía interfaces | Inyectar la clase de servicio concreta en el controller | DIP completo en la frontera HTTP: controllers testeables con stubs del caso de uso y decoradores cableables sin tocar código HTTP; verificado por las reglas R5/R6 del LayeringTest |
 
 ## 17. Control de versiones del documento
 
@@ -396,4 +399,5 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Versión inicial: arquitectura, TDD y plan de fases | Arquitectura Backend |
 | 1.1 | 2026-09-26 | ADR-11: patrón Service + Repository materializado (Security como plantilla canónica) + enforcement con tests de arquitectura | Arq. Backend |
+| 1.2 | 2026-09-26 | ADR-12: contracts para las clases de servicio (`AuthServiceInterface` como plantilla) + reglas R5/R6 en LayeringTest | Arq. Backend |
 

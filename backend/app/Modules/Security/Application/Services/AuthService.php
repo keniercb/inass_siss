@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Application\Services;
 
+use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\DTO\LoginResult;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
@@ -21,7 +22,7 @@ use Illuminate\Contracts\Hashing\Hasher;
  * lifecycle, token scopes) belongs to phase 6 and is tracked there;
  * only basic rate limiting is active now.
  */
-final class AuthService
+final class AuthService implements AuthServiceInterface
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
