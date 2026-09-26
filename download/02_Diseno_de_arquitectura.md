@@ -5,8 +5,8 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo |
 | Documento | Diseño de Arquitectura |
-| Versión | 1.5 |
-| Fecha | 2026-09-26 |
+| Versión | 1.6 |
+| Fecha | 2026-09-27 |
 | Estado | Borrador para revisión del equipo de desarrollo |
 | Documentos relacionados | `Requisitos funcionales.md`, `Modelo de datos.md` |
 
@@ -153,6 +153,8 @@ Eloquent se confina a `Infrastructure`: los modelos mapean tablas, definen relac
 
 **Catálogos como recurso genérico (ADR-15, 2026-09-26).** Los 18 catálogos de la Fase 1 aterrizaron con un patrón de registry: `Catalogs\Application\CatalogRegistry` declara la definición inmutable de cada catálogo uniforme (modelo, columnas, reglas de validación, dependientes que bloquean la desactivación) y de ella beben las tres piezas — los FormRequests arman sus reglas, el `CatalogService` genérico ejecuta los invariantes (unicidad RN-008 anticipada al 422, código inmutable, desactivación lógica bloqueada por referencias activas) y el `EloquentCatalogRepository` resuelve el class-string del modelo. Un solo par de servicio/repositorio con contrato (ADR-11/12) cubre los 16 catálogos uniformes tras `/api/v1/catalogs/{type}`; municipios y agencias tienen servicios propios porque sus claves naturales y reglas difieren (clave compuesta provincia+municipio; coherencia RN-04 garantizada en BD por FK compuesta sobre `municipalities(id, province_id)`, además de la validación de servicio). Los 18 modelos extienden `CatalogModel` (soft delete como desactivación, estampado de autoría por `AuditableObserver` registrado en el provider iterando el registry) y deliberadamente no importan tipos de Security — el autor se expone como id y la bitácora humana llega con RF-AUD-001.
 
+**Configuración general versionada (ADR-16, 2026-09-27).** RN-007 aterrizó en el módulo Settings como la primera lógica de dominio pura del proyecto: `EffectiveSettingsResolver` fija la semántica de vigencia (la versión con mayor `effective_from` menor o igual a la fecha, con la fecha propia incluida) sobre una proyección mínima (`EffectiveSettingCandidate`: id + fecha), testeada con datasets unitarios sin BD; el repositorio materializa la línea de tiempo y el servicio la orquesta con el puerto `ClockInterface` («hoy» nunca se consulta al sistema directamente, la prueba lo congela). El no-solapamiento queda garantizado en BD por `UNIQUE(effective_from)` — fechas distintas particionan el tiempo en vigencias disjuntas —, anticipado al 422 semántico por la sonda del servicio y probado hasta el `QueryException`; el CHECK `max ≥ base` se replica en BD y en validación. Las versiones son inmutables (RF-CAT-005: la corrección crea una vigencia nueva; el recurso no expone update y PATCH responde 405) y solo las vigencias futuras pueden eliminarse (409 `VersionAlreadyEffectiveException`); la FK `pension_cases.calculation_setting_id` de la Fase 3 reforzará la regla en BD. `effective_to` es derivado (día anterior a la siguiente vigencia, null en la más reciente): se calcula en lectura y nunca se desnormaliza.
+
 ## 6. Patrones de diseño y correspondencia SOLID
 
 ### 6.1 Patrones aplicados
@@ -242,6 +244,7 @@ Las escrituras que cruzan agregados ocurren en una transacción de base de datos
 | GET/POST/PATCH/DELETE | `/api/v1/catalogs/{type}` (+ `/{id}`) | `catalogs.view/manage` | CRUD de catálogos uniformes (recurso genérico ADR-15: 16 tipos) |
 | GET/POST/PATCH/DELETE | `/api/v1/municipalities` (+ `/{id}`) | `catalogs.view/manage` | CRUD de municipios con filtro por provincia (RF-CAT-002) |
 | GET/POST/PATCH/DELETE | `/api/v1/agencies` (+ `/{id}`) | `catalogs.view/manage` | CRUD de agencias bancarias con coherencia RN-04 (RF-CAT-003) |
+| GET/POST/DELETE | `/api/v1/general-settings` (+ `/{id}`, `/current?at=…`) | `settings.view/manage` | Configuración general versionada (RF-CAT-005, RN-007): sin update — versiones inmutables; `/current` resuelve la vigencia a una fecha |
 | GET/POST/PATCH | `/api/v1/people` (+ `/{id}`) | `people.*` | CRUD de personas |
 | GET | `/api/v1/people?identity=…` | `people.view` | Búsqueda por identidad |
 | GET/POST/PATCH | `/api/v1/entities`, `/api/v1/offices` | `organizations.*` | Estructura organizacional |
@@ -413,6 +416,7 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | ADR-13 | Documentación OpenAPI generada desde el código (atributos en Presentation + l5-swagger) | Spec YAML/JSON mantenido a mano o externo al repo | El spec manual se desincroniza de las rutas; el generado viaja con cada PR y el test de contrato rompe el build si falta un endpoint |
 | ADR-14 | Campos de auditoría con estampado automático: observer genérico en Shared + puerto `CurrentUserProviderInterface` (impl en Security) | Columnas sueltas rellenadas a mano en cada service | Trazabilidad uniforme (RF-AUD-*) desde la primera tabla (`users`): el actor se resuelve por DIP sin facades en Application y la plantilla queda lista para Fase 1+ con una línea de registro por módulo |
 | ADR-15 | Catálogos uniformes como recurso genérico `/api/v1/catalogs/{type}` dirigido por un registry de definiciones; municipios y agencias con servicios dedicados; coherencia RN-04 por FK compuesta en BD | Un controller+servicio+repositorio por catálogo (≈90 clases repetitivas) o endpoints por tabla | El registry es fuente única para validación, serialización y observadores: agregar un catálogo es una entrada de datos, no código nuevo; 18 tablas comparten 6 piezas de contratos |
+| ADR-16 | Vigencia implícita de la configuración: `UNIQUE(effective_from)` en BD + resolver de dominio puro; versiones inmutables sin update y borrado solo de vigencias futuras; `effective_to` derivado en lectura | `effective_from`/`effective_to` almacenados con solapamiento controlado solo en aplicación (MySQL carece de exclusion constraints) | Con la regla «mayor `effective_from` ≤ fecha», fechas distintas particionan el tiempo: RN-007 queda garantizada por constraint (RN-008) y la semántica vive en un único resolver puro testeado con datasets |
 
 ## 17. Control de versiones del documento
 
@@ -424,4 +428,5 @@ Desarrollo incremental por fases verticales: cada fase entrega valor verificable
 | 1.3 | 2026-09-26 | ADR-13: documentación interactiva de la API con OpenAPI/Swagger (spec desde atributos + test de contrato ApiDocsTest) | Arq. Backend |
 | 1.4 | 2026-09-26 | ADR-14: campos de auditoría en `users` (`created_by`/`updated_by` FK autoreferencial + `deleted_at`) con estampado automático (`AuditableObserver` en Shared + `CurrentUserProviderInterface`); entrada `users` actualizada en el Modelo de datos | Arq. Backend |
 | 1.5 | 2026-09-26 | ADR-15: catálogos de la Fase 1 (18 tablas, CRUD `/api/v1/catalogs/{type}` genérico + `/municipalities` + `/agencies`, seeders Cuba 15/168 idempotentes, FK compuesta RN-04); tabla de endpoints actualizada | Arq. Backend |
+| 1.6 | 2026-09-27 | ADR-16: configuración general versionada RN-007 (módulo Settings: tabla `general_settings` con `effective_from` UNIQUE + CHECK `max ≥ base`, resolver de dominio puro con datasets, `/api/v1/general-settings` sin update por inmutabilidad, `/current?at=…` resuelve la vigencia, borrado solo de vigencias futuras 409); entrada `general_settings` actualizada en el Modelo de datos | Arq. Backend |
 

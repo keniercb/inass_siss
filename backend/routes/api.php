@@ -6,6 +6,7 @@ use App\Modules\Catalogs\Presentation\Controllers\AgencyController;
 use App\Modules\Catalogs\Presentation\Controllers\CatalogController;
 use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
+use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,4 +48,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->only(['index', 'show', 'store', 'update', 'destroy']);
     Route::apiResource('agencies', AgencyController::class)
         ->only(['index', 'show', 'store', 'update', 'destroy']);
+
+    // Configuración general versionada (Fase 1, RF-CAT-005/RN-007):
+    // versions are immutable, so the resource deliberately exposes no
+    // update endpoint — corrections create a new vigencia. `current`
+    // resolves the domain action (greatest effective_from <= date).
+    Route::get('/general-settings/current', [GeneralSettingsController::class, 'current'])
+        ->name('general-settings.current');
+    Route::apiResource('general-settings', GeneralSettingsController::class)
+        ->only(['index', 'show', 'store', 'destroy']);
 });

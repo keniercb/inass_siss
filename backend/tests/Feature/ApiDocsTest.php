@@ -28,10 +28,18 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths'])->toHaveKey('/api/v1/municipalities/{id}')
             ->and($spec['paths'])->toHaveKey('/api/v1/agencies')
             ->and($spec['paths'])->toHaveKey('/api/v1/agencies/{id}')
+            // Configuración general versionada (Fase 1, RF-CAT-005/RN-007).
+            ->and($spec['paths'])->toHaveKey('/api/v1/general-settings')
+            ->and($spec['paths'])->toHaveKey('/api/v1/general-settings/current')
+            ->and($spec['paths'])->toHaveKey('/api/v1/general-settings/{id}')
             ->and($spec['paths']['/api/v1/catalogs/{type}']['get']['security'])->toBe([['sanctumAuth' => []]])
             ->and($spec['paths']['/api/v1/catalogs/{type}'])->toHaveKeys(['get', 'post'])
             ->and($spec['paths']['/api/v1/catalogs/{type}/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
-            ->and($spec['paths']['/api/v1/municipalities']['get']['tags'])->toBe(['Catalogs']);
+            ->and($spec['paths']['/api/v1/municipalities']['get']['tags'])->toBe(['Catalogs'])
+            ->and($spec['paths']['/api/v1/general-settings'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/general-settings/{id}'])->toHaveKeys(['get', 'delete'])
+            ->and($spec['paths']['/api/v1/general-settings/current']['get']['tags'])->toBe(['Settings'])
+            ->and($spec['paths']['/api/v1/general-settings/current']['get']['security'])->toBe([['sanctumAuth' => []]]);
     });
 
     it('documents the catalog schemas and shared error components', function () {
@@ -40,6 +48,9 @@ describe('API documentation (Swagger)', function () {
         expect($spec['components']['schemas']['CatalogItem']['properties']['name']['type'])->toBe('string')
             ->and($spec['components']['schemas']['Municipality']['properties']['code']['type'])->toBe('string')
             ->and($spec['components']['schemas']['Agency']['properties']['municipality']['type'])->toBe('object')
+            ->and($spec['components']['schemas']['GeneralSettingVersion']['properties']['min_work_years']['type'])->toBe('integer')
+            ->and($spec['components']['schemas']['GeneralSettingVersion']['properties']['effective_from']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['GeneralSettingVersion']['properties']['effective_to']['type'])->toBe('string')
             ->and($spec['components']['responses']['Unauthorized']['description'])->toBeString()
             ->and($spec['components']['responses']['ValidationError']['description'])->toBeString()
             ->and($spec['components']['schemas']['User']['properties']['email']['type'])->toBe('string');
