@@ -27,4 +27,5 @@ use OpenApi\Attributes as OA;
     description: 'Token Bearer personal emitido por POST /api/v1/auth/login (Sanctum).',
 )]
 #[OA\Tag(name: 'Auth', description: 'Autenticación y sesión (RF-SEG-001)')]
+#[OA\Tag(name: 'Catalogs', description: 'Catálogos uniformes, municipios y agencias (RF-CAT-001..006)')]
 final class ApiDoc {}

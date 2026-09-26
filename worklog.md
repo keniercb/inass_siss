@@ -269,7 +269,7 @@ Work Log:
 - QA local verde: Pint, PHPStan nivel 8 (0 errores), deptrac 0 violaciones/0 uncovered, Pest 188 tests/581 aserciones 0 fallos (warnings ambientales preexistentes)
 - Verificación HTTP real (artisan serve): login → 15 provincias, 168 municipios con provincia anidada, Isla de la Juventud province null, spec OpenAPI con las 6 rutas nuevas
 - Docs: ADR-15 + nota en 5.2 + endpoints actualizados + v1.5 en AMBAS copias
-- Dos incidentes del daemon recuperados: (1) `git checkout -- .` tras recuperar la rama descartó la entrada 10 del worklog no confirmada; (2) un amend aterrizó sobre main al moverse HEAD entre invocaciones — main re-reseteado a origin/main (verificado byte a byte) y el worklog re-confirmado en la rama
+- Tres incidentes del daemon recuperados: (1) `git checkout -- .` tras recuperar la rama descartó la entrada 10 del worklog no confirmada; (2) un amend aterrizó sobre main al moverse HEAD entre invocaciones — main re-reseteado a origin/main y el worklog re-confirmado en la rama; (3) el mismo `checkout -- .` también había revertido a la versión de main cinco archivos rastreados (routes/api.php, CatalogsServiceProvider, DatabaseSeeder, ApiDoc, ApiDocsTest) que se commitearon en viejo y rompieron 29 tests — detectado con git worktree estable (/home/z/qa-wt, inmune a los flips), restaurados y re-verificados (188/188 en verde) en commit e5f521c
 
 Stage Summary:
 - FASE 1 ARRANCADA (Sprint 2.1-S2.4): CRUD de catálogos operativo con datos oficiales de Cuba sembrados, auditoría de autoría estampada desde la primera tabla de catálogo y contrato de documentación ampliado
