@@ -87,3 +87,33 @@ Stage Summary:
 - Cobertura del módulo Shared en CI: Money 95,2 % / Period 96,4 % / SystemClock 100 % / CubanIdentityNumber alto
 - Único DoD pendiente: docker compose up verificado por 2 devs (requiere Docker, no disponible en sandbox) — queda como primera tarea del equipo
 - Fase 0 cerrada; pendiente revisión con el usuario y decisión de arranque de Fase 1
+
+---
+Task ID: 6
+Agent: Super Z (agente principal)
+Task: Refactor del patrón Service + Repository — la revisión de código detectó que no se empleaban services ni repositories; separar lógica de negocio y acceso a datos de la capa de controllers y adoptarlo como patrón obligatorio para todo el desarrollo
+
+Work Log:
+- Patrón implementado en módulo Security (plantilla canónica conforme a secciones 4-6 de la arquitectura):
+  - Application/Contracts/UserRepositoryInterface (puerto: findByEmail, issueAccessToken, revokeCurrentAccessToken)
+  - Application/Services/AuthService (login/logout; Hasher inyectado como contrato en vez de facade)
+  - Application/DTO/LoginResult (readonly: user + token)
+  - Infrastructure/Persistence/EloquentUserRepository (único punto de acceso a users/personal_access_tokens)
+  - Infrastructure/Persistence/Models/User (movido desde app/Models; newFactory() + docblock @property)
+  - AuthController delgado: valida (LoginRequest) → delega en AuthService → null→401 / LoginResult→envelope RF-API-002
+  - SecurityServiceProvider: bind UserRepositoryInterface → EloquentUserRepository (DIP)
+- Enforcement: tests/Architecture/LayeringTest (R0-R4: sin App\Models raíz; Presentation no consulta BD; Application sin facades/HTTP/queries; Domain puro; Infrastructure no importa Presentation) + testsuite "Architecture" en phpunit.xml
+- Tests: AuthServiceTest (4 tests unitarios sin BD ni contenedor, con InMemoryUserRepository + BcryptHasher rounds=4)
+- scripts/gen-modules.php actualizado con estructura completa de 4 capas + .gitkeep y ejecutado (12 módulos; Shared con layout propio)
+- Imports actualizados: UserResource, AuthTest, UserFactory (+$model explícito), DemoUserSeeder, config/auth.php; app/Models eliminado
+- Bug real encontrado y corregido por los tests: instanceof contra Laravel\Sanctum\AccessToken (clase inexistente en Sanctum 4; la correcta es PersonalAccessToken) — el archivo estaba excluido de PHPStan por diseño; Pest lo detectó vía el test de revocación de token
+- Incidentes del sandbox recuperados: (1) sesión rota con fallo persistente de herramientas (403) al iniciar el QA — trabajo persistido en disco y reanudado; (2) el daemon auto-commitó el refactor a main (4f1c186) y luego revierte HEAD/árbol a 9cac1a2 ENTRE llamadas de herramientas — mitigación: scripts atómicos de una sola invocación (scripts/fix-and-push.sh, scripts/docs-adr11.sh) y push inmediato al remoto
+- QA final: Pint ✓, PHPStan 8 ✓, deptrac 0 violaciones/0 uncovered ✓, Pest 84 tests/141 assertions ✓ vs MySQL 8.4 real
+- Commit 5e27e60 en rama feat/SGP-1-service-repository (push), PR #2 creado
+- Docs: ADR-11 + nota de materialización en sección 5.2 + versión 1.1 en ambas copias del documento de arquitectura
+
+Stage Summary:
+- Patrón Service + Repository adoptado como obligatorio y verificado mecánicamente en CI (LayeringTest falla el build si se erosiona)
+- Plantilla canónica en Security; 12 módulos esqueletizados con las 4 capas para Fase 1+
+- Contrato HTTP intacto (AuthTest sin cambios de comportamiento): refactor sin impacto funcional
+- PR #2: https://github.com/keniercb/inass_siss/pull/2
