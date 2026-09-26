@@ -276,3 +276,23 @@ Stage Summary:
 - Plantilla escalable: agregar un catálogo uniforme = una entrada en el registry + una migración + un modelo (el resto ya está cableado)
 - BLOQUEO EXTERNO: falta el PAT de GitHub (perdido con el reset del sandbox) para push/PR del branch feat/SGP-5-catalogos
 - Pendiente del sprint 2: configuración versionada general_settings (RN-007) + numbering_sequences con bloqueo pesimista y test de concurrencia (RN-009); sprint 3: personas, RBAC y bitácora
+
+---
+Task ID: 10-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de los catálogos de la Fase 1 Sprint 2 — PR #6, CI y merge a main
+
+Work Log:
+- PAT de GitHub re-provisionado por el usuario tras el reset del sandbox; credenciales restauradas en ~/.git-credentials (store helper, permisos 600)
+- Limpieza del estado tras la pausa: el daemon había aterrizado el worklog/entrada 10 + docs v1.5 como commit suelto cb334e8 sobre main local (mensaje UUID); verificado byte a byte que su contenido era idéntico al de la rama (diff vacío en worklog + download/) y main re-reseteado a origin/main sin pérdida
+- QA local re-validado en el worktree estable /home/z/qa-wt antes del push: Pint 146 files PASS, PHPStan 8 0 errores, deptrac 0 violaciones/0 uncovered, Pest 188 tests/581 aserciones 0 fallos (55 warnings ambientales preexistentes)
+- feat/SGP-5-catalogos (tip c824e02) empujado a origin; PR #6 creado por API: https://github.com/keniercb/inass_siss/pull/6
+- CI del PR #6: SUCCESS — job "Quality gate (PHP 8.3)" (Pint → PHPStan 8 → deptrac → Pest vs MySQL 8.4 real → gates de cobertura 80/95 → build Docker)
+- PR #6 squash-mergeeado a main como d5c73c0f (4 commits de la rama condensados con mensaje de alcance completo); main local sincronizado
+- BLOQUEO EXTERNO RESUELTO: el push/PR/merge pendiente de la entrada 10 quedó desbloqueado con el nuevo PAT
+
+Stage Summary:
+- ADR-15 CERRADO EN MAIN: los 18 catálogos operativos con el recurso genérico /api/v1/catalogs/{type}, semilla oficial de Cuba (15 provincias + 168 municipios) y auditoría de autoría estampada
+- Fase 1 Sprint 2 parte 1 completa; plantilla de catálogo escalable lista para los módulos de negocio
+- Siguiente: sprint 2 parte 2 — configuración versionada general_settings (RN-007) + numbering_sequences con bloqueo pesimista y test de concurrencia (RN-009); sprint 3: personas, RBAC y bitácora
+- Higiene del sandbox: PAT de desarrollo vigente — recordar al usuario rotarlo al cerrar la etapa de desarrollo
