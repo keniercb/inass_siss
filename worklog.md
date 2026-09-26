@@ -196,3 +196,17 @@ Stage Summary:
 - Contrato de documentación en CI: ApiDocsTest rompe el build si un endpoint publicado no aparece en el spec o la UI se rompe
 - Plantilla para Fase 1+: cada endpoint nuevo = atributos OA en la acción + schema en el Resource; ApiDocsTest obliga a mantenerlo
 - DoD de documentación listo para cuando lleguen más módulos; endurecimiento de la UI en producción queda en Fase 6
+
+---
+Task ID: 8-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de la documentación Swagger — PR #4, CI y merge a main
+
+Work Log:
+- PR #4 creado con la plantilla del repo y CI SUCCESS (job "Quality gate (PHP 8.3)": Pint, PHPStan 8, deptrac, Pest vs MySQL 8.4 con ApiDocsTest incluido, gates de cobertura, Docker)
+- PR #4 squash-mergeeado a main (48a7895e) y main local sincronizado; rama local borrada
+
+Stage Summary:
+- ADR-13 CERRADO EN MAIN: /api/documentation (UI Swagger) y /api/docs (spec OpenAPI 3) operativos; la documentación vive con el código y CI la verifica (ApiDocsTest)
+- El sandbox local quedó verificando por HTTP real la UI completa (assets + try-it-out de login contra MySQL 13306)
+- Fase 1 dispondrá de documentación automática desde el primer endpoint nuevo
