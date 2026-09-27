@@ -40,8 +40,9 @@ final class AgencyApiTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
-        $this->actingAs($this->user);
+        // Admin role: catalog/settings management is admin-exclusive in
+        // the PermissionMatrix (RF-SEG-002), so CRUD suites act as admin.
+        $this->user = $this->actingAsRole('admin');
 
         $this->holguin = Province::query()->create(['code' => '12', 'name' => 'Holguín']);
         $this->santiago = Province::query()->create(['code' => '14', 'name' => 'Santiago de Cuba']);

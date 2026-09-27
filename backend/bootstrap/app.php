@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Security\Presentation\Middleware\EnsurePermission;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // framework's default guest redirect to a "login" route that does
         // not exist here; the exception is rendered as JSON 401 below.
         $middleware->redirectGuestsTo(fn () => null);
+
+        // Route-level RBAC (RF-SEG-002, ADR-18): protected routes declare
+        // `permission:modulo.accion` and the Security-owned guard resolves
+        // it against the spatie tables seeded from the PermissionMatrix.
+        $middleware->alias([
+            'permission' => EnsurePermission::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API-only backend (RF-API-002): unauthenticated requests under
