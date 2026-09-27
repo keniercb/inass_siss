@@ -14,6 +14,7 @@ use App\Modules\Settings\Infrastructure\Persistence\MysqlSequenceGenerator;
 use App\Modules\Settings\Presentation\Console\EmitSequenceCommand;
 use App\Modules\Shared\Contracts\SequenceGeneratorInterface;
 use App\Modules\Shared\Support\AuditableObserver;
+use App\Modules\Shared\Support\AuditTrailObserver;
 use Illuminate\Support\ServiceProvider;
 
 final class SettingsServiceProvider extends ServiceProvider
@@ -63,6 +64,10 @@ final class SettingsServiceProvider extends ServiceProvider
         // settings version are stamped by the Shared observer, so the
         // "who froze these parameters" trail exists from day one.
         GeneralSetting::observe(AuditableObserver::class);
+
+        // Activity trail (RF-AUD-001, ADR-19): every settings write is
+        // recorded in the append-only bitácora with old and new values.
+        GeneralSetting::observe(AuditTrailObserver::class);
 
         // ADR-17: emission probe used by the concurrency test and by
         // operations (each run burns real numbers, RN-009).

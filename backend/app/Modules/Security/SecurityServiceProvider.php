@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Security;
 
+use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
 use App\Modules\Shared\Support\AuditableObserver;
+use App\Modules\Shared\Support\AuditTrailObserver;
 use Illuminate\Support\ServiceProvider;
 
 final class SecurityServiceProvider extends ServiceProvider
@@ -43,6 +46,13 @@ final class SecurityServiceProvider extends ServiceProvider
             CurrentUserProviderInterface::class,
             AuthenticatedUserIdProvider::class,
         );
+
+        // Audit trail read port (RF-AUD-003, ADR-19): the bitácora is
+        // append-only, so the query surface is the single contract.
+        $this->app->bind(
+            AuditLogQueryInterface::class,
+            EloquentAuditLogQuery::class,
+        );
     }
 
     public function boot(): void
@@ -51,5 +61,9 @@ final class SecurityServiceProvider extends ServiceProvider
         // the container on each model event, so the actor port above is
         // injected transparently into every created_by/updated_by stamp.
         User::observe(AuditableObserver::class);
+
+        // Activity trail (RF-AUD-001, ADR-19): user account writes land
+        // in the append-only bitácora too (toda escritura crítica).
+        User::observe(AuditTrailObserver::class);
     }
 }

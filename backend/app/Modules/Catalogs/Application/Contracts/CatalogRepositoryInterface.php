@@ -93,4 +93,11 @@ interface CatalogRepositoryInterface
      * Logically deactivates the entry (soft delete, RF-CAT-001).
      */
     public function deactivate(CatalogModel $model): void;
+
+    /**
+     * Restores a logically deactivated entry (RF-AUD-004): fires the
+     * restored model event so the activity trail records who brought
+     * the row back.
+     */
+    public function restore(CatalogModel $model): void;
 }

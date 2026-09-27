@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalogs\Presentation\Controllers;
 
 use App\Modules\Catalogs\Application\Contracts\CatalogServiceInterface;
+use App\Modules\Catalogs\Application\Exceptions\CatalogEntryNotDeletedException;
 use App\Modules\Catalogs\Application\Exceptions\CatalogHasActiveReferencesException;
 use App\Modules\Catalogs\Application\Exceptions\UnknownCatalogException;
 use App\Modules\Catalogs\Presentation\Requests\CatalogIndexRequest;
@@ -279,5 +280,58 @@ final class CatalogController
         }
 
         return response()->json(['message' => 'Catalog entry deactivated.']);
+    }
+
+    #[OA\Post(
+        path: '/api/v1/catalogs/{type}/{id}/restore',
+        operationId: 'catalogRestore',
+        tags: ['Catálogos'],
+        summary: 'Restaurar una entrada desactivada',
+        description: 'Devuelve a la vida una entrada lógicamente desactivada (RF-AUD-004). La restauración es exclusiva del rol con permiso catalogs.manage (Administrador) y queda registrada en la bitácora con autor, fecha y valores restaurados.',
+        security: [['sanctumAuth' => []]],
+        parameters: [
+            new OA\PathParameter(name: 'type', required: true, schema: new OA\Schema(type: 'string', example: 'races')),
+            new OA\PathParameter(name: 'id', required: true, schema: new OA\Schema(type: 'integer', format: 'int64', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Entrada restaurada',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'message', type: 'string', example: 'Catalog entry restored.')],
+                ),
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Sin permiso catalogs.manage',
+                content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string', example: 'Forbidden.')]),
+            ),
+            new OA\Response(
+                response: 404,
+                description: 'Catálogo desconocido o entrada inexistente',
+                content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string', example: 'Not Found')]),
+            ),
+            new OA\Response(
+                response: 409,
+                description: 'La entrada ya está activa',
+                content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string', example: 'The catalog entry is already active: only deactivated entries can be restored.')]),
+            ),
+        ],
+    )]
+    public function restore(string $type, int $id): JsonResponse
+    {
+        try {
+            $restored = $this->catalogs->restore($type, $id);
+        } catch (UnknownCatalogException) {
+            abort(404, "Unknown catalog [{$type}].");
+        } catch (CatalogEntryNotDeletedException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        if (! $restored) {
+            abort(404, 'Catalog entry not found.');
+        }
+
+        return response()->json(['message' => 'Catalog entry restored.']);
     }
 }

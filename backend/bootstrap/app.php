@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Security\Presentation\Middleware\AssignRequestId;
 use App\Modules\Security\Presentation\Middleware\EnsurePermission;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -27,6 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => EnsurePermission::class,
         ]);
+
+        // Activity trail correlation (RF-AUD-001, ADR-19): every request
+        // carries a request_id that the AuditTrailObserver stamps on
+        // each activity row (forwarded X-Request-Id or fresh UUID).
+        $middleware->append(AssignRequestId::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API-only backend (RF-API-002): unauthenticated requests under

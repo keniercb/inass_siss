@@ -146,4 +146,9 @@ final class EloquentCatalogRepository implements CatalogRepositoryInterface
     {
         $model->delete();
     }
+
+    public function restore(CatalogModel $model): void
+    {
+        $model->restore();
+    }
 }

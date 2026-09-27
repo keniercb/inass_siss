@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalogs\Application\Contracts;
 
+use App\Modules\Catalogs\Application\Exceptions\CatalogEntryNotDeletedException;
 use App\Modules\Catalogs\Application\Exceptions\CatalogHasActiveReferencesException;
 use App\Modules\Catalogs\Application\Exceptions\UnknownCatalogException;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
@@ -63,4 +64,13 @@ interface CatalogServiceInterface
      * @throws CatalogHasActiveReferencesException
      */
     public function deactivate(string $type, int $id): bool;
+
+    /**
+     * Restores a logically deactivated entry (RF-AUD-004): audited by
+     * the Shared AuditTrailObserver through the restored event.
+     *
+     * @throws UnknownCatalogException
+     * @throws CatalogEntryNotDeletedException when the entry is already active
+     */
+    public function restore(string $type, int $id): bool;
 }
