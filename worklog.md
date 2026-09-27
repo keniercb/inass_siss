@@ -406,3 +406,22 @@ Stage Summary:
 - La matriz como dataset de Pest anticipa la fase 6: extenderla es añadir filas, no tocar consumidores
 - audit.view/audit.export ya sembrados para el siguiente slice (bitácora RF-AUD-003)
 - Pendiente del sprint: bitácora transversal (PR siguiente), People (S3.1-S3.3), usuario↔persona + restricción por estado (S3.5)
+
+---
+Task ID: 13-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del RBAC base — PR #9, CI y merge a main
+
+Work Log:
+- PR #9 creado por API: https://github.com/keniercb/inass_siss/pull/9 (rama feat/SGP-8-rbac, tip dddec958, 3 commits atómicos: feature + docs ADR-18 + worklog Task 13)
+- CI del PR #9: SUCCESS — job "Quality gate (PHP 8.3)" completo sobre el pull_request de dddec958 (Pint, PHPStan 8, deptrac 0/0, Pest 305 tests vs MySQL 8.4 del runner, gates de cobertura con pcov y build Docker)
+- PR #9 squash-mergeeado a main como aacc989f con mensaje de alcance completo; push-run de main sobre aacc989f: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota y local eliminadas
+- Incidente del daemon documentado en Task 13: el reset --hard de la corrección de rama descartó edits de docs no confirmados; recuperados regenerándolos y confirmándolos en la misma invocación que el checkout verificado
+
+Stage Summary:
+- ADR-18 CERRADO EN MAIN: RF-SEG-002/S3.4 operativos de extremo a extremo — PermissionMatrix de dominio puro → RolesAndPermissionsSeeder idempotente → spatie/laravel-permission 6.25 → middleware permission: en las rutas existentes (lectura *.view / escritura *.manage) → /auth/me con roles y permisos
+- Matriz rol-permiso como dataset de Pest (S3.4): cada celda es un criterio de aceptación ejecutable que anticipa la matriz completa de la fase 6
+- audit.view/audit.export sembrados y listos para el siguiente slice
+- SIGUIENTE: bitácora transversal (RF-AUD-001/003/004, RNF-005) con spatie/laravel-activitylog + observers, y luego People (S3.1-S3.3) que cerrará RF-PER-002 sobre la bitácora ya instalada
+- Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
