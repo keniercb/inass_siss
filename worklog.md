@@ -448,3 +448,22 @@ Stage Summary:
 - RF-AUD-004 CERRADO para el recurso genérico de catálogos: restauración admin-exclusiva y auditada (la extensión a municipios/agencias/people sigue el mismo patrón cuando toque)
 - RF-PER-002 queda SERVIDO para el slice de People: la edición de personas auditará valores previos desde el día uno
 - Pendiente del sprint: People (S3.1-S3.3), usuario↔persona + restricción por estado (S3.5)
+
+---
+Task ID: 14-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de la bitácora transversal — PR #10, CI y merge a main
+
+Work Log:
+- PR #10 creado por API: https://github.com/keniercb/inass_siss/pull/10 (rama feat/SGP-9-bitacora, tip 4f69554, 3 commits atómicos: feature + docs ADR-19 + worklog Task 14)
+- CI del PR #10: SUCCESS — job "Quality gate (PHP 8.3)" sobre el pull_request de 4f69554 (Pint, PHPStan 8, deptrac 0/0, Pest 321 tests vs MySQL 8.4 del runner, gates de cobertura con pcov incluida la exclusión documentada del observer en el scope Shared, build Docker)
+- PR #10 squash-mergeeado a main como 4e2b512 con mensaje de alcance completo; push-run de main sobre 4e2b512: SUCCESS
+- main local sincronizado; rama remota y local eliminadas
+- Incidentes del daemon (2): HEAD volteado a main entre invocaciones hizo aterrizar commits en main; recuperados con ff-merge y cherry-pick a la rama, y main restaurado con reset/branch -f — contramedida reforzada: checkout con bucle de reintentos + verificación inmediata + branch -f para reset sin checkout
+
+Stage Summary:
+- ADR-19 CERRADO EN MAIN: RF-AUD-001/003 y RNF-005 operativos de extremo a extremo — toda escritura crítica (catálogos, municipios, agencias, configuración, usuarios) aterriza en la bitácora append-only con autor, valores previos/nuevos y request_id; consulta filtrable + export CSV para el Auditor
+- RF-AUD-004 operativo para el recurso genérico de catálogos (restauración admin-exclusiva y auditada); el patrón se extiende a People/municipios/agencias cuando toque
+- FASE 1 SPRINT 3: 2 de 4 slices completos (RBAC PR #9 + bitácora PR #10)
+- SIGUIENTE: People (S3.1-S3.3: migración+dominio, validador RN-001 en requests, búsqueda RF-PER-004, duplicados RF-PER-005, fallecimiento RF-PER-003 con auditoría ya instalada) y luego usuario↔persona + restricción por estado (S3.5)
+- Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
