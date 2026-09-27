@@ -548,3 +548,26 @@ Stage Summary:
 - FASE 1 SPRINT 3: 3 de 4 slices completos (RBAC PR #9 + bitácora PR #10 + People PR #11) — este fix es higiene de documentación entre slices
 - SIGUIENTE: S3.5 — asociación usuario↔persona con unicidad (RF-SEG-004, FK users.person_id reservada) y restricción de acciones por estado de persona (RF-SEG-003); tras ello, Sprint 4 (Organizations)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 17
+Agent: Super Z (agente principal)
+Task: Sprint 3 cierre — S3.5 asociación usuario↔persona (RF-SEG-004) + regla de estado (RF-SEG-003) + enriquecimiento de /auth/me, en rama feat/SGP-12-user-person-link
+
+Work Log:
+- Evidencia previa verificada: /auth/me YA exponía roles y permisos efectivos desde la PR #9 (ADR-18, test test_me_endpoint_returns_roles_and_permissions en verde); el gap real de S3.5 era la persona natural vinculada — el pedido «enriquecer /auth/me» se materializa como bloque person de sesión
+- Requisitos extraídos: RF-SEG-004 (todo usuario puede vincularse a una persona registrada para trazabilidad), RF-SEG-003 (restricción de acciones por estado: p. ej. fallecida no inicia expediente), modelo de datos 5.4 USERS.person_id «NULL, unico» ya reservado, ruleset deptrac Security→People ya permitido
+- TDD ROJA→VERDE: 17 fallos exactos antes de implementar (columna inexistente, método inexistente, rutas/tags ausentes); UserPersonLinkTest (13 tests: happy path con resumen person, idempotencia misma pareja, 409 con persona/cuenta dueña/linked_to_user_id, 422 exists, 404 user, 403 operator/auditor sin users.manage, me con persona fallecida deceased=true, me person null, unlink idempotente, auditoría con valor previo person_id en link y unlink, backstop BD UNIQUE con QueryException) + PersonProcessEligibilityTest (4 tests: viva true, fallecida false, desactivada false, inexistente InvalidArgumentException) + ApiDocsTest ampliado (6 tags exactos, paths users/{id}/person post+delete, schema LinkedPerson, property person en User)
+- Migración 2026_09_28_100000_add_person_id_to_users_table: person_id NULL + UNIQUE + FK→people RESTRICT; el UNIQUE cubre cuentas desactivadas (la persona queda reservada, espejo de la reserva de identidad RN-001)
+- Dominio/Aplicación: UserServiceInterface + UserService (idempotencia y conflicto como reglas de Application, defense in depth; PersonAlreadyLinkedException 409 con person_id + linked_to_user_id); UserRepositoryInterface extendido (findById, findOwnerOfPerson con withTrashed para reflejar la reserva exacta de BD, linkPerson, unlinkPerson) + Eloquent + InMemory fake; PeopleService::canStartNewProcess (viva Y activa; findByIdIncludingDeactivated distingue desactivada de inexistente) — capacidad que PensionCases (F3) consumirá
+- Presentación: UserController (POST/DELETE /users/{id}/person con OA completo, 409/404/403/422 documentados), LinkPersonRequest (exists:people,id), LinkedPersonResource (schema LinkedPerson: id, identity_number, full_name compuesto, deceased derivado), UserResource con person nullable, tag «Usuarios» en ApiDoc, rutas bajo permission:users.manage
+- Relación User::person() con withTrashed: una persona desactivada sigue registrada y el vínculo sigue vigente
+- Bugs reales detectados por el flujo: InvalidArgumentException sin import en namespace (Error en runtime); el guard de test retiene la instancia en memoria tras update directo en BD (fix refresh() in-place); PHPStan exigió @throws \InvalidArgumentException con barra y offsets properties con ?? null (patrón de PersonCrudApiTest)
+- QA local en verde: Pint PASS (22 files), PHPStan 8 — 0 errores (144 archivos), deptrac 0 violaciones/0 uncovered (Security→People permitido por diseño), Pest 430 tests/1327 aserciones/0 fallos vs MySQL 8.4 real (216 warnings ambientales preexistentes); cobertura y build Docker delegadas al runner del CI
+- Docs: ADR-21 + fila de endpoints users + changelog v1.11 en AMBAS copias de arquitectura; entrada users.person_id con semántica de reserva + changelog v1.6 en AMBAS copias del modelo de datos; S3.5 marcado completo + changelog v1.3 en el plan
+
+Stage Summary:
+- RF-SEG-004 CERRADO EN CÓDIGO: asociación usuario↔persona con unicidad de Application + constraint BD (reserva sobre cuentas desactivadas), link/unlink idempotentes y auditados con 409 conversacional
+- RF-SEG-003 MATERIALIZADO COMO CAPACIDAD: canStartNewProcess (viva+activa) listo para el consumo de PensionCases (F3); la matriz completa de la sección 2.4 llega en Fase 6
+- /auth/me COMPLETO COMO SUPERFICIE DE SESIÓN: identidad de cuenta, roles, permisos efectivos y persona natural vinculada (LinkedPerson con estado derivado deceased)
+- SPRIN 3: 4 de 4 slices completos con este PR (RBAC + bitácora + People + usuario↔persona/estado)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo

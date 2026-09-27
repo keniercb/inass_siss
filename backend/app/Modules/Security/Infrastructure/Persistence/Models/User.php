@@ -2,6 +2,7 @@
 
 namespace App\Modules\Security\Infrastructure\Persistence\Models;
 
+use App\Modules\People\Infrastructure\Persistence\Models\Person;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,8 +30,10 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $name
  * @property string $email
  * @property string $password
+ * @property int|null $person_id
  * @property int|null $created_by
  * @property int|null $updated_by
+ * @property Person|null $person
  * @property CarbonImmutable|null $deleted_at
  */
 class User extends Authenticatable
@@ -73,6 +76,18 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Natural person behind the account (S3.5, RF-SEG-004): every
+     * user may link to one registered person for action
+     * traceability; the association is unique at the database level.
+     * withTrashed: a deactivated person stays registered (its
+     * identity is reserved), so the link keeps pointing at it.
+     */
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'person_id')->withTrashed();
     }
 
     /**

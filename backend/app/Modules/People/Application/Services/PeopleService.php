@@ -16,6 +16,7 @@ use App\Modules\Shared\Contracts\ClockInterface;
 use DateTimeImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * Use cases for the People module (RF-PER-001..005).
@@ -143,6 +144,23 @@ final class PeopleService implements PeopleServiceInterface
     public function get(int $id): ?Person
     {
         return $this->people->find($id);
+    }
+
+    public function canStartNewProcess(int $personId): bool
+    {
+        // Including deactivated rows: the probe must tell a
+        // deactivated person (fails eligibility) apart from a
+        // nonexistent one (caller error).
+        $person = $this->people->findByIdIncludingDeactivated($personId);
+
+        if ($person === null) {
+            throw new InvalidArgumentException("Person [{$personId}] not found.");
+        }
+
+        // RF-SEG-003: only living, active people may start new
+        // processes. Being deceased is derived from death_date;
+        // being deactivated is the soft-delete boundary.
+        return $person->death_date === null && $person->deleted_at === null;
     }
 
     public function delete(int $id): bool

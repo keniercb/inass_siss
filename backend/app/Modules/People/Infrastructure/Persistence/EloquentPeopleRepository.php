@@ -77,6 +77,11 @@ final class EloquentPeopleRepository implements PeopleRepositoryInterface
         return Person::query()->find($id);
     }
 
+    public function findByIdIncludingDeactivated(int $id): ?Person
+    {
+        return Person::withTrashed()->find($id);
+    }
+
     public function findByIdentityNumber(string $identityNumber): ?Person
     {
         // withTrashed on purpose (RN-001): the identity of a

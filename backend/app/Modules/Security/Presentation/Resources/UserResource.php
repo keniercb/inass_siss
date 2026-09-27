@@ -30,6 +30,12 @@ use OpenApi\Attributes as OA;
             description: 'Permisos efectivos (de roles y directos), orden alfabético',
             items: new OA\Items(type: 'string', example: 'people.create'),
         ),
+        new OA\Property(
+            property: 'person',
+            nullable: true,
+            description: 'Persona del registro único vinculada a la cuenta (RF-SEG-004); null mientras no exista asociación',
+            ref: '#/components/schemas/LinkedPerson',
+        ),
     ],
 )]
 final class UserResource extends JsonResource
@@ -45,6 +51,7 @@ final class UserResource extends JsonResource
             'email' => $this->email,
             'roles' => $this->getRoleNames()->sort()->values()->all(),
             'permissions' => $this->getAllPermissions()->pluck('name')->sort()->values()->all(),
+            'person' => $this->person !== null ? new LinkedPersonResource($this->person) : null,
         ];
     }
 }

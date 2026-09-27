@@ -8,6 +8,7 @@ use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
 use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
+use App\Modules\Security\Presentation\Controllers\UserController;
 use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -136,4 +137,19 @@ Route::middleware(['auth:sanctum', 'permission:people.delete'])->group(function 
     Route::delete('/people/{id}', [PersonController::class, 'destroy'])
         ->whereNumber('id')
         ->name('people.destroy');
+});
+
+// Cuentas de usuario (Fase 1 Sprint 3, S3.5, RF-SEG-004): the
+// user ↔ person association answers to users.manage (Administrador
+// by the PermissionMatrix). Link and unlink are idempotent writes
+// audited through the observers already watching User (ADR-19);
+// uniqueness is the application rule with the users.person_id
+// UNIQUE constraint as the backstop.
+Route::middleware(['auth:sanctum', 'permission:users.manage'])->group(function (): void {
+    Route::post('/users/{id}/person', [UserController::class, 'linkPerson'])
+        ->whereNumber('id')
+        ->name('users.link-person');
+    Route::delete('/users/{id}/person', [UserController::class, 'unlinkPerson'])
+        ->whereNumber('id')
+        ->name('users.unlink-person');
 });

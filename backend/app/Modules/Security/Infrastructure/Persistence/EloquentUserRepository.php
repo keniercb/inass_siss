@@ -37,4 +37,33 @@ final class EloquentUserRepository implements UserRepositoryInterface
             $token->delete();
         }
     }
+
+    public function findById(int $id): ?User
+    {
+        return User::query()->find($id);
+    }
+
+    public function findOwnerOfPerson(int $personId): ?User
+    {
+        // withTrashed mirrors the database constraint: a deactivated
+        // account still reserves its person (users.person_id UNIQUE
+        // covers soft-deleted rows).
+        return User::withTrashed()
+            ->where('person_id', $personId)
+            ->first();
+    }
+
+    public function linkPerson(User $user, int $personId): User
+    {
+        $user->forceFill(['person_id' => $personId])->save();
+
+        return $user->refresh();
+    }
+
+    public function unlinkPerson(User $user): User
+    {
+        $user->forceFill(['person_id' => null])->save();
+
+        return $user->refresh();
+    }
 }

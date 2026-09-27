@@ -31,4 +31,5 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Settings', description: 'Configuración general versionada y futuras secuencias de numeración (RF-CAT-005, RN-007)')]
 #[OA\Tag(name: 'Auditoría', description: 'Bitácora append-only de acciones: consulta filtrable y exportación CSV (RF-AUD-001, RF-AUD-003)')]
 #[OA\Tag(name: 'Personas', description: 'Registro único de personas: alta con control de duplicados, edición auditada, fallecimiento y búsqueda (RF-PER-001..005)')]
+#[OA\Tag(name: 'Usuarios', description: 'Cuentas de usuario: vinculación con personas del registro único para la trazabilidad de acciones (RF-SEG-004)')]
 final class ApiDoc {}
