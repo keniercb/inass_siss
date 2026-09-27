@@ -571,3 +571,21 @@ Stage Summary:
 - /auth/me COMPLETO COMO SUPERFICIE DE SESIÓN: identidad de cuenta, roles, permisos efectivos y persona natural vinculada (LinkedPerson con estado derivado deceased)
 - SPRIN 3: 4 de 4 slices completos con este PR (RBAC + bitácora + People + usuario↔persona/estado)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 17-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de S3.5 — PR #13, CI y merge a main (Sprint 3 completo)
+
+Work Log:
+- PR #13 creada por API: https://github.com/keniercb/inass_siss/pull/13 (rama feat/SGP-12-user-person-link, tip c8db10c, 3 commits atómicos: feature + docs ADR-21 + worklog Task 17)
+- CI del PR #13: SUCCESS — job "Quality gate (PHP 8.3)" sobre el pull_request de c8db10c (Pint, PHPStan 8, deptrac 0/0, Pest 430 tests vs MySQL 8.4 del runner, gates de cobertura, build Docker)
+- PR #13 squash-mergeeada a main como 254ab9d con mensaje de alcance completo; push-run de main sobre 254ab9d: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota eliminada (HTTP 204) y rama local eliminada
+- Sin incidentes del daemon en la entrega final de esta tarea (checkout preventivo por comando mantenido)
+
+Stage Summary:
+- ADR-21 CERRADO EN MAIN: RF-SEG-004 operativo de extremo a extremo (asociación usuario↔persona con unicidad BD + 409 conversacional, idempotencia, auditoría con valor previo) y RF-SEG-003 materializado como capacidad de estado (canStartNewProcess) lista para PensionCases (F3)
+- /auth/me ES AHORA LA SESIÓN COMPLETA: identidad de cuenta, roles, permisos efectivos y persona natural vinculada (LinkedPerson con deceased derivado); login igual
+- SPRINT 3 CERRADO AL 100% (4/4 slices): RBAC PR #9 + bitábita PR #10 + People PR #11 + usuario↔persona/estado PR #13
+- SIGUIENTE: Sprint 4 (Organizations: entidades, oficinas, jerarquías RN-003, firmas autorizadas) — las 18 tablas de catálogos ya incluyen entity_types/office_types; RN-007/RN-009 del Sprint 2 siguen aplazadas sin cambio de decisión
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
