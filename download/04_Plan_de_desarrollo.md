@@ -207,6 +207,8 @@ Construir la base de datos maestros sobre la que descansan expedientes y cálcul
 - [ ] Asociación usuario↔persona con unicidad (RF-SEG-004) y restricción de acciones por estado de persona (RF-SEG-003: p. ej., persona fallecida no puede iniciar expediente).
 - [ ] Auditoría base con spatie/laravel-activitylog + observers propios: bitácora de toda escritura con valores previos (RF-AUD-001, RNF-005), consulta filtrable de bitácoras para roles autorizados (RF-AUD-003), borrado lógico con restauración auditada (RF-AUD-004).
 
+> **Orden de ejecución ajustado (2026-09-27, sin cambio de alcance)**: RBAC y bitácora se materializan ANTES del módulo People, porque RF-PER-002 (M) exige valores previos en bitácora para toda edición de personas y la bitácora transversal también cubre la escritura de catálogos que el DoD de la fase exige; así el slice de People cierra todos sus requisitos obligatorios en su propio PR. Secuencia real: PR RBAC (S3.4) → PR bitácora (RF-AUD-001/003/004) → PR People (S3.1-S3.3) → PR usuario↔persona y restricción por estado (S3.5).
+
 ### 5.5 Entregables
 
 API de catálogos con datos oficiales sembrados; configuración versionada con resolución de vigencia; generador de secuencias concurrencia-seguro; ciclo de vida de personas completo; RBAC con matriz testeada; bitácora de auditoría transversal operativa.
@@ -680,4 +682,5 @@ Los 66 RF del catálogo quedan asignados: 54 M (todos con fase), 10 S distribuid
 | Versión | Fecha | Cambios | Autor |
 |---|---|---|---|
 | 1.0 | 2026-09-26 | Versión inicial: 8 fases, 13 sprints, gates, DoD, trazabilidad completa | Arquitectura Backend |
+| 1.1 | 2026-09-27 | Sprint 3: nota de orden de ejecución dependencia-conducente (RBAC y bitácora antes de People para cerrar RF-PER-002 dentro del slice de personas); sin cambios de alcance, fechas ni gates | Arq. Backend |
 
