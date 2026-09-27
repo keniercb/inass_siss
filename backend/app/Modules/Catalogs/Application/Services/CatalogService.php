@@ -8,6 +8,7 @@ use App\Modules\Catalogs\Application\CatalogRegistry;
 use App\Modules\Catalogs\Application\Contracts\CatalogRepositoryInterface;
 use App\Modules\Catalogs\Application\Contracts\CatalogServiceInterface;
 use App\Modules\Catalogs\Application\DTO\CatalogDefinition;
+use App\Modules\Catalogs\Application\Exceptions\CatalogEntryNotDeletedException;
 use App\Modules\Catalogs\Application\Exceptions\CatalogHasActiveReferencesException;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -128,6 +129,27 @@ final class CatalogService implements CatalogServiceInterface
         }
 
         $this->catalogs->deactivate($model);
+
+        return true;
+    }
+
+    public function restore(string $type, int $id): bool
+    {
+        $definition = CatalogRegistry::definition($type);
+
+        // Deactivated rows are invisible to find(), so the restore
+        // resolves them through the including-deactivated probe.
+        $model = $this->catalogs->findIncludingDeactivated($definition->model, $id);
+
+        if ($model === null) {
+            return false;
+        }
+
+        if (! $model->trashed()) {
+            throw new CatalogEntryNotDeletedException;
+        }
+
+        $this->catalogs->restore($model);
 
         return true;
     }

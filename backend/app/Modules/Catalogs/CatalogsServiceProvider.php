@@ -14,6 +14,7 @@ use App\Modules\Catalogs\Application\Services\CatalogService;
 use App\Modules\Catalogs\Application\Services\MunicipalityService;
 use App\Modules\Catalogs\Infrastructure\Persistence\EloquentCatalogRepository;
 use App\Modules\Shared\Support\AuditableObserver;
+use App\Modules\Shared\Support\AuditTrailObserver;
 use Illuminate\Support\ServiceProvider;
 
 final class CatalogsServiceProvider extends ServiceProvider
@@ -58,6 +59,7 @@ final class CatalogsServiceProvider extends ServiceProvider
         // transparently into every created_by/updated_by stamp.
         foreach (CatalogRegistry::observedModels() as $model) {
             $model::observe(AuditableObserver::class);
+            $model::observe(AuditTrailObserver::class);
         }
     }
 }

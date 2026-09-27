@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalogs\Presentation\Controllers\AgencyController;
 use App\Modules\Catalogs\Presentation\Controllers\CatalogController;
 use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
+use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
 use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,12 @@ Route::middleware(['auth:sanctum', 'permission:catalogs.manage'])->group(functio
         ->whereNumber('id')
         ->name('catalogs.destroy');
 
+    // Restauración de entradas desactivadas (RF-AUD-004): admin-only
+    // (catalogs.manage) and audited through the restored event.
+    Route::post('/catalogs/{type}/{id}/restore', [CatalogController::class, 'restore'])
+        ->whereNumber('id')
+        ->name('catalogs.restore');
+
     Route::apiResource('municipalities', MunicipalityController::class)
         ->only(['store', 'update', 'destroy']);
     Route::apiResource('agencies', AgencyController::class)
@@ -79,4 +86,19 @@ Route::middleware(['auth:sanctum', 'permission:settings.view'])->group(function 
 Route::middleware(['auth:sanctum', 'permission:settings.manage'])->group(function (): void {
     Route::apiResource('general-settings', GeneralSettingsController::class)
         ->only(['store', 'destroy']);
+});
+
+// Bitácora de acciones (Fase 1 Sprint 3, RF-AUD-003, ADR-19): the
+// trail is append-only (RF-AUD-001), so the surface is strictly
+// read-only — no update or delete route exists by design. Reading
+// answers to audit.view, the CSV export to audit.export (sección 2.2:
+// Auditor has both; the matrix is the single source).
+Route::middleware(['auth:sanctum', 'permission:audit.view'])->group(function (): void {
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])
+        ->name('audit-logs.index');
+});
+
+Route::middleware(['auth:sanctum', 'permission:audit.export'])->group(function (): void {
+    Route::get('/audit-logs/export', [AuditLogController::class, 'export'])
+        ->name('audit-logs.export');
 });

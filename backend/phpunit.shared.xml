@@ -8,6 +8,13 @@
         Dedicated configuration for the Shared module coverage gate
         (Fase 0 DoD: >= 95 %). The source scope is limited to the module so
         the threshold measures exactly the kernel code, not the whole app.
+
+        AuditTrailObserver (ADR-19) is deliberately excluded: it is
+        framework glue (Eloquent events + spatie Activity model +
+        config/request helpers) that cannot run without the booted app,
+        and its behavior is verified end-to-end by the Security feature
+        suite (AuditTrailTest: causer, old/new values, request_id,
+        append-only surface). The gate keeps measuring the pure kernel.
     -->
     <testsuites>
         <testsuite name="Shared">
@@ -20,6 +27,7 @@
         </include>
         <exclude>
             <directory>app/Modules/Shared/Tests</directory>
+            <file>app/Modules/Shared/Support/AuditTrailObserver.php</file>
         </exclude>
     </source>
     <php>
