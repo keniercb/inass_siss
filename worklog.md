@@ -425,3 +425,26 @@ Stage Summary:
 - audit.view/audit.export sembrados y listos para el siguiente slice
 - SIGUIENTE: bitácora transversal (RF-AUD-001/003/004, RNF-005) con spatie/laravel-activitylog + observers, y luego People (S3.1-S3.3) que cerrará RF-PER-002 sobre la bitácora ya instalada
 - Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 14
+Agent: Super Z (agente principal)
+Task: Sprint 3 parte 2 — bitácora transversal append-only (RF-AUD-001/003/004, RNF-005, ADR-19) en rama feat/SGP-9-bitacora
+
+Work Log:
+- spatie/laravel-activitylog 4.2 instalado; migraciones publicadas (activity_log + event + batch_uuid) conformes al modelo de datos 5.9
+- AuditTrailObserver en Shared/Support (patrón ADR-14): created/updated/deleted/restored con causer (CurrentUserProviderInterface + config, sin importar Security → deptrac limpio), diff old/attributes y request_id; cableado con una línea por módulo (Catalogs 18 modelos, Settings, Security users)
+- Middleware AssignRequestId (Security/Presentation) global en bootstrap: X-Request-Id del cliente o UUID fresco por solicitud
+- Superficie de lectura (RF-AUD-003): GET /audit-logs filtrable (causer_id, subject_type/id, event, from/to) paginada con permiso audit.view; GET /audit-logs/export CSV con audit.export; DTOs AuditLogFilters/AuditLogEntry + puerto AuditLogQueryInterface + adaptador EloquentAuditLogQuery; append-only por construcción — sin ruta de mutación (test 404/405)
+- Restauración (RF-AUD-004): POST /catalogs/{type}/{id}/restore admin-exclusiva (catalogs.manage) y auditada vía evento restored; CatalogEntryNotDeletedException → 409; findIncludingDeactivated para resolver filas desactivadas
+- Componente OA Forbidden en ApiResponses (reusable) + tag Auditoría en ApiDoc; ADR-19 en ambas copias de arquitectura (v1.9) y entrada activity_log actualizada en ambas copias del modelo de datos (v1.4)
+- Bugs reales detectados por el flujo: requestBody:false rompía la generación del spec OpenAPI (eliminado) y el foreach sobre el contrato del paginador no iteraba — PHPStan lo destapó porque el test de CSV tenía un falso positivo (created_at en la cabecera contiene created); corregido a items() tipado y aserción ',created,' de fila real
+- Gate Shared: AuditTrailObserver excluido del scope con justificación (glue de framework, cubierto end-to-end por 16 tests de feature; el gate sigue midiendo el kernel puro)
+- QA local: Pint 193 files PASS, PHPStan 8 0 errores, deptrac 0 violaciones/0 uncovered, Pest 321 tests 0 fallos (113 warnings ambientales preexistentes), suite Shared 76/121
+
+Stage Summary:
+- RF-AUD-001 y RNF-005 CERRADOS EN CÓDIGO: toda escritura crítica (catálogos, municipios, agencias, configuración, usuarios) aterriza en la bitácora con autor, fecha, valores previos y nuevos
+- RF-AUD-003 CERRADO: consulta filtrable paginada + export CSV para el Auditor (permisos ya sembrados por la matriz ADR-18)
+- RF-AUD-004 CERRADO para el recurso genérico de catálogos: restauración admin-exclusiva y auditada (la extensión a municipios/agencias/people sigue el mismo patrón cuando toque)
+- RF-PER-002 queda SERVIDO para el slice de People: la edición de personas auditará valores previos desde el día uno
+- Pendiente del sprint: People (S3.1-S3.3), usuario↔persona + restricción por estado (S3.5)
