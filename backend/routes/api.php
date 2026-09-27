@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\Catalogs\Presentation\Controllers\AgencyController;
 use App\Modules\Catalogs\Presentation\Controllers\CatalogController;
 use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
+use App\Modules\Organizations\Presentation\Controllers\AuthorizedSignatureController;
+use App\Modules\Organizations\Presentation\Controllers\EntityController;
+use App\Modules\Organizations\Presentation\Controllers\OfficeController;
 use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
@@ -152,4 +155,64 @@ Route::middleware(['auth:sanctum', 'permission:users.manage'])->group(function (
     Route::delete('/users/{id}/person', [UserController::class, 'unlinkPerson'])
         ->whereNumber('id')
         ->name('users.unlink-person');
+});
+
+// Estructura organizacional (Fase 2 Sprint 4, RF-ENT-001..005):
+// reads —including the hierarchy trees (RF-ENT-005)— answer to
+// organizations.view, held by every consultation role, while writes
+// answer to organizations.manage, exclusive to admin in the
+// PermissionMatrix (ADR-22). The acyclicity rule (RN-003) and the
+// geographic coherence (RN-004) are service-level invariants backed
+// by database constraints; every write lands in the audit trail.
+Route::middleware(['auth:sanctum', 'permission:organizations.view'])->group(function (): void {
+    Route::get('/entities', [EntityController::class, 'index'])
+        ->name('entities.index');
+    Route::get('/entities/tree', [EntityController::class, 'tree'])
+        ->name('entities.tree');
+    Route::get('/entities/{id}', [EntityController::class, 'show'])
+        ->whereNumber('id')
+        ->name('entities.show');
+
+    Route::get('/offices', [OfficeController::class, 'index'])
+        ->name('offices.index');
+    Route::get('/offices/tree', [OfficeController::class, 'tree'])
+        ->name('offices.tree');
+    Route::get('/offices/{id}', [OfficeController::class, 'show'])
+        ->whereNumber('id')
+        ->name('offices.show');
+
+    Route::get('/authorized-signatures', [AuthorizedSignatureController::class, 'index'])
+        ->name('signatures.index');
+    Route::get('/authorized-signatures/{id}', [AuthorizedSignatureController::class, 'show'])
+        ->whereNumber('id')
+        ->name('signatures.show');
+});
+
+Route::middleware(['auth:sanctum', 'permission:organizations.manage'])->group(function (): void {
+    Route::post('/entities', [EntityController::class, 'store'])
+        ->name('entities.store');
+    Route::patch('/entities/{id}', [EntityController::class, 'update'])
+        ->whereNumber('id')
+        ->name('entities.update');
+    Route::delete('/entities/{id}', [EntityController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('entities.destroy');
+
+    Route::post('/offices', [OfficeController::class, 'store'])
+        ->name('offices.store');
+    Route::patch('/offices/{id}', [OfficeController::class, 'update'])
+        ->whereNumber('id')
+        ->name('offices.update');
+    Route::delete('/offices/{id}', [OfficeController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('offices.destroy');
+
+    Route::post('/authorized-signatures', [AuthorizedSignatureController::class, 'store'])
+        ->name('signatures.store');
+    Route::patch('/authorized-signatures/{id}', [AuthorizedSignatureController::class, 'update'])
+        ->whereNumber('id')
+        ->name('signatures.update');
+    Route::delete('/authorized-signatures/{id}', [AuthorizedSignatureController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('signatures.destroy');
 });

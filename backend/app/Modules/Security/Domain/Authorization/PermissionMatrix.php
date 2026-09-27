@@ -40,8 +40,9 @@ final class PermissionMatrix
 
     /**
      * Initial permission catalog for the modules that exist today
-     * (Catalogs, Settings, People, audit trail and user management);
-     * cases/pensioners/payments/reports join in their own phases.
+     * (Catalogs, Settings, People, audit trail, user management and
+     * the organizational structure of Fase 2); cases/pensioners/
+     * payments/reports/legal basis join in their own phases.
      * Alphabetical on purpose: the matrix stays diff-friendly.
      */
     private const array PERMISSIONS = [
@@ -49,6 +50,8 @@ final class PermissionMatrix
         'audit.view',
         'catalogs.manage',
         'catalogs.view',
+        'organizations.manage',
+        'organizations.view',
         'people.create',
         'people.delete',
         'people.edit',
@@ -66,27 +69,32 @@ final class PermissionMatrix
         'admin' => [
             'audit.export', 'audit.view',
             'catalogs.manage', 'catalogs.view',
+            'organizations.manage', 'organizations.view',
             'people.create', 'people.delete', 'people.edit', 'people.view',
             'settings.manage', 'settings.view',
             'users.manage',
         ],
         'director' => [
             'catalogs.view',
+            'organizations.view',
             'people.view',
             'settings.view',
         ],
         'specialist' => [
             'catalogs.view',
+            'organizations.view',
             'people.view',
             'settings.view',
         ],
         'operator' => [
             'catalogs.view',
+            'organizations.view',
             'people.create', 'people.edit', 'people.view',
         ],
         'auditor' => [
             'audit.export', 'audit.view',
             'catalogs.view',
+            'organizations.view',
             'people.view',
             'settings.view',
         ],

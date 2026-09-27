@@ -57,10 +57,33 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/people']['get']['tags'])->toBe(['Personas'])
             ->and($spec['paths']['/api/v1/people/{id}/death']['post']['tags'])->toBe(['Personas'])
             ->and($spec['paths']['/api/v1/people']['get']['security'])->toBe([['sanctumAuth' => []]])
+            // Estructura organizacional (Fase 2 Sprint 4, RF-ENT-001..005).
+            ->and($spec['paths'])->toHaveKey('/api/v1/entities')
+            ->and($spec['paths'])->toHaveKey('/api/v1/entities/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/entities/tree')
+            ->and($spec['paths'])->toHaveKey('/api/v1/offices')
+            ->and($spec['paths'])->toHaveKey('/api/v1/offices/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/offices/tree')
+            ->and($spec['paths'])->toHaveKey('/api/v1/authorized-signatures')
+            ->and($spec['paths'])->toHaveKey('/api/v1/authorized-signatures/{id}')
+            ->and($spec['paths']['/api/v1/entities'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/entities/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/entities/tree']['get']['tags'])->toBe(['Estructura'])
+            ->and($spec['paths']['/api/v1/offices/tree']['get']['tags'])->toBe(['Estructura'])
+            ->and($spec['paths']['/api/v1/authorized-signatures']['get']['tags'])->toBe(['Estructura'])
+            ->and($spec['paths']['/api/v1/authorized-signatures/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
             ->and($spec['components']['schemas']['LinkedPerson']['properties']['full_name']['type'])->toBe('string')
-            ->and($spec['components']['schemas']['LinkedPerson']['properties']['deceased']['type'])->toBe('boolean');
+            ->and($spec['components']['schemas']['LinkedPerson']['properties']['deceased']['type'])->toBe('boolean')
+            // Estructura organizacional (Sprint 4): entity, office and
+            // signature projections.
+            ->and($spec['components']['schemas']['Entity']['properties']['code']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Entity']['properties']['tax_id_number']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Entity']['properties']['social_purpose']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Office']['properties']['address']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['AuthorizedSignature']['properties']['status']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['AuthorizedSignature']['properties']['valid_from']['type'])->toBe('string');
     });
 
     it('documents the catalog schemas and shared error components', function () {
@@ -118,7 +141,7 @@ describe('API documentation (Swagger)', function () {
 
         // Phantom tags spawn description-less groups in Swagger UI; every
         // operation must reference a tag registered in ApiDoc.
-        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios'])
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura'])
             ->and($undeclaredTags)->toBe([]);
     });
 
