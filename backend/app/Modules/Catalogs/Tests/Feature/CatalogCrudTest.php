@@ -30,8 +30,9 @@ final class CatalogCrudTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
-        $this->actingAs($this->user);
+        // Admin role: catalog/settings management is admin-exclusive in
+        // the PermissionMatrix (RF-SEG-002), so CRUD suites act as admin.
+        $this->user = $this->actingAsRole('admin');
     }
 
     public function test_index_serves_every_uniform_catalog_with_the_envelope(): void

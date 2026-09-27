@@ -16,12 +16,17 @@ class DemoUserSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
+        $user = User::firstOrCreate(
             ['email' => 'admin@sgp.local'],
             [
                 'name' => 'SGP Demo Admin',
                 'password' => 'password',
             ],
         );
+
+        // The demo account holds the admin role (RF-SEG-002): staging
+        // keeps full access out of the box. Runs after
+        // RolesAndPermissionsSeeder, and assignRole is pivot-idempotent.
+        $user->assignRole('admin');
     }
 }

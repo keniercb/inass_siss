@@ -11,9 +11,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
- * Eloquent model backing the Security user aggregate (RF-SEG-001).
+ * Eloquent model backing the Security user aggregate (RF-SEG-001,
+ * RF-SEG-002). Roles and permissions arrive through the spatie
+ * pivot tables materialized from the PermissionMatrix domain value
+ * (ADR-05, ADR-18).
  *
  * Lives in the module's Infrastructure layer: Eloquent never leaks
  * to Application contracts beyond type references nor to
@@ -32,7 +36,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.

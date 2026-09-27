@@ -32,8 +32,9 @@ final class MunicipalityApiTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
-        $this->actingAs($this->user);
+        // Admin role: catalog/settings management is admin-exclusive in
+        // the PermissionMatrix (RF-SEG-002), so CRUD suites act as admin.
+        $this->user = $this->actingAsRole('admin');
 
         $this->pinar = Province::query()->create(['code' => '01', 'name' => 'Pinar del Río']);
         $this->habana = Province::query()->create(['code' => '03', 'name' => 'La Habana']);
