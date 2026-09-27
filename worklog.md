@@ -511,3 +511,22 @@ Stage Summary:
 - SIGUIENTE: S3.5 — asociación usuario↔persona con unicidad (RF-SEG-004, FK users.person_id ya reservada en el modelo de datos) y restricción de acciones por estado de persona (RF-SEG-003: persona fallecida no puede iniciar expediente); tras ello, Sprint 4 (Organizations: entidades, oficinas, jerarquías RN-003, firmas autorizadas)
 - El estado fallecido derivado queda listo para que PensionCases (F3) bloquee trámites nuevos sin acoplarse a People
 - Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 16
+Agent: Super Z (agente principal)
+Task: Corrección de la documentación de la API — tag duplicado «Catálogos» vs «Catalogs» en el spec OpenAPI (rama feat/SGP-11-api-tag-catalog)
+
+Work Log:
+- Arranque sobre main limpio (ea626ab, cierre PR #11); el daemon dejó un commit UUID espurio (d36275f, helpers ya fusionados) descartado con reset a origin/main tras verificar su contenido
+- ENTORNO RE-PROVISIONADO DESDE CERO (reinicio total del sandbox): PHP 8.3.30 estático (static-php-cli, userspace ~/.local/bin/php, extensiones pdo_mysql/mbstring/xml/zip/gd/bcmath incluidas), Composer 2.10.3 (~/.local/bin/composer), MySQL 8.4.6 tarball minimal en ~/.runtime/mysql con datadir ~/.runtime/mysql-data y LD_LIBRARY_PATH userspace (libaio1 + libncurses6 extraídas de .deb), puerto 13306, usuario sgp/sgp_local_dev, BDs sgp y sgp_test; script de arranque persistente ~/.runtime/bin/start-mysql.sh; composer install de 96 paquetes
+- Diagnóstico: el tag global registrado en ApiDoc es «Catalogs», pero el endpoint POST /api/v1/catalogs/{type}/{id}/restore (CatalogController, RF-AUD-004) declaraba tags: ['Catálogos'] — string no registrado que hacía a Swagger UI renderizar un segundo grupo sin descripción junto al grupo Catalogs real; las demás menciones de «catálogo(s)» en schemas/rutas son descripciones legítimas, no tags
+- TDD ROJA→VERDE: test anti-regresión en ApiDocsTest («groups every endpoint under the tags declared in ApiDoc») — valida que el restore usa ['Catalogs'], que los tags declarados del spec son exactamente los cinco globales (Auth/Catalogs/Settings/Auditoría/Personas) y que ninguna operación referencia un tag fantasma; roja confirmada con diff exacto ('Catálogos' vs 'Catalogs') y verde tras el fix de una línea
+- QA local en verde: Pint PASS (2 files), PHPStan 8 — 0 errores (136 archivos), deptrac 0 violaciones/0 uncovered, Pest 413 tests/1275 aserciones/0 fallos vs MySQL 8.4 real (199 warnings ambientales preexistentes); compuertas de cobertura y build Docker delegadas al runner del CI (el PHP estático userspace no incluye pcov y el cambio no toca código ejecutable)
+- Commit b7b2a6c (fix + test, atómico) en feat/SGP-11-api-tag-catalog
+- BLOQUEO DE ENTREGA: el reinicio del sandbox eliminó ~/.git-credentials — el PAT no está disponible en este entorno (verificado: remote URL limpia, sin netrc, sin env) y el push/PR/CI/merge quedan pendientes hasta que el usuario restaure la credencial
+
+Stage Summary:
+- La corrección está completa y verificada localmente: el spec genera un único grupo Catalogs con sus 21 endpoints (incluido restore) y ningún tag fantasma puede volver a colarse sin romper ApiDocsTest
+- Rama feat/SGP-11-api-tag-catalog lista para push (commit b7b2a6c); falta únicamente PAT válido para: push → PR vía API → CI → squash-merge → registro de cierre
+- Entorno reprovisionado y documentado para futuras sesiones: start-mysql.sh persistente; recordar export LD_LIBRARY_PATH=~/.runtime/lib/extract/usr/lib/x86_64-linux-gnu para clientes mysql
+- Higiene: PAT a restaurar por el usuario; rotar al cerrar la etapa de desarrollo

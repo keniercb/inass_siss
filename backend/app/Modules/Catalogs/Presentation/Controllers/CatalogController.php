@@ -285,7 +285,7 @@ final class CatalogController
     #[OA\Post(
         path: '/api/v1/catalogs/{type}/{id}/restore',
         operationId: 'catalogRestore',
-        tags: ['Catálogos'],
+        tags: ['Catalogs'],
         summary: 'Restaurar una entrada desactivada',
         description: 'Devuelve a la vida una entrada lógicamente desactivada (RF-AUD-004). La restauración es exclusiva del rol con permiso catalogs.manage (Administrador) y queda registrada en la bitácora con autor, fecha y valores restaurados.',
         security: [['sanctumAuth' => []]],

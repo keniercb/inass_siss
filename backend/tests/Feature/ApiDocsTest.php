@@ -84,6 +84,36 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['User']['properties']['email']['type'])->toBe('string');
     });
 
+    it('groups every endpoint under the tags declared in ApiDoc', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        // RF-API-001: the catalog restore endpoint once declared the
+        // unregistered tag "Catálogos", so Swagger UI rendered a second,
+        // description-less group next to the real Catalogs group.
+        expect($spec['paths']['/api/v1/catalogs/{type}/{id}/restore']['post']['tags'])->toBe(['Catalogs']);
+
+        $declaredTags = collect($spec['tags'])->pluck('name')->all();
+        $usedTags = [];
+        foreach ($spec['paths'] as $pathItem) {
+            foreach ($pathItem as $method => $operation) {
+                if (is_string($method) && in_array($method, ['get', 'post', 'put', 'patch', 'delete'], true) && is_array($operation)) {
+                    $operationTags = is_array($operation['tags'] ?? null) ? $operation['tags'] : [];
+                    foreach ($operationTags as $tag) {
+                        if (is_string($tag)) {
+                            $usedTags[] = $tag;
+                        }
+                    }
+                }
+            }
+        }
+        $undeclaredTags = array_values(array_diff(array_unique($usedTags), $declaredTags));
+
+        // Phantom tags spawn description-less groups in Swagger UI; every
+        // operation must reference a tag registered in ApiDoc.
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas'])
+            ->and($undeclaredTags)->toBe([]);
+    });
+
     it('serves the Swagger UI', function () {
         $this->get('/api/documentation')->assertOk();
     });
