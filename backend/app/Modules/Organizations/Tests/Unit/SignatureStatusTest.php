@@ -13,39 +13,39 @@ use App\Modules\Shared\Contracts\ClockInterface;
 
 describe('SignatureStatus', function () {
     it('resolves active when the window covers today', function () {
-        expect(SignatureStatus::resolve('2020-01-01', '2099-12-31', clock('2026-09-28')))->toBe(SignatureStatus::Active);
+        expect(SignatureStatus::resolve('2020-01-01', '2099-12-31', signatureClock('2026-09-28')))->toBe(SignatureStatus::Active);
     });
 
     it('resolves active when both dates are missing (indefinite)', function () {
-        expect(SignatureStatus::resolve(null, null, clock('2026-09-28')))->toBe(SignatureStatus::Active);
+        expect(SignatureStatus::resolve(null, null, signatureClock('2026-09-28')))->toBe(SignatureStatus::Active);
     });
 
     it('resolves active when only the start is present and already passed', function () {
-        expect(SignatureStatus::resolve('2020-01-01', null, clock('2026-09-28')))->toBe(SignatureStatus::Active);
+        expect(SignatureStatus::resolve('2020-01-01', null, signatureClock('2026-09-28')))->toBe(SignatureStatus::Active);
     });
 
     it('resolves active when only the end is present and still ahead', function () {
-        expect(SignatureStatus::resolve(null, '2099-12-31', clock('2026-09-28')))->toBe(SignatureStatus::Active);
+        expect(SignatureStatus::resolve(null, '2099-12-31', signatureClock('2026-09-28')))->toBe(SignatureStatus::Active);
     });
 
     it('resolves future when the window has not started', function () {
-        expect(SignatureStatus::resolve('2027-01-01', '2099-12-31', clock('2026-09-28')))->toBe(SignatureStatus::Future);
+        expect(SignatureStatus::resolve('2027-01-01', '2099-12-31', signatureClock('2026-09-28')))->toBe(SignatureStatus::Future);
     });
 
     it('resolves expired when the window already closed', function () {
-        expect(SignatureStatus::resolve('2020-01-01', '2026-09-27', clock('2026-09-28')))->toBe(SignatureStatus::Expired);
+        expect(SignatureStatus::resolve('2020-01-01', '2026-09-27', signatureClock('2026-09-28')))->toBe(SignatureStatus::Expired);
     });
 
     it('treats the boundary days as inclusive', function () {
-        expect(SignatureStatus::resolve('2026-09-28', '2026-09-28', clock('2026-09-28')))->toBe(SignatureStatus::Active);
+        expect(SignatureStatus::resolve('2026-09-28', '2026-09-28', signatureClock('2026-09-28')))->toBe(SignatureStatus::Active);
     });
 
     it('resolves expired for an end that is today minus one', function () {
-        expect(SignatureStatus::resolve(null, '2026-09-27', clock('2026-09-28')))->toBe(SignatureStatus::Expired);
+        expect(SignatureStatus::resolve(null, '2026-09-27', signatureClock('2026-09-28')))->toBe(SignatureStatus::Expired);
     });
 
     it('is future for a start that is today plus one', function () {
-        expect(SignatureStatus::resolve('2026-09-29', null, clock('2026-09-28')))->toBe(SignatureStatus::Future);
+        expect(SignatureStatus::resolve('2026-09-29', null, signatureClock('2026-09-28')))->toBe(SignatureStatus::Future);
     });
 });
 
@@ -53,7 +53,7 @@ describe('SignatureStatus', function () {
  * Fixed clock helper: the domain resolves against a date, so the
  * datasets stay deterministic no matter when the suite runs.
  */
-function clock(string $today): ClockInterface
+function signatureClock(string $today): ClockInterface
 {
     return new class($today) implements ClockInterface
     {

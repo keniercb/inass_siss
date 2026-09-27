@@ -35,6 +35,8 @@ final class PermissionMatrixTest extends TestCase
                 'audit.view',
                 'catalogs.manage',
                 'catalogs.view',
+                'legalbases.manage',
+                'legalbases.view',
                 'organizations.manage',
                 'organizations.view',
                 'people.create',
@@ -76,6 +78,7 @@ final class PermissionMatrixTest extends TestCase
             'admin' => [
                 'audit.export' => true, 'audit.view' => true,
                 'catalogs.manage' => true, 'catalogs.view' => true,
+                'legalbases.manage' => true, 'legalbases.view' => true,
                 'organizations.manage' => true, 'organizations.view' => true,
                 'people.create' => true, 'people.delete' => true,
                 'people.edit' => true, 'people.view' => true,
@@ -85,6 +88,7 @@ final class PermissionMatrixTest extends TestCase
             'director' => [
                 'audit.export' => false, 'audit.view' => false,
                 'catalogs.manage' => false, 'catalogs.view' => true,
+                'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
@@ -94,6 +98,7 @@ final class PermissionMatrixTest extends TestCase
             'specialist' => [
                 'audit.export' => false, 'audit.view' => false,
                 'catalogs.manage' => false, 'catalogs.view' => true,
+                'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
@@ -103,6 +108,7 @@ final class PermissionMatrixTest extends TestCase
             'operator' => [
                 'audit.export' => false, 'audit.view' => false,
                 'catalogs.manage' => false, 'catalogs.view' => true,
+                'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => true, 'people.delete' => false,
                 'people.edit' => true, 'people.view' => true,
@@ -112,6 +118,7 @@ final class PermissionMatrixTest extends TestCase
             'auditor' => [
                 'audit.export' => true, 'audit.view' => true,
                 'catalogs.manage' => false, 'catalogs.view' => true,
+                'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
@@ -149,7 +156,7 @@ final class PermissionMatrixTest extends TestCase
     {
         $writing = [
             'catalogs.manage', 'settings.manage', 'users.manage',
-            'organizations.manage',
+            'organizations.manage', 'legalbases.manage',
             'people.create', 'people.edit', 'people.delete',
         ];
 
@@ -163,7 +170,7 @@ final class PermissionMatrixTest extends TestCase
 
     public function test_catalog_and_settings_management_is_admin_exclusive(): void
     {
-        foreach (['catalogs.manage', 'settings.manage', 'users.manage', 'organizations.manage'] as $permission) {
+        foreach (['catalogs.manage', 'settings.manage', 'users.manage', 'organizations.manage', 'legalbases.manage'] as $permission) {
             foreach (PermissionMatrix::roles() as $role) {
                 if ($role === 'admin') {
                     continue;
