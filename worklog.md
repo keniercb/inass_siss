@@ -492,3 +492,22 @@ Stage Summary:
 - La plantilla «política de dominio puro + excepción que transporta el payload del 409» es reutilizable para futuras reglas conversacionales (p. ej. confirmaciones de expediente)
 - Pendiente del sprint: usuario↔persona + restricción por estado (S3.5: RF-SEG-004 unicidad de la asociación, RF-SEG-003 persona fallecida no inicia expediente) — la FK users.person_id ya está reservada en el modelo de datos
 - Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 15-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del módulo People — PR #11, CI y merge a main
+
+Work Log:
+- PR #11 creada por API: https://github.com/keniercb/inass_siss/pull/11 (rama feat/SGP-10-people, tip e0d6f613, 3 commits atómicos: feature + docs ADR-20 + worklog Task 15)
+- CI del PR #11: SUCCESS — job "Quality gate (PHP 8.3)" completado sobre el pull_request de e0d6f613 (Pint, PHPStan 8, deptrac 0/0, Pest 412 tests vs MySQL 8.4 del runner, gates de cobertura y build Docker)
+- PR #11 squash-mergeeada a main como 5f0df60 con mensaje de alcance completo; push-run de main sobre 5f0df60: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota eliminada (HTTP 204), worktree dev-wt y rama local eliminados
+- El commit espurio del daemon al inicio (7e35e68, UUID con helper de la PR #10 ya fusionada) fue descartado tras verificar su contenido; helpers de PR locales preservados sin commit
+
+Stage Summary:
+- ADR-20 CERRADO EN MAIN: RF-PER-001..005 y RN-001 operativos de extremo a extremo — alta con validador estructural del carnet, edición con valores previos en bitácora e identidad inmutable, fallecimiento como acción de ciclo de vida propia (auditada, corregible, con guardas), búsqueda paginada con desambiguación de homónimos y duplicados conversacionales (409 con persona registrada / homónimos confirmables)
+- FASE 1 SPRINT 3: 3 de 4 slices completos (RBAC PR #9 + bitácora PR #10 + People PR #11)
+- SIGUIENTE: S3.5 — asociación usuario↔persona con unicidad (RF-SEG-004, FK users.person_id ya reservada en el modelo de datos) y restricción de acciones por estado de persona (RF-SEG-003: persona fallecida no puede iniciar expediente); tras ello, Sprint 4 (Organizations: entidades, oficinas, jerarquías RN-003, firmas autorizadas)
+- El estado fallecido derivado queda listo para que PensionCases (F3) bloquee trámites nuevos sin acoplarse a People
+- Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
