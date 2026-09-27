@@ -382,3 +382,27 @@ Stage Summary:
 - El puerto Shared SequenceGeneratorInterface queda listo para consumo: Fase 3 (número de expediente) y Fase 5 (control bancario)
 - Siguiente: Sprint 3 — personas (RF-PER-*), RBAC (ADR-05, spatie) y bitácora (RF-AUD-*)
 - Higiene: PAT de desarrollo sigue vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 13
+Agent: Super Z (agente principal)
+Task: Sprint 3 parte 1 — RBAC base operativo con spatie/laravel-permission (RF-SEG-002, S3.4, ADR-18) en rama feat/SGP-8-rbac
+
+Work Log:
+- Sandbox re-provisionado (reset total del entorno): PHP 8.3.32 estático + composer + MySQL 8.4.6 en 13306 vía scripts/reprovision-sandbox.sh; PAT restaurado a ~/.git-credentials
+- Requisitos extraídos de las 4 fuentes: plan S3.1-S3.5, requisitos 2.2/RF-SEG-002/RF-AUD-*, arquitectura 10.1/11, modelo de datos 5.4/5.9
+- Decisión de orden dentro del sprint documentada en el plan (v1.1): RBAC → bitácora → People → usuario↔persona, porque RF-PER-002 (M) exige bitácora de valores previos en la edición de personas
+- TDD ROJA→VERDE: PermissionMatrixTest (64 tests: matriz 5×11 como dataset, invariants admin-total/auditor-solo-lectura/manage-admin-exclusivo/operador-registra-personas) antes del dominio; RbacEnforcementTest (15 tests) antes del middleware
+- Dominio puro: PermissionMatrix (Security/Domain/Authorization) como fuente única de la matriz (5 roles sección 2.2 × 11 permisos modulo.accion)
+- Paquete spatie/laravel-permission 6.25.0 + migración publicada; RolesAndPermissionsSeeder idempotente (firstOrCreate + syncPermissions converge a la matriz); DemoUserSeeder asigna admin
+- Middleware EnsurePermission (Security/Presentation) registrado como alias permission: en bootstrap/app.php; resuelve vía Gate::before del paquete (checkPermissionTo captura permisos inexistentes → 403, no 500; guard-agnóstico con auth:sanctum delante)
+- Retrofit de rutas: grupos lectura (*.view) / escritura (*.manage) para catálogos, municipios, agencias y general-settings; /auth/me y login ahora exponen roles+permissions (UserResource + OA schema)
+- Suite existente actualizada al helper actingAsRole('admin') en TestCase (4 clases de feature, 44 tests afectados); los tests de RBAC derivan el estado esperado de la propia matriz
+- QA local: Pint 178 files PASS, PHPStan 8 0 errores, deptrac 0 violaciones/0 uncovered, Pest 305 tests 0 fallos (97 warnings ambientales preexistentes del .env ausente), suite Shared 76/121
+- Contramedida daemon aplicada: el reset --hard de la corrección de rama descartó los edits de docs no confirmados; regenerados y confirmados en la MISMA invocación que el checkout verificado
+
+Stage Summary:
+- RF-SEG-002/S3.4 CERRADOS EN CÓDIGO: RBAC operativo de extremo a extremo — matriz de dominio pura → seeder idempotente → spatie → middleware en rutas reales → /auth/me con roles y permisos
+- La matriz como dataset de Pest anticipa la fase 6: extenderla es añadir filas, no tocar consumidores
+- audit.view/audit.export ya sembrados para el siguiente slice (bitácora RF-AUD-003)
+- Pendiente del sprint: bitácora transversal (PR siguiente), People (S3.1-S3.3), usuario↔persona + restricción por estado (S3.5)
