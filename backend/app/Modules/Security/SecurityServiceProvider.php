@@ -7,7 +7,9 @@ namespace App\Modules\Security;
 use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
+use App\Modules\Security\Application\Contracts\UserServiceInterface;
 use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Application\Services\UserService;
 use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
@@ -32,6 +34,11 @@ final class SecurityServiceProvider extends ServiceProvider
         $this->app->bind(
             AuthServiceInterface::class,
             AuthService::class,
+        );
+
+        $this->app->bind(
+            UserServiceInterface::class,
+            UserService::class,
         );
 
         $this->app->bind(

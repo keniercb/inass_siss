@@ -33,4 +33,31 @@ interface UserRepositoryInterface
      * Revokes the personal access token used by the current request.
      */
     public function revokeCurrentAccessToken(User $user): void;
+
+    /**
+     * Returns the account with the given id, or null when it does
+     * not exist.
+     */
+    public function findById(int $id): ?User;
+
+    /**
+     * Returns the account that currently owns the given person,
+     * including soft-deleted accounts: the users.person_id UNIQUE
+     * constraint reserves the person for any account, active or
+     * deactivated, so the ownership answer must mirror the database.
+     */
+    public function findOwnerOfPerson(int $personId): ?User;
+
+    /**
+     * Persists the association (the audited write lands in the
+     * bitácora through the observers already observing User) and
+     * returns the refreshed account.
+     */
+    public function linkPerson(User $user, int $personId): User;
+
+    /**
+     * Clears the association (audited as well) and returns the
+     * refreshed account.
+     */
+    public function unlinkPerson(User $user): User;
 }

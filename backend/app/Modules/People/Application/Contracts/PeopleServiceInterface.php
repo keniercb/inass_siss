@@ -55,5 +55,15 @@ interface PeopleServiceInterface
 
     public function get(int $id): ?Person;
 
+    /**
+     * Whether the person may start a new process (S3.5, RF-SEG-003,
+     * defense in depth): only living and active people qualify.
+     * PensionCases (F3) enforces this at submission time consulting
+     * this port, so the state rule stays owned by People.
+     *
+     * @throws \InvalidArgumentException when the person does not exist
+     */
+    public function canStartNewProcess(int $personId): bool;
+
     public function delete(int $id): bool;
 }

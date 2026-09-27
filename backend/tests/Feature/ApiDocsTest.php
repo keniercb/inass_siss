@@ -36,6 +36,10 @@ describe('API documentation (Swagger)', function () {
             // Auditoría (Fase 1 Sprint 3): read-only trail surface.
             ->and($spec['paths'])->toHaveKey('/api/v1/audit-logs')
             ->and($spec['paths'])->toHaveKey('/api/v1/audit-logs/export')
+            // Usuarios (Fase 1 Sprint 3, S3.5/RF-SEG-004): link/unlink.
+            ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}/person')
+            ->and($spec['paths']['/api/v1/users/{id}/person'])->toHaveKeys(['post', 'delete'])
+            ->and($spec['paths']['/api/v1/users/{id}/person']['post']['tags'])->toBe(['Usuarios'])
             // Personas (Fase 1 Sprint 3, RF-PER-*): CRUD + search + death.
             ->and($spec['paths'])->toHaveKey('/api/v1/people')
             ->and($spec['paths'])->toHaveKey('/api/v1/people/{id}')
@@ -52,7 +56,11 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/people/{id}/death'])->toHaveKeys(['post'])
             ->and($spec['paths']['/api/v1/people']['get']['tags'])->toBe(['Personas'])
             ->and($spec['paths']['/api/v1/people/{id}/death']['post']['tags'])->toBe(['Personas'])
-            ->and($spec['paths']['/api/v1/people']['get']['security'])->toBe([['sanctumAuth' => []]]);
+            ->and($spec['paths']['/api/v1/people']['get']['security'])->toBe([['sanctumAuth' => []]])
+            // El resumen de persona vinculada (S3.5) cuelga del schema User.
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
+            ->and($spec['components']['schemas']['LinkedPerson']['properties']['full_name']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['LinkedPerson']['properties']['deceased']['type'])->toBe('boolean');
     });
 
     it('documents the catalog schemas and shared error components', function () {
@@ -110,7 +118,7 @@ describe('API documentation (Swagger)', function () {
 
         // Phantom tags spawn description-less groups in Swagger UI; every
         // operation must reference a tag registered in ApiDoc.
-        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas'])
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios'])
             ->and($undeclaredTags)->toBe([]);
     });
 

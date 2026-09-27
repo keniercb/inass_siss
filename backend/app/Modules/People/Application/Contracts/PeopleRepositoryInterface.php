@@ -29,6 +29,14 @@ interface PeopleRepositoryInterface
     public function find(int $id): ?Person;
 
     /**
+     * Id lookup including soft-deleted people (S3.5, RF-SEG-003):
+     * the eligibility probe must tell deactivated people apart from
+     * nonexistent ones — both fail, but only the latter is a caller
+     * error.
+     */
+    public function findByIdIncludingDeactivated(int $id): ?Person;
+
+    /**
      * Identity lookup including soft-deleted people (RN-001: the
      * identity of a deactivated person cannot be reused).
      */

@@ -40,4 +40,32 @@ final class InMemoryUserRepository implements UserRepositoryInterface
     {
         $this->revokedCurrentToken = true;
     }
+
+    public function findById(int $id): ?User
+    {
+        return $this->stored !== null && $this->stored->id === $id
+            ? $this->stored
+            : null;
+    }
+
+    public function findOwnerOfPerson(int $personId): ?User
+    {
+        return $this->stored !== null && $this->stored->person_id === $personId
+            ? $this->stored
+            : null;
+    }
+
+    public function linkPerson(User $user, int $personId): User
+    {
+        $user->person_id = $personId;
+
+        return $user;
+    }
+
+    public function unlinkPerson(User $user): User
+    {
+        $user->person_id = null;
+
+        return $user;
+    }
 }
