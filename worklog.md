@@ -530,3 +530,21 @@ Stage Summary:
 - Rama feat/SGP-11-api-tag-catalog lista para push (commit b7b2a6c); falta únicamente PAT válido para: push → PR vía API → CI → squash-merge → registro de cierre
 - Entorno reprovisionado y documentado para futuras sesiones: start-mysql.sh persistente; recordar export LD_LIBRARY_PATH=~/.runtime/lib/extract/usr/lib/x86_64-linux-gnu para clientes mysql
 - Higiene: PAT a restaurar por el usuario; rotar al cerrar la etapa de desarrollo
+---
+Task ID: 16-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del fix de documentación de la API — PR #12, CI y merge a main
+
+Work Log:
+- PAT restaurado por el usuario y persistido en ~/.git-credentials (credential.helper store) tras la pérdida por reinicio del sandbox
+- PR #12 creada por API: https://github.com/keniercb/inass_siss/pull/12 (rama feat/SGP-11-api-tag-catalog, tip cf6cc13, 2 commits: fix + worklog Task 16)
+- CI del PR #12: SUCCESS — job "Quality gate (PHP 8.3)" sobre el pull_request de cf6cc13 (Pint, PHPStan 8, deptrac 0/0, Pest vs MySQL 8.4 del runner, gates de cobertura, build Docker)
+- PR #12 squash-mergeeada a main como 911352c con mensaje de alcance completo; push-run de main sobre 911352c: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota eliminada (HTTP 204) y rama local eliminada
+- Entorno reprovisionado en esta tarea queda operativo para S3.5: PHP 8.3.30 (~/.local/bin/php), Composer, MySQL 8.4.6 en 13306 vía ~/.runtime/bin/start-mysql.sh, vendor reinstalado
+
+Stage Summary:
+- FIX CERRADO EN MAIN: el spec OpenAPI genera un único grupo Catalogs con sus 21 endpoints (incluido restore) y ningún tag fantasma; ApiDocsTest protege las tres invariantes (tag del restore, cinco tags globales exactos, cero tags no registrados)
+- FASE 1 SPRINT 3: 3 de 4 slices completos (RBAC PR #9 + bitácora PR #10 + People PR #11) — este fix es higiene de documentación entre slices
+- SIGUIENTE: S3.5 — asociación usuario↔persona con unicidad (RF-SEG-004, FK users.person_id reservada) y restricción de acciones por estado de persona (RF-SEG-003); tras ello, Sprint 4 (Organizations)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
