@@ -5,7 +5,7 @@
 | Proyecto | Sistema de Gestión de Pensionados (SGP) |
 | Cliente | Ministerio de Trabajo (Cuba) |
 | Documento | Plan de Desarrollo por Fases — Implementación del Backend |
-| Versión | 1.0 |
+| Versión | 1.2 |
 | Fecha | 2026-09-26 |
 | Estado | Borrador para aprobación del equipo |
 | Documentos relacionados | `Requisitos funcionales.md` (RF/RNF/RN) · `Diseño de arquitectura.md` (módulos, TDD, ADR) · `Modelo de datos.md` (35 tablas, migraciones) |
@@ -200,12 +200,12 @@ Construir la base de datos maestros sobre la que descansan expedientes y cálcul
 - [ ] `numbering_sequences` + implementación MySQL de `SequenceGeneratorInterface` con bloqueo pesimista (`SELECT ... FOR UPDATE` dentro de transacción) y test de concurrencia real con 8 procesos paralelos sin huecos ni duplicados (RN-009). Este es un entregable de infraestructura que se consumirá en fases 3 y 5.
 
 **Sprint 3 — Personas y seguridad (S3.1-S3.5)**
-- [ ] Migración y dominio de `people`: alta, edición con auditoría de valores previos (RF-PER-002), registro de fallecimiento con fecha (RF-PER-003) y su efecto en búsquedas.
-- [ ] Validador de identidad cubano aplicado en dominio y como regla de Request; unicidad de identidad garantizada por constraint de BD (RN-001).
-- [ ] Búsqueda de personas por identidad, nombre aproximado y filtros básicos, paginada (RF-PER-004); control de duplicados al alta con aviso confirmable (RF-PER-005).
-- [ ] Usuarios + RBAC con spatie/laravel-permission (ADR-05): roles y permisos iniciales del análisis (sección 2.2 de requisitos), matriz rol-permiso como dataset de Pest (anticipa la matriz completa de la fase 6).
+- [x] Migración y dominio de `people`: alta, edición con auditoría de valores previos (RF-PER-002), registro de fallecimiento con fecha (RF-PER-003) y su efecto en búsquedas. ✅ 2026-09-27 (ADR-20, PR People)
+- [x] Validador de identidad cubano aplicado en dominio y como regla de Request; unicidad de identidad garantizada por constraint de BD (RN-001). ✅ 2026-09-27 (`CubanIdentityNumber` como regla + UNIQUE contra activas y desactivadas)
+- [x] Búsqueda de personas por identidad, nombre aproximado y filtros básicos, paginada (RF-PER-004); control de duplicados al alta con aviso confirmable (RF-PER-005). ✅ 2026-09-27 (`DuplicatePolicy`: 409 con persona registrada / homónimos confirmables)
+- [x] Usuarios + RBAC con spatie/laravel-permission (ADR-05): roles y permisos iniciales del análisis (sección 2.2 de requisitos), matriz rol-permiso como dataset de Pest (anticipa la matriz completa de la fase 6). ✅ 2026-09-27 (ADR-18, PR #9)
 - [ ] Asociación usuario↔persona con unicidad (RF-SEG-004) y restricción de acciones por estado de persona (RF-SEG-003: p. ej., persona fallecida no puede iniciar expediente).
-- [ ] Auditoría base con spatie/laravel-activitylog + observers propios: bitácora de toda escritura con valores previos (RF-AUD-001, RNF-005), consulta filtrable de bitácoras para roles autorizados (RF-AUD-003), borrado lógico con restauración auditada (RF-AUD-004).
+- [x] Auditoría base con spatie/laravel-activitylog + observers propios: bitácora de toda escritura con valores previos (RF-AUD-001, RNF-005), consulta filtrable de bitácoras para roles autorizados (RF-AUD-003), borrado lógico con restauración auditada (RF-AUD-004). ✅ 2026-09-27 (ADR-19, PR #10)
 
 > **Orden de ejecución ajustado (2026-09-27, sin cambio de alcance)**: RBAC y bitácora se materializan ANTES del módulo People, porque RF-PER-002 (M) exige valores previos en bitácora para toda edición de personas y la bitácora transversal también cubre la escritura de catálogos que el DoD de la fase exige; así el slice de People cierra todos sus requisitos obligatorios en su propio PR. Secuencia real: PR RBAC (S3.4) → PR bitácora (RF-AUD-001/003/004) → PR People (S3.1-S3.3) → PR usuario↔persona y restricción por estado (S3.5).
 
@@ -683,4 +683,5 @@ Los 66 RF del catálogo quedan asignados: 54 M (todos con fase), 10 S distribuid
 |---|---|---|---|
 | 1.0 | 2026-09-26 | Versión inicial: 8 fases, 13 sprints, gates, DoD, trazabilidad completa | Arquitectura Backend |
 | 1.1 | 2026-09-27 | Sprint 3: nota de orden de ejecución dependencia-conducente (RBAC y bitácora antes de People para cerrar RF-PER-002 dentro del slice de personas); sin cambios de alcance, fechas ni gates | Arq. Backend |
+| 1.2 | 2026-09-27 | Sprint 3: S3.1-S3.3 (Personas, ADR-20) marcados completos junto a S3.4 (RBAC, ADR-18/PR #9) y auditoría base (ADR-19/PR #10); queda pendiente del sprint únicamente S3.5 (usuario↔persona + restricción por estado) | Arq. Backend |
 

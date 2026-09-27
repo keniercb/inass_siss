@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalogs\Presentation\Controllers\AgencyController;
 use App\Modules\Catalogs\Presentation\Controllers\CatalogController;
 use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
+use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
 use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
@@ -101,4 +102,38 @@ Route::middleware(['auth:sanctum', 'permission:audit.view'])->group(function ():
 Route::middleware(['auth:sanctum', 'permission:audit.export'])->group(function (): void {
     Route::get('/audit-logs/export', [AuditLogController::class, 'export'])
         ->name('audit-logs.export');
+});
+
+// Personas (Fase 1 Sprint 3, RF-PER-001..005, S3.1-S3.3): reads
+// answer to people.view, registration to people.create, edition to
+// people.edit and deactivation to people.delete — operador holds
+// create/edit/view, auditor is read-only (PermissionMatrix, ADR-18).
+// Death registration (RF-PER-003) is an edit-scope lifecycle action
+// with its own audited endpoint, never a plain PATCH field.
+Route::middleware(['auth:sanctum', 'permission:people.view'])->group(function (): void {
+    Route::get('/people', [PersonController::class, 'index'])
+        ->name('people.index');
+    Route::get('/people/{id}', [PersonController::class, 'show'])
+        ->whereNumber('id')
+        ->name('people.show');
+});
+
+Route::middleware(['auth:sanctum', 'permission:people.create'])->group(function (): void {
+    Route::post('/people', [PersonController::class, 'store'])
+        ->name('people.store');
+});
+
+Route::middleware(['auth:sanctum', 'permission:people.edit'])->group(function (): void {
+    Route::patch('/people/{id}', [PersonController::class, 'update'])
+        ->whereNumber('id')
+        ->name('people.update');
+    Route::post('/people/{id}/death', [PersonController::class, 'registerDeath'])
+        ->whereNumber('id')
+        ->name('people.death');
+});
+
+Route::middleware(['auth:sanctum', 'permission:people.delete'])->group(function (): void {
+    Route::delete('/people/{id}', [PersonController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('people.destroy');
 });

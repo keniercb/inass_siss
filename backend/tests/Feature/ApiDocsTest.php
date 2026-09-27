@@ -33,13 +33,26 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths'])->toHaveKey('/api/v1/general-settings/current')
             ->and($spec['paths'])->toHaveKey('/api/v1/general-settings/{id}')
             ->and($spec['paths']['/api/v1/catalogs/{type}']['get']['security'])->toBe([['sanctumAuth' => []]])
+            // Auditoría (Fase 1 Sprint 3): read-only trail surface.
+            ->and($spec['paths'])->toHaveKey('/api/v1/audit-logs')
+            ->and($spec['paths'])->toHaveKey('/api/v1/audit-logs/export')
+            // Personas (Fase 1 Sprint 3, RF-PER-*): CRUD + search + death.
+            ->and($spec['paths'])->toHaveKey('/api/v1/people')
+            ->and($spec['paths'])->toHaveKey('/api/v1/people/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/people/{id}/death')
             ->and($spec['paths']['/api/v1/catalogs/{type}'])->toHaveKeys(['get', 'post'])
             ->and($spec['paths']['/api/v1/catalogs/{type}/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
             ->and($spec['paths']['/api/v1/municipalities']['get']['tags'])->toBe(['Catalogs'])
             ->and($spec['paths']['/api/v1/general-settings'])->toHaveKeys(['get', 'post'])
             ->and($spec['paths']['/api/v1/general-settings/{id}'])->toHaveKeys(['get', 'delete'])
             ->and($spec['paths']['/api/v1/general-settings/current']['get']['tags'])->toBe(['Settings'])
-            ->and($spec['paths']['/api/v1/general-settings/current']['get']['security'])->toBe([['sanctumAuth' => []]]);
+            ->and($spec['paths']['/api/v1/general-settings/current']['get']['security'])->toBe([['sanctumAuth' => []]])
+            ->and($spec['paths']['/api/v1/people'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/people/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/people/{id}/death'])->toHaveKeys(['post'])
+            ->and($spec['paths']['/api/v1/people']['get']['tags'])->toBe(['Personas'])
+            ->and($spec['paths']['/api/v1/people/{id}/death']['post']['tags'])->toBe(['Personas'])
+            ->and($spec['paths']['/api/v1/people']['get']['security'])->toBe([['sanctumAuth' => []]]);
     });
 
     it('documents the catalog schemas and shared error components', function () {
@@ -53,7 +66,11 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['GeneralSettingVersion']['properties']['effective_to']['type'])->toBe('string')
             ->and($spec['components']['responses']['Unauthorized']['description'])->toBeString()
             ->and($spec['components']['responses']['ValidationError']['description'])->toBeString()
-            ->and($spec['components']['schemas']['User']['properties']['email']['type'])->toBe('string');
+            ->and($spec['components']['schemas']['User']['properties']['email']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Person']['properties']['identity_number']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Person']['properties']['birth_date']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['Person']['properties']['deceased']['type'])->toBe('boolean')
+            ->and($spec['components']['schemas']['Person']['properties']['father_name']['type'])->toBe('string');
     });
 
     it('documents the response envelope and error shapes', function () {
