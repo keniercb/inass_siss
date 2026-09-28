@@ -656,3 +656,21 @@ Stage Summary:
 - La regla de «forzar una derogada con advertencia» (RF-LEG-003, segunda parte) aterriza con PensionCases F3, que posee la transición de aprobación — documentado en ADR-23
 - SPRINT 4 CERRADO AL 100% EN CÓDIGO (2/2 slices: Organizations PR pendiente + LegalBasis PR pendiente); SIGUIENTE: Fase 3 (PensionCases: expedientes, subregistros, máquina de estados) que consume oficinas, firmas y bases vigentes
 - Higiene: PAT a restaurar por el usuario; rotar al cerrar la etapa de desarrollo
+---
+Task ID: 19-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de LegalBasis — PR #15, CI y merge a main (Sprint 4 completo)
+
+Work Log:
+- Rama apilada feat/SGP-14-legal-basis rebsada sobre main tras el squash-merge de la PR #14 (git rebase --onto): los 3 commits del slice quedan solos sobre a425535/049f8cf; conflicto esperado del worklog resuelto conservando Task 18-cierre + Task 19; diff verificado: 28 archivos/+1805 solo del corpus legal
+- Contramedida del daemon mantenida (quinto volteo de HEAD a main registrado durante la sesión): QA re-ejecutado de forma atómica sobre la rama correcta — Pint PASS (284 files), PHPStan 8 — 0 errores, deptrac 0 violaciones/0 uncovered, Pest 600 tests/1855 aserciones/0 fallos vs MySQL 8.4 real
+- PR #15 creada por API: https://github.com/keniercb/inass_siss/pull/15 (rama feat/SGP-14-legal-basis, tip 912c990 tras el rebase, 3 commits: feature + docs ADR-23 + worklog Task 19)
+- CI del PR #15: SUCCESS — job CI sobre el pull_request de 912c990 (Pint, PHPStan 8, deptrac 0/0, Pest 600 tests vs MySQL 8.4 del runner, gates de cobertura, build Docker)
+- PR #15 squash-mergeeada a main como 5ee2270 con mensaje de alcance completo; push-run de main sobre 5ee2270: SUCCESS
+- main local sincronizado (reset a origin/main) y suite final re-verificada sobre main: 600 tests/1855 aserciones en verde; rama remota eliminada (HTTP 204) y rama local eliminada
+
+Stage Summary:
+- ADR-23 CERRADO EN MAIN: RF-LEG-002/003/004 y RN-006 operativo de extremo a extremo (terna única e inmutable con año derivado H-11, vigencia derivada effective/derogated/future con selector status=effective para F3, derogación auditada, consulta documental filtrable); RF-LEG-001 ya servido por el catálogo genérico ADR-15
+- SPRINT 4 CERRADO AL 100% (2/2 slices entregados): Organizations PR #14 (a425535) + LegalBasis PR #15 (5ee2270) — Fase 2 completa; RBAC a 15 permisos; suite 600 tests/1855 aserciones
+- SIGUIENTE: Fase 3 (PensionCases: expedientes, subregistros salarios/servicios/ciclos, máquina de estados RF-EXP-001..011, historial inmutable RF-AUD-002) que consume oficinas, firmas y bases vigentes ya entregadas; RN-007/RN-009 del Sprint 2 siguen aplazadas sin cambio de decisión
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
