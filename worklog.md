@@ -615,3 +615,22 @@ Stage Summary:
 - La matriz RBAC crece a 13 permisos; /auth/me expone organizations.* automáticamente (seeder re-ejecutable idempotente)
 - Pendiente del sprint: base legal (S4.4-S4.5: RF-LEG-001..004, RN-006 legal, H-11 año derivado) — legal_basis_types ya es catálogo sembrado, falta la tabla legal_bases y la resolución de vigencias
 - Higiene: PAT a restaurar por el usuario; rotar al cerrar la etapa de desarrollo
+---
+Task ID: 18-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de Organizations — PR #14, CI y merge a main
+
+Work Log:
+- PAT restaurado por el usuario tras la tercera pérdida por reinicio del sandbox y persistido en ~/.git-credentials (credential.helper store); entrega desbloqueada
+- Contramedida del daemon reforzada (volteó HEAD a main una vez más a mitad de la verificación, cuarto incidente): checkout + verificación de rama + QA re-ejecutados dentro del mismo comando — la primera pasada de Pest había corrido sin darse cuenta sobre main (430 tests) y se descartó; la pasada atómica sobre la rama correcta confirmó 547 tests
+- QA local re-verificado en la rama antes del push: Pint PASS, PHPStan 8 — 0 errores (con --memory-limit=1G para el PHP estático userspace), deptrac 0 violaciones/0 uncovered, Pest 547 tests/1692 aserciones/0 fallos vs MySQL 8.4 real
+- PR #14 creada por API: https://github.com/keniercb/inass_siss/pull/14 (rama feat/SGP-13-organizations, tip 48c141e, 3 commits: feature + docs ADR-22 + worklog Task 18)
+- CI del PR #14: SUCCESS — job CI sobre el pull_request de 48c141e (Pint, PHPStan 8, deptrac 0/0, Pest 547 tests vs MySQL 8.4 del runner, gates de cobertura, build Docker)
+- PR #14 squash-mergeeada a main como a425535 con mensaje de alcance completo; push-run de main sobre a425535: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota eliminada (HTTP 204) y rama local eliminada
+
+Stage Summary:
+- ADR-22 CERRADO EN MAIN: RF-ENT-001..005 operativo de extremo a extremo — entidades, oficinas, jerarquías acíclicas RN-003, coherencia geográfica RN-004, firmas autorizadas y árboles de consulta; PermissionMatrix a 13 permisos
+- SPRINT 4: 1 de 2 slices entregado (Organizations PR #14); el slice LegalBasis (S4.4-S4.5) está completo en la rama local apilada feat/SGP-14-legal-basis con QA verde registrado
+- SIGUIENTE: PR #15 de feat/SGP-14-legal-basis (rebase sobre main tras el merge de #14), CI, merge y cierre del Sprint 4
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
