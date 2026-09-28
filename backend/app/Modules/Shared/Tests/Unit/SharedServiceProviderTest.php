@@ -17,7 +17,9 @@ use Illuminate\Container\Container;
 
 it('binds the clock to the system implementation', function () {
     $container = new Container;
-    (new SharedServiceProvider($container))->register();
+    // The provider contract wants the full application; a bare
+    // Container is enough for register() and is all this test needs.
+    (new SharedServiceProvider($container))->register(); // @phpstan-ignore argument.type
 
     expect($container->make(SystemClock::class))->toBeInstanceOf(SystemClock::class);
 });
@@ -34,7 +36,7 @@ it('resolves the audit recorder as a singleton', function () {
             }
         },
     );
-    (new SharedServiceProvider($container))->register();
+    (new SharedServiceProvider($container))->register(); // @phpstan-ignore argument.type
 
     $first = $container->make(AuditRecorder::class);
     $second = $container->make(AuditRecorder::class);
