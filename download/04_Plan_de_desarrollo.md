@@ -267,9 +267,9 @@ Modelar el mapa organizacional del Estado que interviene en cada expediente: ent
 - [x] Consulta de estructura (RF-ENT-005): árbol de jerarquía paginado y búsqueda por nombre/NIT. *(ADR-22: `GET /entities/tree` y `/offices/tree` con 5 niveles y corte anunciado `deeper`; búsqueda `q` sobre código/NIT/objeto social — las entidades no llevan columna nombre; el conteo de expedientes por oficina llega con F3)*
 
 **Base legal (S4.4-S4.5)**
-- [ ] Tipos de base legal (catálogo sembrado) y registro de bases legales con organismo emisor, número, fecha y texto referencia.
-- [ ] Control de vigencias legales (RF-LEG-003, RN-006): `effective_from` ≤ `effective_to`, resolución de bases vigentes a una fecha.
-- [ ] Consulta documental filtrable (RF-LEG-004).
+- [x] Tipos de base legal (catálogo sembrado) y registro de bases legales con organismo emisor, número, fecha y texto referencia. *(tipos ya servidos por el catálogo genérico ADR-15 desde el Sprint 2; `legal_bases` con terna tipo-número-año única e inmutable, año derivado de la emisión H-11 — ADR-23)*
+- [x] Control de vigencias legales (RF-LEG-003, RN-006): `effective_from` ≤ `effective_to`, resolución de bases vigentes a una fecha. *(RN-006 como orden `effective_date ≥ issue_date` y `derogation_date ≥ effective_date` según el modelo 5.6, validado contra el estado resultante + CHECKs de BD; vigencia derivada al leer `effective`/`derogated`/`future` con cortes inclusivos y filtro SQL `status=effective` como selector de vigentes; la advertencia de «forzar una derogada» aterriza con la transición de aprobación de F3)*
+- [x] Consulta documental filtrable (RF-LEG-004). *(búsqueda por año, tipo, organismo emisor y texto del número/referencia, paginada)*
 
 ### 6.5 Entregables
 
@@ -686,4 +686,5 @@ Los 66 RF del catálogo quedan asignados: 54 M (todos con fase), 10 S distribuid
 | 1.2 | 2026-09-27 | Sprint 3: S3.1-S3.3 (Personas, ADR-20) marcados completos junto a S3.4 (RBAC, ADR-18/PR #9) y auditoría base (ADR-19/PR #10); queda pendiente del sprint únicamente S3.5 (usuario↔persona + restricción por estado) | Arq. Backend |
 | 1.3 | 2026-09-28 | Sprint 3: S3.5 marcado completo (ADR-21, PR #13) — asociación usuario↔persona con unicidad en BD y 409 conversacional, `/auth/me` enriquecido con la persona vinculada y regla de estado `canStartNewProcess`; Sprint 3 cerrado al 100% | Arq. Backend |
 | 1.4 | 2026-09-28 | Sprint 4: S4.1-S4.3 (Estructura organizacional, ADR-22) marcados completos — entidades/oficinas/firmas con jerarquías acíclicas por dominio puro, coherencia geográfica RN-04 doble, firmas con terna reservada y estado derivado, árboles de 5 niveles; permisos `organizations.*` en la matriz; queda pendiente del sprint la base legal (S4.4-S4.5) | Arq. Backend |
+| 1.5 | 2026-09-28 | Sprint 4: S4.4-S4.5 (Base legal, ADR-23) marcados completos — `legal_bases` con terna única e inmutable, año derivado (H-11), vigencias derivadas con selector `status=effective`, derogación como edición auditada y consulta documental; permisos `legalbases.*` en la matriz (15 permisos); Sprint 4 cerrado al 100% | Arq. Backend |
 

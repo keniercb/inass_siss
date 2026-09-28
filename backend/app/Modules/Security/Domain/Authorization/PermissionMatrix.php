@@ -41,8 +41,8 @@ final class PermissionMatrix
     /**
      * Initial permission catalog for the modules that exist today
      * (Catalogs, Settings, People, audit trail, user management and
-     * the organizational structure of Fase 2); cases/pensioners/
-     * payments/reports/legal basis join in their own phases.
+     * the Fase 2 organizational and legal structure); cases/
+     * pensioners/payments/reports join in their own phases.
      * Alphabetical on purpose: the matrix stays diff-friendly.
      */
     private const array PERMISSIONS = [
@@ -50,6 +50,8 @@ final class PermissionMatrix
         'audit.view',
         'catalogs.manage',
         'catalogs.view',
+        'legalbases.manage',
+        'legalbases.view',
         'organizations.manage',
         'organizations.view',
         'people.create',
@@ -69,6 +71,7 @@ final class PermissionMatrix
         'admin' => [
             'audit.export', 'audit.view',
             'catalogs.manage', 'catalogs.view',
+            'legalbases.manage', 'legalbases.view',
             'organizations.manage', 'organizations.view',
             'people.create', 'people.delete', 'people.edit', 'people.view',
             'settings.manage', 'settings.view',
@@ -76,24 +79,28 @@ final class PermissionMatrix
         ],
         'director' => [
             'catalogs.view',
+            'legalbases.view',
             'organizations.view',
             'people.view',
             'settings.view',
         ],
         'specialist' => [
             'catalogs.view',
+            'legalbases.view',
             'organizations.view',
             'people.view',
             'settings.view',
         ],
         'operator' => [
             'catalogs.view',
+            'legalbases.view',
             'organizations.view',
             'people.create', 'people.edit', 'people.view',
         ],
         'auditor' => [
             'audit.export', 'audit.view',
             'catalogs.view',
+            'legalbases.view',
             'organizations.view',
             'people.view',
             'settings.view',

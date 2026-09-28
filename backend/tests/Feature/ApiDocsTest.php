@@ -72,6 +72,12 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/offices/tree']['get']['tags'])->toBe(['Estructura'])
             ->and($spec['paths']['/api/v1/authorized-signatures']['get']['tags'])->toBe(['Estructura'])
             ->and($spec['paths']['/api/v1/authorized-signatures/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            // Base legal (Fase 2 Sprint 4, RF-LEG-002..004).
+            ->and($spec['paths'])->toHaveKey('/api/v1/legal-bases')
+            ->and($spec['paths'])->toHaveKey('/api/v1/legal-bases/{id}')
+            ->and($spec['paths']['/api/v1/legal-bases'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/legal-bases/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/legal-bases']['get']['tags'])->toBe(['Base legal'])
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
             ->and($spec['components']['schemas']['LinkedPerson']['properties']['full_name']['type'])->toBe('string')
@@ -83,7 +89,12 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['Entity']['properties']['social_purpose']['type'])->toBe('string')
             ->and($spec['components']['schemas']['Office']['properties']['address']['type'])->toBe('string')
             ->and($spec['components']['schemas']['AuthorizedSignature']['properties']['status']['type'])->toBe('string')
-            ->and($spec['components']['schemas']['AuthorizedSignature']['properties']['valid_from']['type'])->toBe('string');
+            ->and($spec['components']['schemas']['AuthorizedSignature']['properties']['valid_from']['type'])->toBe('string')
+            // Base legal (Sprint 4): legal basis projection.
+            ->and($spec['components']['schemas']['LegalBasis']['properties']['number']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['LegalBasis']['properties']['year']['type'])->toBe('integer')
+            ->and($spec['components']['schemas']['LegalBasis']['properties']['status']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['LegalBasis']['properties']['derogation_date']['type'])->toBe('string');
     });
 
     it('documents the catalog schemas and shared error components', function () {
@@ -141,7 +152,7 @@ describe('API documentation (Swagger)', function () {
 
         // Phantom tags spawn description-less groups in Swagger UI; every
         // operation must reference a tag registered in ApiDoc.
-        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura'])
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura', 'Base legal'])
             ->and($undeclaredTags)->toBe([]);
     });
 

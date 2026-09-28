@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalogs\Presentation\Controllers\AgencyController;
 use App\Modules\Catalogs\Presentation\Controllers\CatalogController;
 use App\Modules\Catalogs\Presentation\Controllers\MunicipalityController;
+use App\Modules\LegalBasis\Presentation\Controllers\LegalBasisController;
 use App\Modules\Organizations\Presentation\Controllers\AuthorizedSignatureController;
 use App\Modules\Organizations\Presentation\Controllers\EntityController;
 use App\Modules\Organizations\Presentation\Controllers\OfficeController;
@@ -215,4 +216,30 @@ Route::middleware(['auth:sanctum', 'permission:organizations.manage'])->group(fu
     Route::delete('/authorized-signatures/{id}', [AuthorizedSignatureController::class, 'destroy'])
         ->whereNumber('id')
         ->name('signatures.destroy');
+});
+
+// Base legal (Fase 2 Sprint 4, RF-LEG-002..004): reads answer to
+// legalbases.view — the selector of vigentes that the case approval
+// will consume (RF-LEG-003) — while writes answer to
+// legalbases.manage, exclusive to admin in the PermissionMatrix
+// (ADR-23). The tern type-number-year is unique with the year
+// derived from the issue date (H-11); the derogation is an auditable
+// date edit and the validity is derived at read time.
+Route::middleware(['auth:sanctum', 'permission:legalbases.view'])->group(function (): void {
+    Route::get('/legal-bases', [LegalBasisController::class, 'index'])
+        ->name('legal-bases.index');
+    Route::get('/legal-bases/{id}', [LegalBasisController::class, 'show'])
+        ->whereNumber('id')
+        ->name('legal-bases.show');
+});
+
+Route::middleware(['auth:sanctum', 'permission:legalbases.manage'])->group(function (): void {
+    Route::post('/legal-bases', [LegalBasisController::class, 'store'])
+        ->name('legal-bases.store');
+    Route::patch('/legal-bases/{id}', [LegalBasisController::class, 'update'])
+        ->whereNumber('id')
+        ->name('legal-bases.update');
+    Route::delete('/legal-bases/{id}', [LegalBasisController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('legal-bases.destroy');
 });
