@@ -9,6 +9,7 @@ use App\Modules\LegalBasis\Presentation\Controllers\LegalBasisController;
 use App\Modules\Organizations\Presentation\Controllers\AuthorizedSignatureController;
 use App\Modules\Organizations\Presentation\Controllers\EntityController;
 use App\Modules\Organizations\Presentation\Controllers\OfficeController;
+use App\Modules\PensionCases\Presentation\Controllers\PensionCaseController;
 use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
@@ -274,4 +275,46 @@ Route::middleware(['auth:sanctum', 'permission:legalbases.manage'])->group(funct
     Route::delete('/legal-bases/{id}', [LegalBasisController::class, 'destroy'])
         ->whereNumber('id')
         ->name('legal-bases.destroy');
+});
+
+// Expedientes (Fase 3 Sprint 5, RF-EXP-001..004): the aggregate root
+// of the PensionCases module. Reads answer to cases.view (specialist,
+// director and auditor consult; operator keeps it to review what it
+// captured), creation answers to cases.create (operator: data capture
+// registers cases in estado Solicitud per section 2.2) and the
+// subrecord highs/removals answer to cases.edit while the case stays
+// in submitted (plan S5.4). Transitions arrive in S6 with their own
+// review/approve/reject permissions.
+Route::middleware(['auth:sanctum', 'permission:cases.view'])->group(function (): void {
+    Route::get('/pension-cases', [PensionCaseController::class, 'index'])
+        ->name('pension-cases.index');
+    Route::get('/pension-cases/{id}', [PensionCaseController::class, 'show'])
+        ->whereNumber('id')
+        ->name('pension-cases.show');
+});
+
+Route::middleware(['auth:sanctum', 'permission:cases.create'])->group(function (): void {
+    Route::post('/pension-cases', [PensionCaseController::class, 'store'])
+        ->name('pension-cases.store');
+});
+
+Route::middleware(['auth:sanctum', 'permission:cases.edit'])->group(function (): void {
+    Route::post('/pension-cases/{id}/salary-records', [PensionCaseController::class, 'addSalaryRecord'])
+        ->whereNumber('id')
+        ->name('pension-cases.salary-records.store');
+    Route::delete('/pension-cases/{id}/salary-records/{record}', [PensionCaseController::class, 'removeSalaryRecord'])
+        ->whereNumber(['id', 'record'])
+        ->name('pension-cases.salary-records.destroy');
+    Route::post('/pension-cases/{id}/service-records', [PensionCaseController::class, 'addServiceRecord'])
+        ->whereNumber('id')
+        ->name('pension-cases.service-records.store');
+    Route::delete('/pension-cases/{id}/service-records/{record}', [PensionCaseController::class, 'removeServiceRecord'])
+        ->whereNumber(['id', 'record'])
+        ->name('pension-cases.service-records.destroy');
+    Route::post('/pension-cases/{id}/work-cycles', [PensionCaseController::class, 'addWorkCycle'])
+        ->whereNumber('id')
+        ->name('pension-cases.work-cycles.store');
+    Route::delete('/pension-cases/{id}/work-cycles/{record}', [PensionCaseController::class, 'removeWorkCycle'])
+        ->whereNumber(['id', 'record'])
+        ->name('pension-cases.work-cycles.destroy');
 });

@@ -94,6 +94,29 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/legal-bases'])->toHaveKeys(['get', 'post'])
             ->and($spec['paths']['/api/v1/legal-bases/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
             ->and($spec['paths']['/api/v1/legal-bases']['get']['tags'])->toBe(['Base legal'])
+            // Expedientes (Fase 3 Sprint 5, RF-EXP-001..004):
+            // aggregate + subrecord subresources.
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/salary-records')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/salary-records/{record}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/service-records')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/service-records/{record}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/work-cycles')
+            ->and($spec['paths'])->toHaveKey('/api/v1/pension-cases/{id}/work-cycles/{record}')
+            ->and($spec['paths']['/api/v1/pension-cases'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}'])->toHaveKeys(['get'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/salary-records'])->toHaveKeys(['post'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/salary-records/{record}'])->toHaveKeys(['delete'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/service-records/{record}'])->toHaveKeys(['delete'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/work-cycles'])->toHaveKeys(['post'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/work-cycles/{record}'])->toHaveKeys(['delete'])
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases']['post']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}']['get']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/salary-records']['post']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/work-cycles/{record}']['delete']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['security'])->toBe([['sanctumAuth' => []]])
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
             // Estado de seguridad derivado de la sesión (S3.6, ADR-24).
@@ -177,7 +200,7 @@ describe('API documentation (Swagger)', function () {
 
         // Phantom tags spawn description-less groups in Swagger UI; every
         // operation must reference a tag registered in ApiDoc.
-        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura', 'Base legal'])
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura', 'Base legal', 'Expedientes'])
             ->and($undeclaredTags)->toBe([]);
     });
 
