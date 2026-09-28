@@ -61,6 +61,7 @@ final class PermissionMatrix
         'settings.manage',
         'settings.view',
         'users.manage',
+        'users.view',
     ];
 
     /**
@@ -75,7 +76,7 @@ final class PermissionMatrix
             'organizations.manage', 'organizations.view',
             'people.create', 'people.delete', 'people.edit', 'people.view',
             'settings.manage', 'settings.view',
-            'users.manage',
+            'users.manage', 'users.view',
         ],
         'director' => [
             'catalogs.view',
@@ -104,6 +105,11 @@ final class PermissionMatrix
             'organizations.view',
             'people.view',
             'settings.view',
+            // Account directory read (ADR-24): the Auditor resolves
+            // bitácora causers (who acted) and needs the account
+            // surface to cross-read; strictly read-only (solo lectura,
+            // sección 2.2) — never users.manage.
+            'users.view',
         ],
     ];
 

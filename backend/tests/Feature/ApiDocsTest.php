@@ -40,6 +40,22 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}/person')
             ->and($spec['paths']['/api/v1/users/{id}/person'])->toHaveKeys(['post', 'delete'])
             ->and($spec['paths']['/api/v1/users/{id}/person']['post']['tags'])->toBe(['Usuarios'])
+            // Gestión de usuarios (S3.6, RF-SEC-001/RF-AUD-004, ADR-24):
+            // directory, lifecycle, unlock and password reset.
+            ->and($spec['paths'])->toHaveKey('/api/v1/users')
+            ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}')
+            ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}/restore')
+            ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}/unlock')
+            ->and($spec['paths'])->toHaveKey('/api/v1/users/{id}/password')
+            ->and($spec['paths'])->toHaveKey('/api/v1/auth/password')
+            ->and($spec['paths']['/api/v1/users'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/users/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/users']['get']['tags'])->toBe(['Usuarios'])
+            ->and($spec['paths']['/api/v1/users/{id}/restore']['post']['tags'])->toBe(['Usuarios'])
+            ->and($spec['paths']['/api/v1/users/{id}/unlock']['post']['tags'])->toBe(['Usuarios'])
+            ->and($spec['paths']['/api/v1/users/{id}/password']['patch']['tags'])->toBe(['Usuarios'])
+            ->and($spec['paths']['/api/v1/auth/password']['post']['tags'])->toBe(['Auth'])
+            ->and($spec['paths']['/api/v1/users']['get']['security'])->toBe([['sanctumAuth' => []]])
             // Personas (Fase 1 Sprint 3, RF-PER-*): CRUD + search + death.
             ->and($spec['paths'])->toHaveKey('/api/v1/people')
             ->and($spec['paths'])->toHaveKey('/api/v1/people/{id}')
@@ -80,6 +96,15 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/legal-bases']['get']['tags'])->toBe(['Base legal'])
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
+            // Estado de seguridad derivado de la sesión (S3.6, ADR-24).
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('status')
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('locked')
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('locked_until')
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('failed_login_attempts')
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('password_changed_at')
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('password_expired')
+            ->and($spec['components']['schemas']['User']['properties']['locked']['type'])->toBe('boolean')
+            ->and($spec['components']['schemas']['User']['properties']['password_expired']['type'])->toBe('boolean')
             ->and($spec['components']['schemas']['LinkedPerson']['properties']['full_name']['type'])->toBe('string')
             ->and($spec['components']['schemas']['LinkedPerson']['properties']['deceased']['type'])->toBe('boolean')
             // Estructura organizacional (Sprint 4): entity, office and

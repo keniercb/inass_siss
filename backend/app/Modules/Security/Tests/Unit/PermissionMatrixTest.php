@@ -46,6 +46,7 @@ final class PermissionMatrixTest extends TestCase
                 'settings.manage',
                 'settings.view',
                 'users.manage',
+                'users.view',
             ],
             PermissionMatrix::permissions(),
         );
@@ -83,7 +84,7 @@ final class PermissionMatrixTest extends TestCase
                 'people.create' => true, 'people.delete' => true,
                 'people.edit' => true, 'people.view' => true,
                 'settings.manage' => true, 'settings.view' => true,
-                'users.manage' => true,
+                'users.manage' => true, 'users.view' => true,
             ],
             'director' => [
                 'audit.export' => false, 'audit.view' => false,
@@ -93,7 +94,7 @@ final class PermissionMatrixTest extends TestCase
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
                 'settings.manage' => false, 'settings.view' => true,
-                'users.manage' => false,
+                'users.manage' => false, 'users.view' => false,
             ],
             'specialist' => [
                 'audit.export' => false, 'audit.view' => false,
@@ -103,7 +104,7 @@ final class PermissionMatrixTest extends TestCase
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
                 'settings.manage' => false, 'settings.view' => true,
-                'users.manage' => false,
+                'users.manage' => false, 'users.view' => false,
             ],
             'operator' => [
                 'audit.export' => false, 'audit.view' => false,
@@ -113,7 +114,7 @@ final class PermissionMatrixTest extends TestCase
                 'people.create' => true, 'people.delete' => false,
                 'people.edit' => true, 'people.view' => true,
                 'settings.manage' => false, 'settings.view' => false,
-                'users.manage' => false,
+                'users.manage' => false, 'users.view' => false,
             ],
             'auditor' => [
                 'audit.export' => true, 'audit.view' => true,
@@ -123,7 +124,7 @@ final class PermissionMatrixTest extends TestCase
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
                 'settings.manage' => false, 'settings.view' => true,
-                'users.manage' => false,
+                'users.manage' => false, 'users.view' => true,
             ],
         ];
 
@@ -166,6 +167,10 @@ final class PermissionMatrixTest extends TestCase
                 "Auditor must not hold writing permission [{$permission}] (solo lectura, sección 2.2).",
             );
         }
+
+        // Read-only also means reading: the Auditor keeps the account
+        // directory (users.view, ADR-24) for bitácora cross-reading.
+        self::assertTrue(PermissionMatrix::roleHasPermission('auditor', 'users.view'));
     }
 
     public function test_catalog_and_settings_management_is_admin_exclusive(): void

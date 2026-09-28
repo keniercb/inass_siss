@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security;
 
+use App\Modules\Security\Application\Authentication\SecurityPolicies;
 use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
@@ -14,31 +15,47 @@ use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
+use App\Modules\Shared\Contracts\ClockInterface;
 use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
 use App\Modules\Shared\Support\AuditableObserver;
 use App\Modules\Shared\Support\AuditTrailObserver;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Support\ServiceProvider;
 
 final class SecurityServiceProvider extends ServiceProvider
 {
     /**
      * Module wiring (ADR-11, ADR-12): Presentation and Application
-     * depend on ports only. The service contract receives the use
-     * case implementation and the repository contract receives the
+     * depend on ports only. The service contracts receive the use
+     * case implementations and the repository contract receives the
      * Eloquent adapter, so tests can rebind fakes for either and a
      * future store change never touches business logic (DIP,
      * architecture doc section 7).
+     *
+     * The hardening policies (password/lockout, ADR-24) are rebuilt
+     * from configuration on EVERY resolution: the domain values stay
+     * pure while runtime config overrides apply to the next request.
      */
     public function register(): void
     {
         $this->app->bind(
             AuthServiceInterface::class,
-            AuthService::class,
+            fn ($app): AuthService => new AuthService(
+                $app->make(UserRepositoryInterface::class),
+                $app->make(Hasher::class),
+                $app->make(ClockInterface::class),
+                SecurityPolicies::lockoutFromConfig(),
+                SecurityPolicies::passwordFromConfig(),
+            ),
         );
 
         $this->app->bind(
             UserServiceInterface::class,
-            UserService::class,
+            fn ($app): UserService => new UserService(
+                $app->make(UserRepositoryInterface::class),
+                $app->make(ClockInterface::class),
+                SecurityPolicies::passwordFromConfig(),
+            ),
         );
 
         $this->app->bind(
@@ -70,7 +87,8 @@ final class SecurityServiceProvider extends ServiceProvider
         User::observe(AuditableObserver::class);
 
         // Activity trail (RF-AUD-001, ADR-19): user account writes land
-        // in the append-only bitácora too (toda escritura crítica).
+        // in the append-only bitácora too (toda escritura crítica), with
+        // secret columns redacted (RedactsAuditAttributes, ADR-24).
         User::observe(AuditTrailObserver::class);
     }
 }

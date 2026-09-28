@@ -37,6 +37,12 @@ Route::post('/auth/login', [AuthController::class, 'login'])
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    // Renovación voluntaria de la propia contraseña (RF-SEG-001,
+    // ADR-24): any authenticated account may renew its secret; the
+    // service verifies the current one and revokes every OTHER
+    // session (this token survives).
+    Route::post('/auth/password', [AuthController::class, 'changePassword'])
+        ->name('auth.change-password');
 });
 
 Route::middleware(['auth:sanctum', 'permission:catalogs.view'])->group(function (): void {
@@ -143,13 +149,39 @@ Route::middleware(['auth:sanctum', 'permission:people.delete'])->group(function 
         ->name('people.destroy');
 });
 
-// Cuentas de usuario (Fase 1 Sprint 3, S3.5, RF-SEG-004): the
-// user ↔ person association answers to users.manage (Administrador
-// by the PermissionMatrix). Link and unlink are idempotent writes
-// audited through the observers already watching User (ADR-19);
-// uniqueness is the application rule with the users.person_id
-// UNIQUE constraint as the backstop.
+// Cuentas de usuario (S3.5 + S3.6, RF-SEG-001/004, RF-AUD-004,
+// ADR-24): the account directory and detail answer to users.view
+// (Administrador + Auditor, strictly read-only for the Auditor),
+// while the lifecycle writes —creation, edition, deactivation,
+// restoration, unlock, password reset and the user ↔ person
+// association— answer to users.manage (Administrador). Every write
+// lands in the append-only bitácora with secrets redacted.
+Route::middleware(['auth:sanctum', 'permission:users.view'])->group(function (): void {
+    Route::get('/users', [UserController::class, 'index'])
+        ->name('users.index');
+    Route::get('/users/{id}', [UserController::class, 'show'])
+        ->whereNumber('id')
+        ->name('users.show');
+});
+
 Route::middleware(['auth:sanctum', 'permission:users.manage'])->group(function (): void {
+    Route::post('/users', [UserController::class, 'store'])
+        ->name('users.store');
+    Route::patch('/users/{id}', [UserController::class, 'update'])
+        ->whereNumber('id')
+        ->name('users.update');
+    Route::delete('/users/{id}', [UserController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('users.destroy');
+    Route::post('/users/{id}/restore', [UserController::class, 'restore'])
+        ->whereNumber('id')
+        ->name('users.restore');
+    Route::post('/users/{id}/unlock', [UserController::class, 'unlock'])
+        ->whereNumber('id')
+        ->name('users.unlock');
+    Route::patch('/users/{id}/password', [UserController::class, 'resetPassword'])
+        ->whereNumber('id')
+        ->name('users.reset-password');
     Route::post('/users/{id}/person', [UserController::class, 'linkPerson'])
         ->whereNumber('id')
         ->name('users.link-person');
