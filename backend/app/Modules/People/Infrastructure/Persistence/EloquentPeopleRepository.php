@@ -12,13 +12,16 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 /**
  * Eloquent persistence for people (ADR-11): the single data-access
  * point of the People module. Search implements the RF-PER-004
- * surface — exact identity, multi-word name fragments crossing the
- * four name columns, sex, deceased state and birth-date range — with
- * the listing order of idx_people_names so homonyms cluster together
- * and disambiguation is visually immediate. Identity and citizen
- * card lookups include soft-deleted people because RN-001 reserves
- * the identity and RF-PER-005 the card for the whole registry, while
- * homonym candidates only consider living people.
+ * surface — identity by prefix (patrón ci_buscado%: the operator
+ * types digits progressively and the result narrows with every
+ * digit; the validation only lets digits through, so the LIKE
+ * pattern needs no escaping), multi-word name fragments crossing
+ * the four name columns, sex, deceased state and birth-date range —
+ * with the listing order of idx_people_names so homonyms cluster
+ * together and disambiguation is visually immediate. Identity and
+ * citizen card lookups include soft-deleted people because RN-001
+ * reserves the identity and RF-PER-005 the card for the whole
+ * registry, while homonym candidates only consider living people.
  */
 final class EloquentPeopleRepository implements PeopleRepositoryInterface
 {
@@ -30,7 +33,11 @@ final class EloquentPeopleRepository implements PeopleRepositoryInterface
             ->orderBy('birth_date');
 
         if (isset($filters['identity']) && $filters['identity'] !== '') {
-            $query->where('identity_number', $filters['identity']);
+            // ci_buscado%: a partial CI narrows with every typed
+            // digit instead of demanding all eleven. The request
+            // layer only lets digits through, so the pattern is
+            // injection-free by construction.
+            $query->where('identity_number', 'LIKE', $filters['identity'].'%');
         }
 
         if (isset($filters['q']) && $filters['q'] !== '') {

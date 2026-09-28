@@ -16,8 +16,9 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 interface PeopleRepositoryInterface
 {
     /**
-     * Search with the RF-PER-004 surface: exact identity, name
-     * fragments (multi-word, across the name columns), sex, deceased
+     * Search with the RF-PER-004 surface: identity by prefix
+     * (patrón ci_buscado%, 1-11 digits), name fragments
+     * (multi-word, across the name columns), sex, deceased
      * state and birth date range, paginated and ordered by
      * first_surname / first_name / birth_date (idx_people_names).
      *

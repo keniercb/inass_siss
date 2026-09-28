@@ -7,10 +7,12 @@ namespace App\Modules\People\Presentation\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Query filters for the person search (RF-PER-004): exact identity,
- * name fragments, sex, deceased state and birth-date range. The
- * repository owns the semantics; this class only pins the wire
- * contract.
+ * Query filters for the person search (RF-PER-004): identity by
+ * prefix (patrón ci_buscado%, 1-11 digits so the operator can
+ * search while typing), name fragments, sex, deceased state and
+ * birth-date range. The repository owns the semantics; this class
+ * only pins the wire contract. Digits-only keeps the downstream
+ * LIKE pattern injection-free without escaping.
  */
 final class PersonIndexRequest extends FormRequest
 {
@@ -25,7 +27,10 @@ final class PersonIndexRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'identity' => ['nullable', 'string', 'digits:11'],
+            // 1-11 digits: a partial CI narrows the search with every
+            // typed digit (patrón ci_buscado%); 11 keeps the full-CI
+            // behaviour as the longest possible prefix.
+            'identity' => ['nullable', 'string', 'digits_between:1,11'],
             'q' => ['nullable', 'string', 'max:120'],
             'sex' => ['nullable', 'string', 'max:1', 'in:M,F'],
             // Query strings are always text: accept the wire spellings
