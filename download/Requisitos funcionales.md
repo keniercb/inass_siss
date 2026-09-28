@@ -171,7 +171,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 - [ ] El fallecimiento es datable y auditable (quién y cuándo lo registró).
 
 **RF-PER-004 (M) — Búsqueda de personas (MO)**
-- [ ] Búsqueda por número de identidad exacto y por combinación de nombres/apellidos.
+- [ ] Búsqueda por prefijo de número de identidad (patrón ci_buscado%, 1 a 11 dígitos: acota con cada dígito tecleado y 11 dígitos equivale a la búsqueda exacta) y por combinación de nombres/apellidos.
 - [ ] Resultados paginados con datos suficientes para desambiguar homónimos (fecha de nacimiento, padres).
 
 **RF-PER-005 (S) — Control de duplicados (DA H-08)**

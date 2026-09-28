@@ -10,7 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Person search GET /api/v1/people (RF-PER-004): exact identity,
+ * Person search GET /api/v1/people (RF-PER-004): identity by
+ * prefix (patrón ci_buscado%: narrows with every typed digit),
  * name combinations, basic filters, pagination and the fields that
  * disambiguate homonyms (birth date and parents).
  */
@@ -75,23 +76,90 @@ final class PersonSearchApiTest extends TestCase
         ]);
     }
 
-    public function test_searches_by_exact_identity(): void
+    public function test_searches_by_identity(): void
     {
         $juan = Person::query()->where('first_name', 'Juan')->first();
         $this->assertNotNull($juan);
 
+        // A full CI is the longest possible prefix, so the exact
+        // behaviour survives the prefix semantics: one person.
         $this->getJson("/api/v1/people?identity={$juan->identity_number}")
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $juan->id);
     }
 
-    public function test_exact_identity_with_no_match_returns_an_empty_page(): void
+    public function test_searches_by_identity_prefix(): void
+    {
+        // ci_buscado%: a partial CI narrows to every person whose
+        // identity starts with the typed digits.
+        $juan = Person::query()->where('first_name', 'Juan')->first();
+        $this->assertNotNull($juan);
+
+        $prefix = substr((string) $juan->identity_number, 0, 6);
+
+        $this->getJson("/api/v1/people?identity={$prefix}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $juan->id);
+    }
+
+    public function test_identity_prefix_matches_several_people(): void
+    {
+        // The century/sex digit alone groups a whole population
+        // cohort: every 1900s male in the seed (Juan, Luis).
+        $this->getJson('/api/v1/people?identity=1')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $this->getJson('/api/v1/people?identity=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_identity_search_is_a_prefix_not_a_substring(): void
+    {
+        // Digits that only appear in the middle of a CI must not
+        // match: only ci_buscado%, never %ci_buscado%.
+        $juan = Person::query()->where('first_name', 'Juan')->first();
+        $this->assertNotNull($juan);
+
+        $middle = substr((string) $juan->identity_number, 2, 4);
+
+        $this->getJson("/api/v1/people?identity={$middle}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_identity_with_no_match_returns_an_empty_page(): void
     {
         $this->getJson('/api/v1/people?identity=00000000000')
             ->assertOk()
             ->assertJsonCount(0, 'data')
             ->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_identity_prefix_with_no_match_returns_an_empty_page(): void
+    {
+        // No seeded CI starts with 3..6 (century digits not in use).
+        $this->getJson('/api/v1/people?identity=3')
+            ->assertOk()
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_rejects_a_non_digit_identity_filter(): void
+    {
+        $this->getJson('/api/v1/people?identity=18A01')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['identity']);
+    }
+
+    public function test_rejects_an_overly_long_identity_filter(): void
+    {
+        $this->getJson('/api/v1/people?identity=180010510066')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['identity']);
     }
 
     public function test_searches_by_name_fragment(): void

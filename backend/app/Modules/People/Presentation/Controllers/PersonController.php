@@ -43,10 +43,10 @@ final class PersonController
         operationId: 'peopleIndex',
         tags: ['Personas'],
         summary: 'Búsqueda de personas',
-        description: 'Búsqueda por identidad exacta, fragmentos de nombres/apellidos (combinables) y filtros básicos, paginada y ordenada por apellido/nombre/fecha de nacimiento (RF-PER-004). Los resultados incluyen fecha de nacimiento y padres para desambiguar homónimos.',
+        description: 'Búsqueda por prefijo de identidad (patrón ci_buscado%: acota con cada dígito tecleado), fragmentos de nombres/apellidos (combinables) y filtros básicos, paginada y ordenada por apellido/nombre/fecha de nacimiento (RF-PER-004). Los resultados incluyen fecha de nacimiento y padres para desambiguar homónimos.',
         security: [['sanctumAuth' => []]],
         parameters: [
-            new OA\QueryParameter(name: 'identity', description: 'Número de identidad exacto', schema: new OA\Schema(type: 'string')),
+            new OA\QueryParameter(name: 'identity', description: 'Prefijo del carné de identidad: 1 a 11 dígitos, ci_buscado% (11 dígitos equivale a la búsqueda exacta)', schema: new OA\Schema(type: 'string', minLength: 1, maxLength: 11)),
             new OA\QueryParameter(name: 'q', description: 'Fragmentos de nombre/apellido (cada palabra debe aparecer)', schema: new OA\Schema(type: 'string', maxLength: 120)),
             new OA\QueryParameter(name: 'sex', schema: new OA\Schema(type: 'string', enum: ['M', 'F'])),
             new OA\QueryParameter(name: 'deceased', schema: new OA\Schema(type: 'boolean')),
