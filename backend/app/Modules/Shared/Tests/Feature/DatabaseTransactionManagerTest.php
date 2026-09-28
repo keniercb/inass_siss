@@ -12,9 +12,9 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\Shared\Contracts\TransactionManager;
 use App\Modules\Shared\Support\DatabaseTransactionManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
-
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 it('binds the transaction port to the database implementation', function () {
     expect($this->app->make(TransactionManager::class))->toBeInstanceOf(DatabaseTransactionManager::class);
