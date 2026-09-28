@@ -3,8 +3,9 @@
 namespace App\Modules\Security\Infrastructure\Persistence\Models;
 
 use App\Modules\People\Infrastructure\Persistence\Models\Person;
-use Carbon\CarbonImmutable;
+use App\Modules\Shared\Contracts\RedactsAuditAttributes;
 use Database\Factories\UserFactory;
+use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,13 +31,16 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $name
  * @property string $email
  * @property string $password
+ * @property int $failed_login_attempts
+ * @property DateTimeImmutable|null $locked_at
+ * @property DateTimeImmutable|null $password_changed_at
  * @property int|null $person_id
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property Person|null $person
- * @property CarbonImmutable|null $deleted_at
+ * @property DateTimeImmutable|null $deleted_at
  */
-class User extends Authenticatable
+class User extends Authenticatable implements RedactsAuditAttributes
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes;
@@ -50,9 +54,19 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'failed_login_attempts',
+        'locked_at',
+        'password_changed_at',
         'created_by',
         'updated_by',
     ];
+
+    /**
+     * Explicit storage date format: the immutable casts resolve it
+     * without a database connection (unit tests build bare models),
+     * matching MySQL's datetime precision.
+     */
+    protected $dateFormat = 'Y-m-d H:i:s';
 
     /**
      * The attributes that should be hidden for serialization.
@@ -75,6 +89,12 @@ class User extends Authenticatable
             'deleted_at' => 'datetime',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'failed_login_attempts' => 'integer',
+            // Immutable casts (ADR-24): the lockout/password lifecycle
+            // domain values consume DateTimeImmutable, and CarbonImmutable
+            // satisfies that contract without conversion glue.
+            'locked_at' => 'immutable_datetime',
+            'password_changed_at' => 'immutable_datetime',
         ];
     }
 
@@ -104,6 +124,19 @@ class User extends Authenticatable
     public function updater(): BelongsTo
     {
         return $this->belongsTo(self::class, 'updated_by');
+    }
+
+    /**
+     * Secret columns that must never reach the bitácora (ADR-24):
+     * the audit trail keeps the FACT that the password changed with
+     * a [redacted] marker instead of the hash, because the log is
+     * readable by the Auditor role (RF-AUD-003).
+     *
+     * @return list<string>
+     */
+    public function auditRedactedAttributes(): array
+    {
+        return ['password', 'remember_token'];
     }
 
     /**

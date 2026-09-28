@@ -5,28 +5,87 @@ declare(strict_types=1);
 namespace App\Modules\Security\Tests\Fakes;
 
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
+use App\Modules\Security\Domain\Authentication\LockoutState;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
+use DateTimeImmutable;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as ConcretePaginator;
 
 /**
  * In-memory stand-in for the user repository port (ADR-11): lets the
- * AuthService unit tests run without a database or the container and
+ * Security unit suites run without a database or the container and
  * records every call so the tests can assert the interactions.
+ *
+ * The password cast still applies (the model hashes on assignment),
+ * so accounts created through the fake authenticate with the same
+ * semantics as the Eloquent adapter. Soft-deleted accounts keep
+ * reserving their email and person, mirroring the real UNIQUE scope.
  */
 final class InMemoryUserRepository implements UserRepositoryInterface
 {
-    public ?User $stored = null;
+    /** @var array<int, User> */
+    public array $users = [];
+
+    /** @var array<int, true> */
+    public array $deactivated = [];
+
+    /** @var array<int, list<string>> */
+    public array $roles = [];
 
     public int $issuedTokens = 0;
 
     public bool $revokedCurrentToken = false;
 
-    public function findByEmail(string $email): ?User
+    public int $revokedAllTokens = 0;
+
+    public int $revokedOtherTokens = 0;
+
+    public int $clearedFailures = 0;
+
+    public int $unlocked = 0;
+
+    public int $restored = 0;
+
+    /** @var list<LockoutState> */
+    public array $recordedFailures = [];
+
+    /** @var array<int, string> plain-text passwords by user id */
+    public array $resetPasswords = [];
+
+    public ?User $lastCreated = null;
+
+    private int $nextId = 1;
+
+    /**
+     * Registers a hand-built account (id assigned when absent) with
+     * its roles, replacing the old single $stored slot.
+     *
+     * @param  list<string>  $roles
+     */
+    public function seed(User $user, array $roles = []): User
     {
-        if ($this->stored === null || $this->stored->email !== $email) {
-            return null;
+        // Bare (unsaved) models report id 0 once cast: assign the next
+        // sequence number to any model the test did not build with one.
+        if ((int) $user->id === 0) {
+            $user->id = $this->nextId;
         }
 
-        return $this->stored;
+        $this->nextId = max($this->nextId, (int) $user->id + 1);
+        $this->users[(int) $user->id] = $user;
+        $this->roles[(int) $user->id] = $roles;
+
+        return $user;
+    }
+
+    public function findByEmail(string $email): ?User
+    {
+        foreach ($this->users as $user) {
+            if ($user->email === $email && ! isset($this->deactivated[(int) $user->id])) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     public function issueAccessToken(User $user): string
@@ -43,16 +102,27 @@ final class InMemoryUserRepository implements UserRepositoryInterface
 
     public function findById(int $id): ?User
     {
-        return $this->stored !== null && $this->stored->id === $id
-            ? $this->stored
-            : null;
+        if (isset($this->users[$id]) && ! isset($this->deactivated[$id])) {
+            return $this->users[$id];
+        }
+
+        return null;
+    }
+
+    public function findByIdIncludingDeactivated(int $id): ?User
+    {
+        return $this->users[$id] ?? null;
     }
 
     public function findOwnerOfPerson(int $personId): ?User
     {
-        return $this->stored !== null && $this->stored->person_id === $personId
-            ? $this->stored
-            : null;
+        foreach ($this->users as $user) {
+            if ($user->person_id === $personId) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     public function linkPerson(User $user, int $personId): User
@@ -67,5 +137,171 @@ final class InMemoryUserRepository implements UserRepositoryInterface
         $user->person_id = null;
 
         return $user;
+    }
+
+    public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
+    {
+        $needle = mb_strtolower((string) ($filters['q'] ?? ''));
+        $role = $filters['role'] ?? null;
+        $status = $filters['status'] ?? 'active';
+
+        $matches = array_filter($this->users, function (User $user) use ($needle, $role, $status): bool {
+            $deleted = isset($this->deactivated[(int) $user->id]);
+
+            if ($status === 'active' && $deleted) {
+                return false;
+            }
+
+            if ($status === 'inactive' && ! $deleted) {
+                return false;
+            }
+
+            if ($role !== null && ! in_array($role, $this->roles[(int) $user->id] ?? [], true)) {
+                return false;
+            }
+
+            if ($needle !== '' && ! str_contains(mb_strtolower((string) $user->name), $needle)
+                && ! str_contains(mb_strtolower((string) $user->email), $needle)) {
+                return false;
+            }
+
+            return true;
+        });
+
+        $page = max(1, $page);
+
+        $items = array_values($matches);
+
+        return new ConcretePaginator(
+            array_slice($items, ($page - 1) * $perPage, $perPage),
+            count($items),
+            $perPage,
+            $page,
+        );
+    }
+
+    public function emailTaken(string $email): bool
+    {
+        foreach ($this->users as $user) {
+            if ($user->email === $email) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function createUser(string $name, string $email, string $password, array $roles, DateTimeImmutable $passwordChangedAt): User
+    {
+        $user = new User;
+        $user->name = $name;
+        $user->email = $email;
+        $user->password = $password;
+        $user->password_changed_at = $passwordChangedAt;
+        $user->id = $this->nextId;
+
+        $this->lastCreated = $user;
+
+        return $this->seed($user, $roles);
+    }
+
+    public function updateUser(User $user, ?string $name, ?array $roles): User
+    {
+        if ($name !== null) {
+            $user->name = $name;
+        }
+
+        if ($roles !== null) {
+            $this->roles[(int) $user->id] = $roles;
+        }
+
+        return $user;
+    }
+
+    public function deactivate(User $user): void
+    {
+        $this->deactivated[(int) $user->id] = true;
+        // Mirrors the real soft delete so restore() sees a deleted row.
+        $user->deleted_at = new DateTimeImmutable('2000-01-01 00:00:00');
+        $this->revokedAllTokens++;
+    }
+
+    public function restore(User $user): User
+    {
+        unset($this->deactivated[(int) $user->id]);
+        $user->deleted_at = null;
+        $this->restored++;
+
+        return $user;
+    }
+
+    public function unlock(User $user): User
+    {
+        $this->unlocked++;
+        $user->failed_login_attempts = 0;
+        $user->locked_at = null;
+
+        return $user;
+    }
+
+    public function recordFailedAttempt(User $user, LockoutState $state): void
+    {
+        $user->failed_login_attempts = $state->failedAttempts;
+        $user->locked_at = $state->lockedAt;
+        $this->recordedFailures[] = $state;
+    }
+
+    public function clearLoginFailures(User $user): void
+    {
+        $this->clearedFailures++;
+        $user->failed_login_attempts = 0;
+        $user->locked_at = null;
+    }
+
+    public function resetPassword(User $user, string $password, DateTimeImmutable $changedAt): User
+    {
+        $user->password = $password;
+        $user->password_changed_at = $changedAt;
+        $user->failed_login_attempts = 0;
+        $user->locked_at = null;
+        $this->resetPasswords[(int) $user->id] = $password;
+
+        return $user;
+    }
+
+    public function revokeAllTokens(User $user): void
+    {
+        $this->revokedAllTokens++;
+    }
+
+    public function revokeOtherTokens(User $user): void
+    {
+        $this->revokedOtherTokens++;
+    }
+
+    public function roleNamesOf(User $user): array
+    {
+        return $this->roles[(int) $user->id] ?? [];
+    }
+
+    public function countActiveAdministrators(User $except): int
+    {
+        $count = 0;
+
+        foreach ($this->users as $user) {
+            if ((int) $user->id === (int) $except->id) {
+                continue;
+            }
+
+            if (isset($this->deactivated[(int) $user->id])) {
+                continue;
+            }
+
+            if (in_array('admin', $this->roles[(int) $user->id] ?? [], true)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }

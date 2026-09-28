@@ -15,6 +15,13 @@
         and its behavior is verified end-to-end by the Security feature
         suite (AuditTrailTest: causer, old/new values, request_id,
         append-only surface). The gate keeps measuring the pure kernel.
+
+        AuditRecorder (ADR-24) is excluded for the same reason: it is
+        the extracted writer behind that observer (spatie Activity
+        persistence, container config and request state), exercised
+        end-to-end by the Security feature suite (AuditTrailTest and
+        the user-management bitácora assertions, including secret
+        redaction).
     -->
     <testsuites>
         <testsuite name="Shared">
@@ -28,6 +35,7 @@
         <exclude>
             <directory>app/Modules/Shared/Tests</directory>
             <file>app/Modules/Shared/Support/AuditTrailObserver.php</file>
+            <file>app/Modules/Shared/Support/AuditRecorder.php</file>
         </exclude>
     </source>
     <php>

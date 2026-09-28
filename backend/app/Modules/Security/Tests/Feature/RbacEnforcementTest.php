@@ -51,6 +51,8 @@ final class RbacEnforcementTest extends TestCase
             'agencies index' => ['GET', '/api/v1/agencies', 'catalogs.view', 200],
             'settings current' => ['GET', '/api/v1/general-settings/current', 'settings.view', 200],
             'settings index' => ['GET', '/api/v1/general-settings', 'settings.view', 200],
+            'users index' => ['GET', '/api/v1/users', 'users.view', 200],
+            'users show' => ['GET', '/api/v1/users/{user}', 'users.view', 200],
         ];
     }
 
@@ -78,6 +80,15 @@ final class RbacEnforcementTest extends TestCase
                     'max_calc_percent' => 90,
                     'annual_increase_percent' => 1,
                     'effective_from' => '2030-01-01',
+                ], 201,
+            ],
+            'users store' => [
+                'POST', '/api/v1/users',
+                [
+                    'name' => 'Usuario RBAC',
+                    'email' => 'rbac-user@sgp.local',
+                    'password' => 'Segura2026',
+                    'roles' => ['operator'],
                 ], 201,
             ],
         ];
@@ -119,10 +130,14 @@ final class RbacEnforcementTest extends TestCase
      */
     public function test_every_role_reads_exactly_what_the_matrix_grants(string $method, string $uriTemplate, string $permission, int $successStatus): void
     {
-        $uri = str_replace('{race}', (string) $this->raceId, $uriTemplate);
-
         foreach (PermissionMatrix::roles() as $role) {
             $this->refreshAuthenticatedUser($role);
+
+            $uri = str_replace('{race}', (string) $this->raceId, $uriTemplate);
+            // The users.show placeholder points at the acting user
+            // itself: always present, so 200 vs 403 depends purely on
+            // the role.
+            $uri = str_replace('{user}', (string) $this->user->id, $uri);
 
             $response = $this->call($method, $uri);
 
@@ -141,10 +156,18 @@ final class RbacEnforcementTest extends TestCase
      *
      * @param  array<string, mixed>  $payload
      */
-    public function test_only_admin_writes_catalogs_municipalities_and_settings(string $method, string $uri, array $payload, int $expectedStatus): void
+    public function test_only_admin_writes_the_protected_resources(string $method, string $uri, array $payload, int $expectedStatus): void
     {
         $uri = str_replace('{province}', (string) $this->provinceId, $uri);
-        $payload = str_replace('{province}', (string) $this->provinceId, $payload);
+        // Payloads may carry non-string values (e.g. the users roles
+        // array): the placeholder substitution only touches strings.
+        $provinceId = (string) $this->provinceId;
+        $payload = array_map(
+            static fn ($value): mixed => is_string($value)
+                ? str_replace('{province}', $provinceId, $value)
+                : $value,
+            $payload,
+        );
 
         foreach (PermissionMatrix::roles() as $role) {
             $this->refreshAuthenticatedUser($role);

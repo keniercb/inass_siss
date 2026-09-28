@@ -21,6 +21,9 @@ class DemoUserSeeder extends Seeder
             [
                 'name' => 'SGP Demo Admin',
                 'password' => 'password',
+                // Baseline for the (optional) password expiry (ADR-24):
+                // the demo account counts its age from creation.
+                'password_changed_at' => now(),
             ],
         );
 

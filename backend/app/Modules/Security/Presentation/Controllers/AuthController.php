@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Security\Presentation\Controllers;
 
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
+use App\Modules\Security\Application\Exceptions\PasswordExpiredException;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
+use App\Modules\Security\Presentation\Requests\ChangeOwnPasswordRequest;
 use App\Modules\Security\Presentation\Requests\LoginRequest;
 use App\Modules\Security\Presentation\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +37,7 @@ final class AuthController
         operationId: 'authLogin',
         tags: ['Auth'],
         summary: 'Autenticar credenciales y emitir token',
-        description: 'Verifica las credenciales y emite un token Bearer (RF-SEG-001). El email desconocido y la contraseña errónea colapsan en el mismo 401 para no revelar cuál falló. Limitado por throttle: 10 intentos por minuto.',
+        description: 'Verifica las credenciales y emite un token Bearer (RF-SEG-001). El email desconocido, la contraseña errónea y la cuenta bloqueada por intentos fallidos colapsan en el mismo 401 para no revelar cuál falló; una contraseña caducada (política opcional, ADR-24) responde 401 con mensaje de renovación. Limitado por throttle: 10 intentos por minuto.',
         requestBody: new OA\RequestBody(
             required: true,
             description: 'Credenciales del usuario',
@@ -98,10 +100,20 @@ final class AuthController
     )]
     public function login(LoginRequest $request): JsonResponse
     {
-        $result = $this->auth->login(
-            $request->validated('email'),
-            $request->validated('password'),
-        );
+        try {
+            $result = $this->auth->login(
+                $request->validated('email'),
+                $request->validated('password'),
+            );
+        } catch (PasswordExpiredException) {
+            // Valid secrets, aged-out password (ADR-24): the caller is
+            // told to renew instead of guessing "wrong password"; an
+            // administrator resets it when self-service is no longer
+            // possible.
+            return response()->json([
+                'message' => 'The password has expired and must be renewed.',
+            ], 401);
+        }
 
         if ($result === null) {
             return response()->json([
@@ -192,6 +204,62 @@ final class AuthController
 
         return response()->json([
             'message' => 'Token revoked.',
+        ]);
+    }
+
+    #[OA\Post(
+        path: '/api/v1/auth/password',
+        operationId: 'authChangePassword',
+        tags: ['Auth'],
+        summary: 'Renovar la propia contraseña',
+        description: 'Renovación voluntaria (RF-SEG-001 "renovación", ADR-24): verifica la contraseña actual, aplica la política a la nueva y revoca todas las demás sesiones — el token de la solicitud sigue vivo. Una contraseña caducada no puede renovarse aquí (se requiere login previo): un Administrador la restablece con PATCH /users/{id}/password.',
+        security: [['sanctumAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            description: 'Contraseña actual y nueva',
+            content: new OA\JsonContent(
+                required: ['current_password', 'password'],
+                properties: [
+                    new OA\Property(property: 'current_password', type: 'string', format: 'password', example: 'Segura2026'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'Renovada2026', description: 'Sujeta a la política (longitud mínima y complejidad) y distinta de la actual'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Contraseña renovada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', ref: '#/components/schemas/User'),
+                    ],
+                ),
+            ),
+            new OA\Response(
+                response: 401,
+                description: 'Token ausente, inválido o ya revocado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Unauthenticated.'),
+                    ],
+                ),
+            ),
+            new OA\Response(ref: '#/components/responses/ValidationError', response: 422),
+        ],
+    )]
+    public function changePassword(ChangeOwnPasswordRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        assert($user instanceof User);
+
+        $user = $this->auth->changePassword(
+            $user,
+            (string) $request->validated('current_password'),
+            (string) $request->validated('password'),
+        );
+
+        return response()->json([
+            'data' => new UserResource($user),
         ]);
     }
 }
