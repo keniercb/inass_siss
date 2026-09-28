@@ -260,11 +260,11 @@ Modelar el mapa organizacional del Estado que interviene en cada expediente: ent
 ### 6.4 Tareas del sprint
 
 **Estructura organizacional (S4.1-S4.3)**
-- [ ] Migraciones y dominio de entidades y oficinas con jerarquías auto-referenciadas.
-- [ ] Regla de aciclicidad como test de dominio puro (RN-03): dataset con árboles válidos e inválidos; el algoritmo de detección de ciclos se implementa en `Domain`, no en BD, y se ejecuta antes de persistir.
-- [ ] Coherencia geográfica (RN-04, RF-ENT-004): toda entidad/oficina con provincia exige municipio perteneciente; validación en dominio + constraint compuesto en BD.
-- [ ] Cargos y firmas autorizadas por entidad (RF-ENT-003): unicidad activa de firma (persona+cargo+entidad), historial de revocación.
-- [ ] Consulta de estructura (RF-ENT-005): árbol de jerarquía paginado y búsqueda por nombre/NIT.
+- [x] Migraciones y dominio de entidades y oficinas con jerarquías auto-referenciadas. *(ADR-22: migraciones `entities`/`offices` con FK compuesta RN-04 y claves naturales UNIQUE reservadas por soft delete)*
+- [x] Regla de aciclicidad como test de dominio puro (RN-03): dataset con árboles válidos e inválidos; el algoritmo de detección de ciclos se implementa en `Domain`, no en BD, y se ejecuta antes de persistir. *(ADR-22: `HierarchyPolicy::wouldCreateCycle` + HierarchyPolicyTest con 12 datasets: raíz, cadena, árbol ancho, re-enraizado válido, self, 2-ciclo, 3-ciclo, cadena de 6 niveles, padre desconocido, pureza)*
+- [x] Coherencia geográfica (RN-04, RF-ENT-004): toda entidad/oficina con provincia exige municipio perteneciente; validación en dominio + constraint compuesto en BD. *(ADR-22: 422 semántico por campo contra el estado resultante + FK compuesta, backstop probado con QueryException)*
+- [x] Cargos y firmas autorizadas por entidad (RF-ENT-003): unicidad activa de firma (persona+cargo+entidad), historial de revocación. *(ADR-22: terna UNIQUE cubriendo revocadas — la revocación es soft delete auditado que preserva el historial y mantiene la terna reservada; ventana RN-006 y estado derivado `active`/`future`/`expired`)*
+- [x] Consulta de estructura (RF-ENT-005): árbol de jerarquía paginado y búsqueda por nombre/NIT. *(ADR-22: `GET /entities/tree` y `/offices/tree` con 5 niveles y corte anunciado `deeper`; búsqueda `q` sobre código/NIT/objeto social — las entidades no llevan columna nombre; el conteo de expedientes por oficina llega con F3)*
 
 **Base legal (S4.4-S4.5)**
 - [ ] Tipos de base legal (catálogo sembrado) y registro de bases legales con organismo emisor, número, fecha y texto referencia.
@@ -685,4 +685,5 @@ Los 66 RF del catálogo quedan asignados: 54 M (todos con fase), 10 S distribuid
 | 1.1 | 2026-09-27 | Sprint 3: nota de orden de ejecución dependencia-conducente (RBAC y bitácora antes de People para cerrar RF-PER-002 dentro del slice de personas); sin cambios de alcance, fechas ni gates | Arq. Backend |
 | 1.2 | 2026-09-27 | Sprint 3: S3.1-S3.3 (Personas, ADR-20) marcados completos junto a S3.4 (RBAC, ADR-18/PR #9) y auditoría base (ADR-19/PR #10); queda pendiente del sprint únicamente S3.5 (usuario↔persona + restricción por estado) | Arq. Backend |
 | 1.3 | 2026-09-28 | Sprint 3: S3.5 marcado completo (ADR-21, PR #13) — asociación usuario↔persona con unicidad en BD y 409 conversacional, `/auth/me` enriquecido con la persona vinculada y regla de estado `canStartNewProcess`; Sprint 3 cerrado al 100% | Arq. Backend |
+| 1.4 | 2026-09-28 | Sprint 4: S4.1-S4.3 (Estructura organizacional, ADR-22) marcados completos — entidades/oficinas/firmas con jerarquías acíclicas por dominio puro, coherencia geográfica RN-04 doble, firmas con terna reservada y estado derivado, árboles de 5 niveles; permisos `organizations.*` en la matriz; queda pendiente del sprint la base legal (S4.4-S4.5) | Arq. Backend |
 

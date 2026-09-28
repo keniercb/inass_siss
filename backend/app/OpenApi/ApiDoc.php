@@ -32,4 +32,5 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Auditoría', description: 'Bitácora append-only de acciones: consulta filtrable y exportación CSV (RF-AUD-001, RF-AUD-003)')]
 #[OA\Tag(name: 'Personas', description: 'Registro único de personas: alta con control de duplicados, edición auditada, fallecimiento y búsqueda (RF-PER-001..005)')]
 #[OA\Tag(name: 'Usuarios', description: 'Cuentas de usuario: vinculación con personas del registro único para la trazabilidad de acciones (RF-SEG-004)')]
+#[OA\Tag(name: 'Estructura', description: 'Estructura organizacional: entidades, oficinas, jerarquías acíclicas (RN-003), firmas autorizadas y árbol de consulta (RF-ENT-001..005)')]
 final class ApiDoc {}
