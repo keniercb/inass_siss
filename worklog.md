@@ -766,3 +766,22 @@ Stage Summary:
 - Advertencias de dominio puro (RF-EXP-002/003): huecos interiores de la serie salarial, solapes de servicios con días inclusivos y vínculos sin cerrar — viajan como objeto warnings junto a data, nunca bloquean
 - Matriz RBAC a 19 permisos (cases.view/create/edit); suite 797 tests / 2477 aserciones; ADR-25 documentado
 - SIGUIENTE: Sprint 6 (S6.1-S6.5) — CaseStatus con MATRIZ de transiciones como dataset de Pest primero (sección 2.4), POST /pension-cases/{id}/transitions con evidencia exigible, revisión con completitud (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada con volumen (RF-EXP-011)
+---
+Task ID: 22-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del Sprint 5 — PR #18, CI y merge a main (PensionCases en main)
+
+Work Log:
+- PR #18 creada por API: https://github.com/keniercb/inass_siss/pull/18 (rama feat/SGP-17-pension-cases, 4 commits: feature b69368a + docs 7dd0114 + tests Shared 56e6b10/269c2ba + TestCase class c267e40)
+- Incidentes del daemon durante la entrega (12-15: volteos de HEAD a main en el commit del feature, del docs, del test y del fix de estilo): recuperados con checkout + cherry-pick + branch -f en comandos atómicos, sin pérdida; lección consolidada — commitear con verificación de rama DENTRO del mismo comando y empujar de inmediato
+- CI #1 (7dd0114) FAILURE: la puerta de cobertura Shared ≥95% cayó por el binding nuevo del TransactionManager sin cubrir (lección de PR #16 re-aplicada: tocar el provider de un módulo medido exige cubrir el cableado) — fix: DatabaseTransactionManagerTest con binding + commit/rollback contra MySQL real
+- CI #2 (56e6b10) FAILURE: Pint marcó 1 issue de estilo en el test nuevo (fully_qualified_strict_types) — fix: pint aplicado
+- CI #3 (269c2ba) FAILURE: PHPStan del runner marcó $this->app sin tipar en el closure de Pest (la pasada local previa no incluía el archivo) — fix: conversión a test de clase TestCase (el closure además hacía unreachable el fail() tras closure :never)
+- CI #4 (c267e40) SUCCESS — job «Quality gate (PHP 8.3)»: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner, puerta Shared ≥95% recuperada y build Docker
+- PR #18 mergeeada a main como 9046fe1 con merge commit; rama local sincronizada a origin/main
+
+Stage Summary:
+- FASE 3 SPRINT 5 EN MAIN: el sistema registra expedientes de pensión con número secuencial único (RN-009), estado inicial submitted y subregistros atómicos; un expediente abierto por persona (columna generada + UNIQUE físicos); altas/bajas de salarios/servicios/ciclos solo en submitted (409 con estado); warnings de evidencia (huecos, solapes, vínculos abiertos) en cada respuesta; matriz RBAC a 19 permisos
+- Suite completa: 800 tests / 2480 aserciones (797 del slice + 3 del TransactionManager) contra MySQL real; ADR-25 documentado con las decisiones y sus contrapesos
+- SIGUIENTE: Sprint 6 (S6.1-S6.5) — matriz de transiciones como dataset de Pest ANTES del enum, POST /pension-cases/{id}/transitions con evidencia exigible (nota, base legal vigente en aprobación/denegación), completitud en revisión (RF-EXP-006), reapertura administrativa (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002, tabla pension_case_histories aún sin migrar) y búsqueda afinada con volumen de ~50k expedientes sintéticos (RF-EXP-011)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
