@@ -725,3 +725,21 @@ Stage Summary:
 - FASE 2 COMPLETA Y S3.6 CERRADO: el sistema puede provisionar sus propios operadores/especialistas — prerrequisito operativo para la captura masiva de expedientes
 - SIGUIENTE: Fase 3 (PensionCases: expedientes, subregistros, máquina de estados RF-EXP-001..011, historial inmutable RF-AUD-002) consumiendo oficinas, firmas, bases vigentes y cuentas ya administrables; RN-007/RN-009 del Sprint 2 siguen aplazadas sin cambio de decisión
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 21
+Agent: Super Z (agente principal)
+Task: Corregir el CRUD de personas — la búsqueda por carné de identidad no debe ser exacta, debe aplicar el patrón ci_buscado% (RF-PER-004)
+
+Work Log:
+- Sandbox recreado otra vez (toolchain perdido): re-provisionado PHP 8.3.29 estático (~/.local/bin/php, extensiones pdo_mysql/mbstring/xml/zip/gd/bcmath), Composer 2.10.3, MySQL 8.4.6 portátil en 13306 (mysqld --initialize-insecure, usuario sgp/sgp_local_dev, BDs sgp y sgp_test, script idempotente ~/.runtime/bin/start-mysql.sh con LD_LIBRARY_PATH userspace libaio1t64+libncurses6 extraídas de .deb, symlink libaio.so.1), composer install (96 paquetes) y .env restaurado desde .env.example + key:generate
+- TDD ROJA: PersonSearchApiTest renombrado test_searches_by_identity (el CI completo es el prefijo más largo) + 6 tests nuevos: prefijo de 6 dígitos, prefijo de cohorte (identity=1 → Juan+Luis), prefijo-no-substring (dígitos intermedios no matchean), prefijo sin resultados, 422 por no-dígitos, 422 por >11 dígitos — roja confirmada (4 fallos: validación digits:11 y WHERE exacto)
+- TDD VERDE: PersonIndexRequest identity digits:11 → digits_between:1,11 (solo dígitos → LIKE sin riesgo de inyección de comodines); EloquentPeopleRepository::search() WHERE identity_number LIKE 'ci_buscado%'; OA del PersonController (descripción del endpoint + parámetro identity con minLength/maxLength 1-11); docblocks de PeopleRepositoryInterface y del repositorio actualizados a semántica de prefijo
+- Regresión: suite completa contra MySQL real (ADR-08) 706 passed / 2196 assertions; Pint PASS (25 archivos People); PHPStan nivel 8 sin errores (turbo-ext cae a PHP puro por el binario estático, limitación local conocida)
+- Docs de trazabilidad: Requisitos funcionales.md RF-PER-004 (búsqueda por prefijo ci_buscado%, 1-11 dígitos, 11 = exacta), Diseño de arquitectura.md (fila del endpoint GET /people), Modelo de datos.md (semántica de la búsqueda people)
+- Incidente menor auto-infligido: un git reset --hard sobre main descartó los cambios sin commitear (el checkout de la rama no sobrevivió al recreado del shell); todo re-hecho desde el registro de ediciones y re-verificado en verde antes de commitear — lección reafirmada: commitear antes de cualquier cirugía de git
+- Branch fix/SGP-16-people-identity-prefix, commit f25ce0d, PR #17, CI verde, mergeada como 81f314e
+
+Stage Summary:
+- GET /api/v1/people?identity=… ahora aplica patrón ci_buscado% (LIKE prefijo): acota con cada dígito tecleado; 11 dígitos equivale a la búsqueda exacta previa, así que ningún consumidor se rompe
+- La regla digits_between:1,11 garantiza que por el filtro solo pasan dígitos → el LIKE es inmune a inyección de comodines por construcción, sin escaping
+- Docs RF/arquitectura/modelo de datos alineados con la semántica nueva; PR #17 mergeada en main, CI verde
