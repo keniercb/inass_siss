@@ -12,10 +12,14 @@ use InvalidArgumentException;
  *
  * The five institutional roles come from section 2.2 of the
  * requirements: administrador (technical staff, everything),
- * director (approves cases, read-only consultation until the
- * EXP/CAL/REP permissions arrive with their phases), especialista
- * (case worker, consultation), operador (data capture, registers
- * people) and auditor (strictly read-only plus the audit trail).
+ * director (approves cases: read-only consultation until the
+ * review/approve permissions arrive with S6, then the exclusive
+ * approval), especialista (case worker: consultation until S6,
+ * then the review surface), operador (data capture: registers
+ * people and cases in estado Solicitud with their subrecords) and
+ * auditor (strictly read-only plus the audit trail, with cases.view
+ * to cross-read the subjects of the bitácora — same precedent as
+ * people.view and users.view).
  *
  * The matrix is deliberately a pure domain value: the seeder
  * materializes it into spatie/laravel-permission tables, the Pest
@@ -40,14 +44,17 @@ final class PermissionMatrix
 
     /**
      * Initial permission catalog for the modules that exist today
-     * (Catalogs, Settings, People, audit trail, user management and
-     * the Fase 2 organizational and legal structure); cases/
-     * pensioners/payments/reports join in their own phases.
-     * Alphabetical on purpose: the matrix stays diff-friendly.
+     * (Catalogs, Settings, People, audit trail, user management, the
+     * Fase 2 organizational and legal structure and the Fase 3 case
+     * aggregate); pensioners/payments/reports join in their own
+     * phases. Alphabetical on purpose: the matrix stays diff-friendly.
      */
     private const array PERMISSIONS = [
         'audit.export',
         'audit.view',
+        'cases.create',
+        'cases.edit',
+        'cases.view',
         'catalogs.manage',
         'catalogs.view',
         'legalbases.manage',
@@ -71,6 +78,7 @@ final class PermissionMatrix
     private const array GRANTS = [
         'admin' => [
             'audit.export', 'audit.view',
+            'cases.create', 'cases.edit', 'cases.view',
             'catalogs.manage', 'catalogs.view',
             'legalbases.manage', 'legalbases.view',
             'organizations.manage', 'organizations.view',
@@ -79,6 +87,7 @@ final class PermissionMatrix
             'users.manage', 'users.view',
         ],
         'director' => [
+            'cases.view',
             'catalogs.view',
             'legalbases.view',
             'organizations.view',
@@ -86,6 +95,7 @@ final class PermissionMatrix
             'settings.view',
         ],
         'specialist' => [
+            'cases.view',
             'catalogs.view',
             'legalbases.view',
             'organizations.view',
@@ -93,6 +103,7 @@ final class PermissionMatrix
             'settings.view',
         ],
         'operator' => [
+            'cases.create', 'cases.edit', 'cases.view',
             'catalogs.view',
             'legalbases.view',
             'organizations.view',
@@ -100,6 +111,7 @@ final class PermissionMatrix
         ],
         'auditor' => [
             'audit.export', 'audit.view',
+            'cases.view',
             'catalogs.view',
             'legalbases.view',
             'organizations.view',

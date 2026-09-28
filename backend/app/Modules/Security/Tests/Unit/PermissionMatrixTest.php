@@ -33,6 +33,9 @@ final class PermissionMatrixTest extends TestCase
             [
                 'audit.export',
                 'audit.view',
+                'cases.create',
+                'cases.edit',
+                'cases.view',
                 'catalogs.manage',
                 'catalogs.view',
                 'legalbases.manage',
