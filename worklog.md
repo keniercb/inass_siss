@@ -703,3 +703,25 @@ Stage Summary:
 - LA BITÁCORA NUNCA VE SECRETOS: RedactsAuditAttributes + AuditRecorder extraído como única escritora (password→[redacted] en created/updated/deleted/restored) y entradas explícitas para cambios de roles con la asignación previa; el conteo de fallos es saveQuietly (la bitácora registra el desbloqueo, no cada typo)
 - Matriz RBAC a 16 permisos (users.view: admin+auditor); suite 698 tests/2173 aserciones
 - SIGUIENTE: Fase 3 (PensionCases) con cuentas provisionables por el propio sistema; PAT vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 20-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de S3.6 — PR #16, CI y merge a main (gestión de usuarios en main)
+
+Work Log:
+- Tres incidentes del daemon durante la entrega (volteos de HEAD a main en los momentos del commit/checkout/parche, séptimo-octavo-noveno registro): recuperados con checkout + branch -f + verificación de rama DENTRO del mismo comando que el commit — un commit cayó en main y se recolocó con branch -f feat… + branch -f main 75e2d00 sin pérdida; el guardado de rama abortó un commit fallido antes de que aterrizara
+- QA re-levantado de forma atómica sobre la rama correcta tras detectar un volteo que invalidó una pasada de verificación (Pest 698 sobre el árbol correcto confirmado por presencia de UserManagementTest + TIP fd73d3b)
+- PR #16 creada por API: https://github.com/keniercb/inass_siss/pull/16 (rama feat/SGP-15-user-management, 3 commits: feature 107c7d1 + docs ADR-24 aaa4776 + worklog Task 20 fd73d3b)
+- CI #1 (fd73d3b) FAILURE: la puerta de cobertura Shared cayó a 94.9% — SharedServiceProvider quedó a 0% al crecer con el binding singleton de AuditRecorder (lección: cambiar el provider de un módulo medido por la puerta exige cubrir el cableado); fix: SharedServiceProviderTest con Container desnudo (reloj→SystemClock y recorder como singleton con actor nulo del puerto de Security) — 78 tests Shared
+- CI #2 (926064c) FAILURE: PHPStan del runner marcó el Container desnudo contra el contrato Application del constructor (la pasada local anterior no incluyó el archivo nuevo); fix: ignores inline justificados (mismo patrón del trait BootsMinimalValidator)
+- CI #3 (bbdb966) SUCCESS — job «Quality gate (PHP 8.3)»: Pint, PHPStan 8, deptrac 0/0, Pest vs MySQL del runner, puerta de cobertura ≥95% recuperada y build Docker
+- PR #16 squash-mergeeada a main como 1581a91 con mensaje de alcance completo; push-run de main sobre 1581a91: SUCCESS
+- main local sincronizado (reset a origin/main); rama remota eliminada (HTTP 204) y rama local eliminada; suite final re-verificada sobre main: 700 tests/2176 aserciones en verde (698 del slice + 2 del provider)
+
+Stage Summary:
+- ADR-24 CERRADO EN MAIN: RF-SEC-001 operativo de extremo a extremo — bloqueo por fuerza bruta con desbloqueo administrativo auditado, política de contraseñas (longitud/complejidad/caducidad opcional) aplicada en alta/reset/renovación, renovación propia con supervivencia de sesión, CRUD administrativo con guardas de último administrador y revocación total de tokens en desactivación, bitácora sin secretos (password [redacted]) y cambios de roles auditados explícitamente
+- Matriz RBAC a 16 permisos (users.view: admin+auditor); suite 700 tests/2176 aserciones
+- FASE 2 COMPLETA Y S3.6 CERRADO: el sistema puede provisionar sus propios operadores/especialistas — prerrequisito operativo para la captura masiva de expedientes
+- SIGUIENTE: Fase 3 (PensionCases: expedientes, subregistros, máquina de estados RF-EXP-001..011, historial inmutable RF-AUD-002) consumiendo oficinas, firmas, bases vigentes y cuentas ya administrables; RN-007/RN-009 del Sprint 2 siguen aplazadas sin cambio de decisión
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
