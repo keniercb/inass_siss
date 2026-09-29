@@ -805,3 +805,21 @@ Stage Summary:
 - Roles personalizados asignables a cuentas (permisos efectivos vía spatie sin cableado extra); matriz a 21 permisos
 - Fix documentado del guard mutado por auth:sanctum (ADR-26): clase entera de fallos latentes eliminada
 - Docs: ADR-26 + filas de endpoints + changelog 1.16 (arquitectura), entrada roles ampliada + changelog 1.11 (modelo de datos), ítem S12 marcado ejecutado + changelog 1.8 (plan)
+---
+Task ID: 23-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del CRUD de roles — PR #19, CI y merge a main
+
+Work Log:
+- PR #19 creada por API: https://github.com/keniercb/inass_siss/pull/19 (rama feat/SGP-18-roles-crud, 6 commits: 2 feat + test + docs + worklog + style)
+- Incidente del daemon recurrente (lección de Task 22 aplicada pero reaparecida en otra fase): los 5 commits iniciales cayeron sobre main local porque el daemon volteó HEAD entre el checkout de la rama y el primer commit — recuperados con branch -f a la punta + reset --hard de main + push --force-with-lease en comandos atómicos con verificación de rama dentro del mismo comando; el daemon también volteó HEAD durante la verificación local de Pint (la pasada «verde» era contra main viejo, 344 archivos) — re-verificado sobre la rama correcta (362 archivos) para descubrir el fallo real
+- CI #1 (d72fc2e) FAILURE: Pint marcó 2 issues fully_qualified_strict_types en los FormRequests de roles — los docblocks con FQCN inline que la corrección de PHPStan introdujo DESPUÉS de la pasada local de Pint (secuencia de puertas: cualquier edición posterior exige re-correr TODAS las puertas antes de commitear) — fix: pint sobre los requests + verificación doble (pint PASS 362 y PHPStan 0) + suite unit re-verificada
+- CI #2 (c5c4c6e) SUCCESS — job «Quality gate (PHP 8.3)»: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (878/2737), puerta Shared ≥95% y build Docker
+- PR #19 mergeeada a main como 0c9be6a con merge commit; main local sincronizado y regresión final sobre main en verde: 878 tests / 2738 assertions
+
+Stage Summary:
+- CRUD DE ROLES EN MAIN (RF-SEG-002, ADR-26): directorio con institucionales is_system inmutables + personalizados con subconjuntos del catálogo de 21 permisos; PATCH parcial con reemplazo completo del set; borrado 409 conversacional con conteo de pivotes (desactivadas incluidas); concesiones auditadas con set previo y conservadas al borrar; roles personalizados asignables a cuentas de inmediato (guardRoles → directorio + Rule::exists)
+- Fix estructural documentado: $guard_name = 'web' en el modelo Role del módulo — el middleware auth:sanctum muta auth.defaults.guard por el resto del proceso y el morfo users() de spatie resolvería NULL en cualquier modelo construido tras una petición autenticada
+- Suite completa: 878 tests / 2738 aserciones contra MySQL real; matriz a 21 permisos; ADR-26 + changelogs (arquitectura 1.16, modelo de datos 1.11, plan 1.8)
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum (sección 2.4), POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
