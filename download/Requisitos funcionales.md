@@ -157,7 +157,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 
 **RF-PER-001 (M) — Registro de personas (MO)**
 - [ ] Campos obligatorios: número de identidad, primer nombre, primer apellido, sexo, fecha de nacimiento y dirección.
-- [ ] El número de identidad valida el formato cubano de 11 dígitos, incluido el dígito verificador (regla `CubanIdentityNumber`).
+- [ ] El número de identidad valida 11 dígitos, mes (dígitos 3-4) y día (dígitos 5-6); el sexo declarado se contrasta con la paridad del dígito 10 del carné (par masculino, impar femenino). Corregido 2026-09-30 (ADR-30, regla `CubanIdentityNumber`): el dígito verificador sigue diferido a P-08.
 - [ ] El número de identidad es único en el sistema.
 - [ ] Sexo restringido a `M`/`F`; fecha de muerte, si existe, posterior a la de nacimiento.
 
@@ -443,7 +443,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 
 | ID | Regla |
 |---|---|
-| RN-001 | El número de identidad cubano (11 dígitos) valida formato y dígito verificador; es único e inmutable |
+| RN-001 | El número de identidad cubano (11 dígitos) valida 11 dígitos, mes (dígitos 3-4) y día (dígitos 5-6); el sexo se codifica en el dígito 10 (par masculino, impar femenino) y se contrasta con el declarado; es único e inmutable (dígito verificador: P-08) |
 | RN-002 | Sexo restringido a `M`/`F`; toda regla sensible al sexo deriva de la configuración vigente |
 | RN-003 | Las jerarquías de entidades y oficinas son acíclicas; un nodo no puede ser ascendiente de sí mismo |
 | RN-004 | En toda entidad con provincia y municipio, el municipio pertenece a la provincia |
@@ -467,7 +467,7 @@ Durante el análisis se identificaron puntos que requieren validación del área
 | P-05 | Formato del archivo de nómina electrónica exigido por cada agencia | Exportación (RF-PAG-004) | Generador de archivos con plantillas configurables |
 | P-06 | Catálogos oficiales definitivos (razas, niveles educacionales, categorías, tipos de pensión, regímenes vigentes) | Seeders y pruebas de aceptación | Seeders versionables en el repositorio, ajustables sin migraciones |
 | P-07 | Volumen real de datos históricos a migrar y fuente autorizada | Plan de fases 7 | Migración como proyecto aparte, acotada al inicio de UAT |
-| P-08 | Algoritmo oficial del dígito verificador del carnet de identidad (posición 11); no existe fuente pública verificable | Validación de identidad en People (RN-001) | Validación estructural completa implementada en la Fase 0; política de checksum intercambiable cuando el Ministerio confirme la regla |
+| P-08 | Algoritmo oficial del dígito verificador del carnet de identidad (posición 11); no existe fuente pública verificable | Validación de identidad en People (RN-001) | Validación estructural corregida 2026-09-30 (ADR-30: 11 dígitos, mes/día y sexo por paridad del dígito 10 — año y consecutivo sin validar); política de checksum intercambiable cuando el Ministerio confirme la regla |
 
 ## 8. Matriz de trazabilidad
 
