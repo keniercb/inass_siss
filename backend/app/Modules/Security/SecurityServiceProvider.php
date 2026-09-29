@@ -7,15 +7,19 @@ namespace App\Modules\Security;
 use App\Modules\Security\Application\Authentication\SecurityPolicies;
 use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
+use App\Modules\Security\Application\Contracts\PermissionServiceInterface;
+use App\Modules\Security\Application\Contracts\PermissionUsageQueryInterface;
 use App\Modules\Security\Application\Contracts\RoleRepositoryInterface;
 use App\Modules\Security\Application\Contracts\RoleServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\Contracts\UserServiceInterface;
 use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Application\Services\PermissionService;
 use App\Modules\Security\Application\Services\RoleService;
 use App\Modules\Security\Application\Services\UserService;
 use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
+use App\Modules\Security\Infrastructure\Persistence\EloquentPermissionUsageQuery;
 use App\Modules\Security\Infrastructure\Persistence\EloquentRoleRepository;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
 use App\Modules\Security\Infrastructure\Persistence\Models\Role;
@@ -79,6 +83,19 @@ final class SecurityServiceProvider extends ServiceProvider
         $this->app->bind(
             RoleRepositoryInterface::class,
             EloquentRoleRepository::class,
+        );
+
+        // Permission catalog (RF-SEG-002, ADR-27): read-only surface
+        // that answers to the matrix with live usage projections from
+        // the spatie pivots.
+        $this->app->bind(
+            PermissionServiceInterface::class,
+            PermissionService::class,
+        );
+
+        $this->app->bind(
+            PermissionUsageQueryInterface::class,
+            EloquentPermissionUsageQuery::class,
         );
 
         // Audit actor port (ADR-14): stamping needs to know who performs

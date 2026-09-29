@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Auditoría', description: 'Bitácora append-only de acciones: consulta filtrable y exportación CSV (RF-AUD-001, RF-AUD-003)')]
 #[OA\Tag(name: 'Personas', description: 'Registro único de personas: alta con control de duplicados, edición auditada, fallecimiento y búsqueda (RF-PER-001..005)')]
 #[OA\Tag(name: 'Usuarios', description: 'Cuentas de usuario: vinculación con personas del registro único para la trazabilidad de acciones (RF-SEG-004)')]
-#[OA\Tag(name: 'Roles', description: 'Gestión de roles: los cinco institucionales inmutables de la sección 2.2 y los personalizados con subconjuntos del catálogo de permisos (RF-SEG-002, ADR-26)')]
+#[OA\Tag(name: 'Roles', description: 'Gestión de roles y catálogo de permisos: los cinco institucionales inmutables de la sección 2.2, los personalizados con subconjuntos del catálogo y la superficie de solo lectura de permisos que consume el editor de roles (RF-SEG-002, ADR-26/27)')]
 #[OA\Tag(name: 'Estructura', description: 'Estructura organizacional: entidades, oficinas, jerarquías acíclicas (RN-003), firmas autorizadas y árbol de consulta (RF-ENT-001..005)')]
 #[OA\Tag(name: 'Base legal', description: 'Corpus legal: bases con terna tipo-número-año única, año derivado de la emisión (H-11), vigencias derivadas (RN-006) y consulta documental (RF-LEG-001..004)')]
 #[OA\Tag(name: 'Expedientes', description: 'Expedientes de pensión: apertura con número secuencial (RN-009), subregistros de salarios/servicios/ciclos con validaciones RN-005 y advertencias de evidencia (RF-EXP-001..004)')]
