@@ -34,7 +34,7 @@ final class PersonDuplicatesApiTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
-            'identity_number' => '18506150012',
+            'identity_number' => '85061510002',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'sex' => 'M',
@@ -46,7 +46,7 @@ final class PersonDuplicatesApiTest extends TestCase
     public function test_a_duplicate_identity_answers_409_with_the_registered_person(): void
     {
         $existing = Person::factory()->create([
-            'identity_number' => '18506150012',
+            'identity_number' => '85061510002',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'birth_date' => '1985-06-15',
@@ -56,7 +56,7 @@ final class PersonDuplicatesApiTest extends TestCase
 
         $response->assertConflict()
             ->assertJsonPath('person.id', $existing->id)
-            ->assertJsonPath('person.identity_number', '18506150012')
+            ->assertJsonPath('person.identity_number', '85061510002')
             ->assertJsonPath('person.first_name', 'Juan')
             ->assertJsonPath('person.birth_date', '1985-06-15');
 
@@ -67,7 +67,7 @@ final class PersonDuplicatesApiTest extends TestCase
 
     public function test_a_duplicate_identity_is_blocked_even_after_a_soft_delete(): void
     {
-        $existing = Person::factory()->create(['identity_number' => '18506150012']);
+        $existing = Person::factory()->create(['identity_number' => '85061510002']);
         $existing->delete();
 
         // RN-001: the identity is unique against deactivated persons
@@ -81,7 +81,7 @@ final class PersonDuplicatesApiTest extends TestCase
     public function test_homonym_candidates_warn_the_operator(): void
     {
         Person::factory()->create([
-            'identity_number' => '18506150098',
+            'identity_number' => '85061510004',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'birth_date' => '1985-06-15',
@@ -90,7 +90,7 @@ final class PersonDuplicatesApiTest extends TestCase
         $response = $this->postJson('/api/v1/people', $this->payload());
 
         $response->assertConflict()
-            ->assertJsonPath('candidates.0.identity_number', '18506150098')
+            ->assertJsonPath('candidates.0.identity_number', '85061510004')
             ->assertJsonPath('candidates.0.first_name', 'Juan')
             ->assertJsonPath('candidates.0.birth_date', '1985-06-15');
 
@@ -100,7 +100,7 @@ final class PersonDuplicatesApiTest extends TestCase
     public function test_a_confirmed_homonym_is_registered(): void
     {
         Person::factory()->create([
-            'identity_number' => '18506150098',
+            'identity_number' => '85061510004',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'birth_date' => '1985-06-15',
@@ -117,7 +117,7 @@ final class PersonDuplicatesApiTest extends TestCase
         // Only living people are duplicate candidates: a deceased
         // homonym is history, not a registry conflict.
         Person::factory()->create([
-            'identity_number' => '18506150098',
+            'identity_number' => '85061510004',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'birth_date' => '1985-06-15',
@@ -131,7 +131,7 @@ final class PersonDuplicatesApiTest extends TestCase
     public function test_homonym_detection_ignores_a_different_birth_date(): void
     {
         Person::factory()->create([
-            'identity_number' => '18506150098',
+            'identity_number' => '85061510004',
             'first_name' => 'Juan',
             'first_surname' => 'Pérez',
             'birth_date' => '1986-01-01',
@@ -154,7 +154,7 @@ final class PersonDuplicatesApiTest extends TestCase
         // A different name/birth date on purpose: this suite exercises
         // the citizen-card rule, not the homonym warning.
         $this->postJson('/api/v1/people', $this->payload([
-            'identity_number' => '18506159999',
+            'identity_number' => '72090312340',
             'first_name' => 'Roberto',
             'birth_date' => '1972-09-03',
             'citizen_card_id' => 'FUC-2020-000123',
@@ -167,7 +167,7 @@ final class PersonDuplicatesApiTest extends TestCase
         Person::factory()->create(['citizen_card_id' => null]);
 
         $this->postJson('/api/v1/people', $this->payload([
-            'identity_number' => '18506159999',
+            'identity_number' => '72090312340',
             'first_name' => 'Roberto',
             'birth_date' => '1972-09-03',
             'citizen_card_id' => null,
@@ -181,6 +181,6 @@ final class PersonDuplicatesApiTest extends TestCase
         $this->expectException(QueryException::class);
 
         Person::query()->create($this->payload());
-        Person::query()->create($this->payload(['identity_number' => '18506150012']));
+        Person::query()->create($this->payload(['identity_number' => '85061510002']));
     }
 }

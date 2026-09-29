@@ -35,7 +35,7 @@ it('allows registration when nothing collides', function () {
 it('blocks an already registered identity even when confirmed', function () {
     $policy = new DuplicatePolicy;
 
-    $registered = duplicateCandidate(7, '18506150012', 'Juan', 'Pérez', '1985-06-15');
+    $registered = duplicateCandidate(7, '85061510002', 'Juan', 'Pérez', '1985-06-15');
 
     expect($policy->evaluate($registered, [], true))->toBe(DuplicateVerdict::IdentityRegistered)
         ->and($policy->evaluate($registered, [], false))->toBe(DuplicateVerdict::IdentityRegistered);
@@ -69,7 +69,7 @@ it('ignores confirmation when there are no homonyms', function () {
 it('prefers the identity block over the homonym warning', function () {
     $policy = new DuplicatePolicy;
 
-    $registered = duplicateCandidate(7, '18506150012', 'Juan', 'Pérez', '1985-06-15');
+    $registered = duplicateCandidate(7, '85061510002', 'Juan', 'Pérez', '1985-06-15');
     $homonyms = [duplicateCandidate(9, '18506150098', 'Juan', 'Pérez', '1985-06-15')];
 
     // When both apply, the identity duplicate is the answer the caller
