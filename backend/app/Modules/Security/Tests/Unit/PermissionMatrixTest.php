@@ -65,6 +65,21 @@ final class PermissionMatrixTest extends TestCase
         self::assertSame($granted, PermissionMatrix::roleHasPermission($role, $permission));
     }
 
+    public function test_every_catalog_permission_follows_the_module_action_convention(): void
+    {
+        // The permission catalog is a closed, code-owned set: every
+        // entry must be a lowercase module.action pair, because the
+        // catalog surface (ADR-27) decomposes each name on exactly
+        // one dot and the route pattern only admits this shape.
+        foreach (PermissionMatrix::permissions() as $permission) {
+            self::assertMatchesRegularExpression(
+                '/^[a-z][a-z0-9_]*\\.[a-z]+$/',
+                $permission,
+                "Permission [{$permission}] must follow the modulo.accion convention.",
+            );
+        }
+    }
+
     /**
      * The full matrix (S3.4): every role x permission pair with its
      * expected grant, so each cell is one executable acceptance
@@ -83,6 +98,7 @@ final class PermissionMatrixTest extends TestCase
         $expected = [
             'admin' => [
                 'audit.export' => true, 'audit.view' => true,
+                'cases.create' => true, 'cases.edit' => true, 'cases.view' => true,
                 'catalogs.manage' => true, 'catalogs.view' => true,
                 'legalbases.manage' => true, 'legalbases.view' => true,
                 'organizations.manage' => true, 'organizations.view' => true,
@@ -94,6 +110,7 @@ final class PermissionMatrixTest extends TestCase
             ],
             'director' => [
                 'audit.export' => false, 'audit.view' => false,
+                'cases.create' => false, 'cases.edit' => false, 'cases.view' => true,
                 'catalogs.manage' => false, 'catalogs.view' => true,
                 'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
@@ -105,6 +122,7 @@ final class PermissionMatrixTest extends TestCase
             ],
             'specialist' => [
                 'audit.export' => false, 'audit.view' => false,
+                'cases.create' => false, 'cases.edit' => false, 'cases.view' => true,
                 'catalogs.manage' => false, 'catalogs.view' => true,
                 'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
@@ -116,6 +134,7 @@ final class PermissionMatrixTest extends TestCase
             ],
             'operator' => [
                 'audit.export' => false, 'audit.view' => false,
+                'cases.create' => true, 'cases.edit' => true, 'cases.view' => true,
                 'catalogs.manage' => false, 'catalogs.view' => true,
                 'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,
@@ -127,6 +146,7 @@ final class PermissionMatrixTest extends TestCase
             ],
             'auditor' => [
                 'audit.export' => true, 'audit.view' => true,
+                'cases.create' => false, 'cases.edit' => false, 'cases.view' => true,
                 'catalogs.manage' => false, 'catalogs.view' => true,
                 'legalbases.manage' => false, 'legalbases.view' => true,
                 'organizations.manage' => false, 'organizations.view' => true,

@@ -130,6 +130,21 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('is_system')
             ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('permissions')
             ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('users_count')
+            // Catálogo de permisos (RF-SEG-002, ADR-27): the read-only
+            // surface the role editor consumes.
+            ->and($spec['paths'])->toHaveKey('/api/v1/permissions')
+            ->and($spec['paths'])->toHaveKey('/api/v1/permissions/{permission}')
+            ->and($spec['paths']['/api/v1/permissions'])->toHaveKeys(['get'])
+            ->and($spec['paths']['/api/v1/permissions/{permission}'])->toHaveKeys(['get'])
+            ->and($spec['paths']['/api/v1/permissions']['get']['tags'])->toBe(['Roles'])
+            ->and($spec['paths']['/api/v1/permissions/{permission}']['get']['tags'])->toBe(['Roles'])
+            ->and($spec['paths']['/api/v1/permissions']['get']['security'])->toBe([['sanctumAuth' => []]])
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('name')
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('module')
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('action')
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('institutional_roles')
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('custom_roles')
+            ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('users_count')
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
             // Estado de seguridad derivado de la sesión (S3.6, ADR-24).
