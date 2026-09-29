@@ -136,7 +136,7 @@ final class PersonController
             content: new OA\JsonContent(
                 required: ['identity_number', 'first_name', 'first_surname', 'sex', 'birth_date', 'address'],
                 properties: [
-                    new OA\Property(property: 'identity_number', type: 'string', example: '18506150012'),
+                    new OA\Property(property: 'identity_number', type: 'string', example: '85061510002'),
                     new OA\Property(property: 'first_name', type: 'string', example: 'Juan'),
                     new OA\Property(property: 'middle_name', type: 'string', nullable: true, example: 'Carlos'),
                     new OA\Property(property: 'first_surname', type: 'string', example: 'Pérez'),

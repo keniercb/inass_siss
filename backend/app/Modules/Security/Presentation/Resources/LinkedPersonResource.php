@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
     description: 'Resumen de la persona del registro único vinculada a una cuenta (RF-SEG-004). deceased se deriva de death_date.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
-        new OA\Property(property: 'identity_number', type: 'string', example: '18506150012', description: 'Carné de identidad de la persona vinculada (RN-001)'),
+        new OA\Property(property: 'identity_number', type: 'string', example: '85061510002', description: 'Carné de identidad de la persona vinculada (RN-001)'),
         new OA\Property(property: 'full_name', type: 'string', example: 'Juan Carlos Pérez Gómez', description: 'Nombre de visualización compuesto de los cuatro campos de nombre'),
         new OA\Property(property: 'deceased', type: 'boolean', example: false, description: 'Derivado: death_date no nula; una persona fallecida no puede iniciar trámites nuevos (RF-SEG-003)'),
     ],

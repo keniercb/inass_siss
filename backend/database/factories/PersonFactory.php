@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /**
  * Person factory for the People module suites (RF-PER-*).
  *
- * The generated identity numbers are structurally valid under RN-001
- * (prefix/century+gender, real calendar birth date, 11 digits), so
- * every created person passes the CubanIdentityNumber rule. The
- * issuance sequence is a per-process counter: collisions inside one
- * test would need 900 people, and RefreshDatabase resets the table
- * between tests, so cross-test repetition is harmless.
+ * The generated identity numbers are structurally valid under
+ * RN-001 as corrected (11 digits; month 01-12 and day 01-31 taken
+ * from the birth date, which stays coherent; sex parity in digit
+ * 10 — even male, odd female), so every created person passes the
+ * CubanIdentityNumber rule. The registry sequence is a per-process
+ * counter: collisions inside one test would need 900 people, and
+ * RefreshDatabase resets the table between tests, so cross-test
+ * repetition is harmless.
  *
  * @extends Factory<Person>
  */
@@ -58,9 +60,10 @@ final class PersonFactory extends Factory
 
         [$year, $month, $day] = explode('-', $birthDate);
 
-        $prefix = $sex === 'F' ? 2 : 1;
+        // Digit 10 encodes the sex: even male, odd female (RN-001).
+        $sexDigit = $sex === 'F' ? 1 : 0;
 
-        return sprintf('%d%s%s%s%03d6', $prefix, substr($year, 2, 2), $month, $day, $sequence);
+        return sprintf('%s%s%s%03d%d6', substr($year, 2, 2), $month, $day, $sequence, $sexDigit);
     }
 
     /** Sets the birth date (and a coherent identity number) for a male person. */

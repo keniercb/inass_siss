@@ -11,13 +11,14 @@ use Illuminate\Foundation\Http\FormRequest;
  * Payload for registering a person (RF-PER-001).
  *
  * The identity number is validated structurally by the Shared value
- * object through the CubanIdentity rule (RN-001); its uniqueness is
- * probed by the service to answer the RF-PER-005 semantics (409 with
- * the registered person) and backed by the database UNIQUE index.
- * Mandatory fields follow the data model (section 5.4); death is
- * never set here — it has its own audited lifecycle endpoint
- * (RF-PER-003). `confirm` carries the operator's duplicate warning
- * acknowledgment (RF-PER-005).
+ * object through the CubanIdentity rule (RN-001: 11 digits, month and
+ * day ranges) and its digit-10 parity is cross-checked against the
+ * declared sex; its uniqueness is probed by the service to answer
+ * the RF-PER-005 semantics (409 with the registered person) and
+ * backed by the database UNIQUE index. Mandatory fields follow the
+ * data model (section 5.4); death is never set here — it has its own
+ * audited lifecycle endpoint (RF-PER-003). `confirm` carries the
+ * operator's duplicate warning acknowledgment (RF-PER-005).
  */
 final class StorePersonRequest extends FormRequest
 {
@@ -32,7 +33,7 @@ final class StorePersonRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'identity_number' => ['required', 'string', 'digits:11', new CubanIdentity],
+            'identity_number' => ['required', 'string', 'digits:11', new CubanIdentity($this->declaredSex())],
             'first_name' => ['required', 'string', 'max:50'],
             'middle_name' => ['nullable', 'string', 'max:50'],
             'first_surname' => ['required', 'string', 'max:50'],
@@ -46,5 +47,17 @@ final class StorePersonRequest extends FormRequest
             'citizen_card_id' => ['nullable', 'string', 'max:30'],
             'confirm' => ['nullable', 'boolean'],
         ];
+    }
+
+    /**
+     * The declared sex when it is already parseable, so the identity
+     * rule can cross-check the digit-10 parity; anything else (absent
+     * or malformed) is left to the `sex` field's own validation.
+     */
+    private function declaredSex(): ?string
+    {
+        $sex = $this->input('sex');
+
+        return is_string($sex) && in_array($sex, ['M', 'F'], true) ? $sex : null;
     }
 }

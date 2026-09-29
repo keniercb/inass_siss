@@ -44,7 +44,7 @@ use OpenApi\Attributes as OA;
             description: 'Persona autorizada (resumen del registro único)',
             properties: [
                 new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 5),
-                new OA\Property(property: 'identity_number', type: 'string', example: '18506150012'),
+                new OA\Property(property: 'identity_number', type: 'string', example: '85061510002'),
                 new OA\Property(property: 'full_name', type: 'string', example: 'Juan Carlos Pérez Gómez'),
             ],
         ),

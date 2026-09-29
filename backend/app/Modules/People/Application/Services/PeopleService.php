@@ -13,6 +13,7 @@ use App\Modules\People\Domain\DuplicatePolicy;
 use App\Modules\People\Domain\DuplicateVerdict;
 use App\Modules\People\Infrastructure\Persistence\Models\Person;
 use App\Modules\Shared\Contracts\ClockInterface;
+use App\Modules\Shared\Support\CubanIdentityNumber;
 use DateTimeImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
@@ -100,6 +101,19 @@ final class PeopleService implements PeopleServiceInterface
             if (array_key_exists($guarded, $attributes)) {
                 throw ValidationException::withMessages([
                     $guarded => "The {$guarded} field is not editable here.",
+                ]);
+            }
+        }
+
+        // The immutable identity number is the sex authority: digit
+        // 10 encodes it (even male, odd female). A PATCH may restate
+        // the encoded sex, but never contradict it.
+        if (isset($attributes['sex']) && is_string($attributes['sex'])) {
+            $encoded = CubanIdentityNumber::fromString((string) $person->identity_number)->gender();
+
+            if ($attributes['sex'] !== $encoded) {
+                throw ValidationException::withMessages([
+                    'sex' => "The identity number encodes the sex {$encoded} (digit 10); it cannot be contradicted here.",
                 ]);
             }
         }

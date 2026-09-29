@@ -23,7 +23,7 @@ use OpenApi\Attributes as OA;
     description: 'Persona del registro único del SGP (RF-PER-001). deceased se deriva de death_date: el fallecimiento es una fecha, estar fallecido es estado derivado, nunca una columna.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
-        new OA\Property(property: 'identity_number', type: 'string', example: '18506150012', description: 'Carné de identidad: 11 dígitos, único e inmutable (RN-001)'),
+        new OA\Property(property: 'identity_number', type: 'string', example: '85061510002', description: 'Carné de identidad: 11 dígitos (mes 01-12 y día 01-31 validados, sexo por paridad del dígito 10), único e inmutable (RN-001)'),
         new OA\Property(property: 'first_name', type: 'string', example: 'Juan', description: 'Primer nombre'),
         new OA\Property(property: 'middle_name', type: 'string', nullable: true, example: 'Carlos', description: 'Segundo nombre'),
         new OA\Property(property: 'first_surname', type: 'string', example: 'Pérez', description: 'Primer apellido'),
