@@ -7,6 +7,7 @@ namespace App\Modules\Security\Presentation\Requests;
 use App\Modules\Security\Domain\Authorization\PermissionMatrix;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\In;
 
 /**
  * Custom role creation payload (RF-SEG-002, ADR-26): a slug name
@@ -23,7 +24,7 @@ final class StoreRoleRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string|\Illuminate\Validation\Rules\In>>
+     * @return array<string, array<int, string|In>>
      */
     public function rules(): array
     {
