@@ -917,3 +917,20 @@ Stage Summary:
 - Suite completa: 943 tests / 2973 aserciones contra MySQL real; fábrica y fixtures generan carnés coherentes con la nueva regla
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset ANTES del enum, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 26-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-21 — PR #22, CI y merge a main (validación del carné corregida)
+
+Work Log:
+- PR #22 creada por API: https://github.com/keniercb/inass_siss/pull/22 (rama feat/SGP-21-carnet-validacion, 4 commits: feat 134de5a + test 644bcef + docs ADR-30 3f54cb8 + worklog f233274)
+- Incidente del daemon recurrente pero contenido: volteó HEAD a main TRES veces entre comandos (incluida entre el commit de feat y el de tests); cada volteo fue atrapado por la verificación de rama DENTRO del mismo comando encadenado (lección de Tasks 22-25) — sin pérdida ni commit erróneo; un volteo también falseó la lectura del SHA para el sondeo de CI (rev-parse HEAD dio la punta de main): el sondeo se corrigió contra la punta de la RAMA
+- CI (Quality gate PHP 8.3) SUCCESS a la primera: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (943/2973) y build Docker
+- PR #22 mergeeada a main como 6c84faf con merge commit; main local sincronizado y regresión final sobre main en verde: 943 tests / 2973 aserciones
+
+Stage Summary:
+- VALIDACIÓN DEL CARNÉ EN MAIN (ADR-30): 11 dígitos, mes 01-12 (dígitos 3-4), día 01-31 (dígitos 5-6), año y consecutivo sin validar; sexo por paridad del dígito 10 contrastado contra el declarado al alta y contra el número inmutable en PATCH; el value object quedó con la validación mínima honesta (sin prefijo, sin calendario, sin birthDate)
+- Suite completa: 943 tests / 2973 aserciones contra MySQL real; scripts/smoke_carnet.php como fumiga repetible
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
