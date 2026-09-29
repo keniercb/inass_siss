@@ -14,9 +14,12 @@ use Illuminate\Validation\Rules\Exists;
  * initial password (policy-checked) and at least one role of the
  * directory — institutional OR custom (RF-SEG-002, ADR-26: the
  * exists rule reads the roles table, so roles created through the
- * management surface become assignable immediately). Semantic
- * failures the request cannot see — an email reserved by a
- * deactivated account — answer 422 from the service.
+ * management surface become assignable immediately). The optional
+ * office_id must point at an ACTIVE office (ADR-29: whereNull
+ * deleted_at — the offices soft delete, and the user's territorial
+ * scope must be live). Semantic failures the request cannot see —
+ * an email reserved by a deactivated account — answer 422 from the
+ * service.
  */
 final class StoreUserRequest extends FormRequest
 {
@@ -36,6 +39,11 @@ final class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', new ConformsToPasswordPolicy],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['required', 'string', Rule::exists('roles', 'name')->where('guard_name', 'web')],
+            'office_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('offices', 'id')->whereNull('deleted_at'),
+            ],
         ];
     }
 }

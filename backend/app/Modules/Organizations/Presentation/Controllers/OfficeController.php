@@ -83,7 +83,7 @@ final class OfficeController
         operationId: 'officesTree',
         tags: ['Estructura'],
         summary: 'Árbol de la jerarquía de oficinas',
-        description: 'Jerarquía completa como árbol anidado (RF-ENT-005) con profundidad máxima de 5 niveles y el corte anunciado (deeper=true). El conteo de expedientes tramitados por oficina se incorpora con el módulo PensionCases (F3, ADR-22).',
+        description: 'Jerarquía completa como árbol anidado (RF-ENT-005) con profundidad máxima de 5 niveles y el corte anunciado (deeper=true). Cada nodo incluye el conteo de expedientes tramitados por la oficina (cases_count) y por su ámbito (scope_cases_count: la oficina y sus subordinadas activas, ADR-28).',
         security: [['sanctumAuth' => []]],
         responses: [
             new OA\Response(
@@ -100,6 +100,8 @@ final class OfficeController
                                     new OA\Property(property: 'id', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'address', type: 'string'),
                                     new OA\Property(property: 'type', type: 'object', nullable: true),
+                                    new OA\Property(property: 'cases_count', type: 'integer', description: 'Expedientes tramitados por la oficina (todo estado)'),
+                                    new OA\Property(property: 'scope_cases_count', type: 'integer', description: 'Expedientes en su ámbito (ella y sus subordinadas activas)'),
                                     new OA\Property(property: 'children', type: 'array', items: new OA\Items(type: 'object')),
                                     new OA\Property(property: 'deeper', type: 'boolean', description: 'Presente solo en nodos cortados al nivel máximo'),
                                 ],
@@ -123,7 +125,7 @@ final class OfficeController
         operationId: 'officesShow',
         tags: ['Estructura'],
         summary: 'Detalle de una oficina',
-        description: 'Devuelve la oficina activa con ese id (las desactivadas responden 404).',
+        description: 'Devuelve la oficina activa con ese id (las desactivadas responden 404) con el conteo de expedientes tramitados por la oficina y por su ámbito (RF-ENT-005, ADR-28).',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -147,7 +149,12 @@ final class OfficeController
 
         abort_if($office === null, 404, 'Office not found.');
 
-        return response()->json(['data' => new OfficeResource($office)]);
+        return response()->json([
+            'data' => OfficeResource::withCaseCountSummary(
+                $office,
+                $this->offices->caseCountSummary($office),
+            ),
+        ]);
     }
 
     #[OA\Post(

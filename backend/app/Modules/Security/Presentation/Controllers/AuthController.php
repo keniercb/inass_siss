@@ -135,7 +135,7 @@ final class AuthController
         operationId: 'authMe',
         tags: ['Auth'],
         summary: 'Usuario autenticado',
-        description: 'Devuelve el usuario asociado al token Bearer de la solicitud (RF-SEG-001).',
+        description: 'Devuelve el usuario asociado al token Bearer de la solicitud (RF-SEG-001) con su oficina territorial de pertenencia (ADR-29): data.office porta la oficina activa a la que pertenece la cuenta — null si no tiene ninguna —, la base que el filtrado por ámbito territorial del Sprint 6 consumirá.',
         security: [['sanctumAuth' => []]],
         responses: [
             new OA\Response(
@@ -160,8 +160,15 @@ final class AuthController
     )]
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        // Territorial scope (ADR-29): the office relations ride the
+        // same response — one eager load instead of three lazy ones
+        // per /me call.
+        $user?->loadMissing(['office.officeType', 'office.province', 'office.municipality']);
+
         return response()->json([
-            'data' => new UserResource($request->user()),
+            'data' => new UserResource($user),
         ]);
     }
 

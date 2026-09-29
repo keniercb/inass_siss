@@ -9,9 +9,12 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OfficeType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
+use App\Modules\Organizations\Application\Contracts\OfficeAssignmentQueryInterface;
+use App\Modules\Organizations\Application\Contracts\OfficeCaseCountQueryInterface;
 use App\Modules\Organizations\Application\Contracts\OfficeRepositoryInterface;
 use App\Modules\Organizations\Application\Contracts\OfficeServiceInterface;
 use App\Modules\Organizations\Domain\HierarchyPolicy;
+use App\Modules\Organizations\Domain\HierarchyTotals;
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +27,12 @@ use Illuminate\Validation\ValidationException;
  * geographic coherence (RN-004) validated upfront with the composite
  * database key as the last line. Offices carry no natural key, so
  * there is no uniqueness or immutability guard.
+ *
+ * The case counts of RF-ENT-005 (second part, ADR-28) cross the
+ * module boundary through the OfficeCaseCountQueryInterface port:
+ * the projection comes from PensionCases — the data owner — while
+ * this service aggregates the ámbito totals with the pure Domain
+ * HierarchyTotals over the active snapshot.
  */
 final class OfficeService implements OfficeServiceInterface
 {
@@ -39,6 +48,8 @@ final class OfficeService implements OfficeServiceInterface
     public function __construct(
         private readonly OfficeRepositoryInterface $offices,
         private readonly CatalogRepositoryInterface $catalogs,
+        private readonly OfficeCaseCountQueryInterface $caseCounts,
+        private readonly OfficeAssignmentQueryInterface $assignments,
     ) {}
 
     public function create(array $attributes): Office
@@ -120,10 +131,22 @@ final class OfficeService implements OfficeServiceInterface
             }
         }
 
+        $counters = $this->scopeCounters($nodes);
+
         return array_map(
-            fn (Office $root): array => $this->renderNode($root, $childrenOf, 1),
+            fn (Office $root): array => $this->renderNode($root, $childrenOf, 1, $counters),
             $roots,
         );
+    }
+
+    public function caseCountSummary(Office $office): array
+    {
+        $counters = $this->scopeCounters($this->offices->hierarchyNodes());
+
+        return [
+            'cases_count' => $counters['own'][$office->id] ?? 0,
+            'scope_cases_count' => $counters['scope'][$office->id] ?? 0,
+        ];
     }
 
     public function delete(int $id): bool
@@ -137,6 +160,17 @@ final class OfficeService implements OfficeServiceInterface
         if ($this->offices->hasActiveChildren($office->id)) {
             throw ValidationException::withMessages([
                 'parent_office_id' => 'The office still has active child offices; deactivate them first.',
+            ]);
+        }
+
+        // Territorial scope guard (ADR-29): an office with active
+        // accounts assigned refuses to leave the map — a silent null
+        // would strand the users' /auth/me office without a trace.
+        $assignedUsers = $this->assignments->countActiveUsers($office->id);
+
+        if ($assignedUsers > 0) {
+            throw ValidationException::withMessages([
+                'office_id' => "The office still has {$assignedUsers} active users assigned; reassign them first.",
             ]);
         }
 
@@ -254,20 +288,52 @@ final class OfficeService implements OfficeServiceInterface
     }
 
     /**
+     * Own and scope case counters over the active snapshot: the own
+     * map comes from the PensionCases projection and the scope map
+     * is the bottom-up aggregation of the ámbito (ADR-28).
+     *
+     * @param  list<Office>  $nodes
+     * @return array{own: array<int, int>, scope: array<int, int>}
+     */
+    private function scopeCounters(array $nodes): array
+    {
+        $own = $this->caseCounts->countsByOffice();
+
+        $parentMap = [];
+        foreach ($nodes as $node) {
+            $parentMap[$node->id] = $node->parent_office_id;
+        }
+
+        return [
+            'own' => $own,
+            'scope' => HierarchyTotals::subtreeTotals($parentMap, $own),
+        ];
+    }
+
+    /**
      * @param  array<int, list<Office>>  $childrenOf
+     * @param  array{own: array<int, int>, scope: array<int, int>}  $counters
      * @return array<string, mixed>
      */
-    private function renderNode(Office $node, array $childrenOf, int $depth): array
+    private function renderNode(Office $node, array $childrenOf, int $depth, array $counters): array
     {
         $children = $childrenOf[$node->id] ?? [];
 
         $type = $node->officeType;
 
+        $typeSummary = $type === null ? null : ['id' => $type->id, 'code' => $type->code, 'name' => $type->name];
+
+        $counts = [
+            'cases_count' => $counters['own'][$node->id] ?? 0,
+            'scope_cases_count' => $counters['scope'][$node->id] ?? 0,
+        ];
+
         if ($depth >= self::TREE_MAX_DEPTH) {
             return [
                 'id' => $node->id,
                 'address' => $node->address,
-                'type' => $type === null ? null : ['id' => $type->id, 'code' => $type->code, 'name' => $type->name],
+                'type' => $typeSummary,
+                ...$counts,
                 'deeper' => $children !== [],
             ];
         }
@@ -275,9 +341,10 @@ final class OfficeService implements OfficeServiceInterface
         return [
             'id' => $node->id,
             'address' => $node->address,
-            'type' => $type === null ? null : ['id' => $type->id, 'code' => $type->code, 'name' => $type->name],
+            'type' => $typeSummary,
+            ...$counts,
             'children' => array_map(
-                fn (Office $child): array => $this->renderNode($child, $childrenOf, $depth + 1),
+                fn (Office $child): array => $this->renderNode($child, $childrenOf, $depth + 1, $counters),
                 $children,
             ),
         ];

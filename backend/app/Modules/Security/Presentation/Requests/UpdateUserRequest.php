@@ -14,7 +14,10 @@ use Illuminate\Validation\Rules\Exists;
  * against the roles directory (RF-SEG-002, ADR-26). The email may
  * travel for read-modify-write clients but is immutable — a change
  * answers 422 from the service with the immutability message
- * (natural-key doctrine).
+ * (natural-key doctrine). office_id follows PATCH semantics
+ * (ADR-29): present in the payload — even as an explicit null — it
+ * reassigns or clears the territorial office; absent, it stays
+ * untouched. Must reference an ACTIVE office.
  */
 final class UpdateUserRequest extends FormRequest
 {
@@ -33,6 +36,11 @@ final class UpdateUserRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'roles' => ['nullable', 'array', 'min:1'],
             'roles.*' => ['required', 'string', Rule::exists('roles', 'name')->where('guard_name', 'web')],
+            'office_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('offices', 'id')->whereNull('deleted_at'),
+            ],
         ];
     }
 }

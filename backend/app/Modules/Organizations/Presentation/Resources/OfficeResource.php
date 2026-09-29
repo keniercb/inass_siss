@@ -18,7 +18,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'Office',
     title: 'Oficina',
-    description: 'Oficina del Ministerio (RF-ENT-002). La pareja municipio-provincia es coherente (RN-04) y la jerarquía (parent) acíclica (RN-003).',
+    description: 'Oficina del Ministerio (RF-ENT-002). La pareja municipio-provincia es coherente (RN-04) y la jerarquía (parent) acíclica (RN-003). El detalle incluye el conteo de expedientes tramitados por la oficina y por su ámbito (RF-ENT-005, ADR-28).',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 3),
         new OA\Property(
@@ -52,16 +52,40 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'address', type: 'string', example: 'Calle Martí #100, Holguín'),
         new OA\Property(property: 'parent_office_id', type: 'integer', format: 'int64', nullable: true, description: 'Oficina superior (jerarquía acíclica RN-003)'),
         new OA\Property(property: 'parent', type: 'object', nullable: true, description: 'Resumen de la oficina superior'),
+        new OA\Property(property: 'cases_count', type: 'integer', example: 3, description: 'Expedientes tramitados por la oficina (todo estado; ADR-28)'),
+        new OA\Property(property: 'scope_cases_count', type: 'integer', example: 7, description: 'Expedientes en su ámbito: la oficina y sus subordinadas activas (RF-ENT-005, ADR-28)'),
     ],
 )]
 final class OfficeResource extends JsonResource
 {
+    /** @var array{cases_count: int, scope_cases_count: int}|null */
+    private ?array $caseSummary = null;
+
+    /**
+     * Detail projection with the case counts (RF-ENT-005, ADR-28).
+     *
+     * A named constructor instead of a second constructor argument:
+     * the inherited single-argument constructor is what
+     * collection()/mapInto rely on — Laravel passes the collection
+     * KEY as a second argument there, so widening the signature
+     * breaks every paginated listing.
+     *
+     * @param  array{cases_count: int, scope_cases_count: int}  $caseSummary
+     */
+    public static function withCaseCountSummary(Office $office, array $caseSummary): self
+    {
+        $resource = new self($office);
+        $resource->caseSummary = $caseSummary;
+
+        return $resource;
+    }
+
     /**
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             'id' => $this->id,
             'type' => $this->whenLoaded('officeType', fn () => [
                 'id' => $this->officeType?->id,
@@ -90,5 +114,12 @@ final class OfficeResource extends JsonResource
                 ],
             ]),
         ];
+
+        if ($this->caseSummary !== null) {
+            $data['cases_count'] = $this->caseSummary['cases_count'];
+            $data['scope_cases_count'] = $this->caseSummary['scope_cases_count'];
+        }
+
+        return $data;
     }
 }

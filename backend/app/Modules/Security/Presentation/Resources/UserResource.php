@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Presentation\Resources;
 
+use App\Modules\Organizations\Presentation\Resources\OfficeResource;
 use App\Modules\Security\Application\Authentication\SecurityPolicies;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Shared\Contracts\ClockInterface;
@@ -38,6 +39,12 @@ use OpenApi\Attributes as OA;
             nullable: true,
             description: 'Persona del registro único vinculada a la cuenta (RF-SEG-004); null mientras no exista asociación',
             ref: '#/components/schemas/LinkedPerson',
+        ),
+        new OA\Property(
+            property: 'office',
+            nullable: true,
+            description: 'Oficina territorial de pertenencia (ADR-29): /auth/me y la gestión de cuentas la devuelven; null si la cuenta no pertenece a ninguna oficina activa',
+            ref: '#/components/schemas/Office',
         ),
         new OA\Property(
             property: 'status',
@@ -108,6 +115,9 @@ final class UserResource extends JsonResource
             'roles' => $this->getRoleNames()->sort()->values()->all(),
             'permissions' => $this->getAllPermissions()->pluck('name')->sort()->values()->all(),
             'person' => $this->person !== null ? new LinkedPersonResource($this->person) : null,
+            'office' => $this->office !== null
+                ? new OfficeResource($this->office->loadMissing(['officeType', 'province', 'municipality']))
+                : null,
             'status' => $this->deleted_at === null ? 'active' : 'inactive',
             'locked' => $locked,
             'locked_until' => $lockedUntil,

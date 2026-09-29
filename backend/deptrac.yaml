@@ -93,6 +93,7 @@ deptrac:
     Security:
       - Shared
       - People
+      - Organizations
     Reporting:
       - Shared
       - Catalogs
