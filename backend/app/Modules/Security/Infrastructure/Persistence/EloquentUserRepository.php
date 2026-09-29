@@ -6,6 +6,7 @@ namespace App\Modules\Security\Infrastructure\Persistence;
 
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Domain\Authentication\LockoutState;
+use App\Modules\Security\Infrastructure\Persistence\Models\Role;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Shared\Support\AuditRecorder;
 use DateTimeImmutable;
@@ -16,8 +17,9 @@ use Laravel\Sanctum\PersonalAccessToken;
  * Eloquent + Sanctum implementation of the user repository port.
  *
  * The single place in the Security module allowed to touch the
- * users and personal_access_tokens tables (architecture doc
- * section 6: Eloquent is confined to Infrastructure; ADR-11).
+ * users, personal_access_tokens and (read-only, for the role
+ * catalog probe) roles tables (architecture doc section 6: Eloquent
+ * is confined to Infrastructure; ADR-11).
  *
  * Audit semantics (ADR-19/ADR-24): business writes go through the
  * normal save pipeline so the observers watching User land them in
@@ -246,6 +248,21 @@ final class EloquentUserRepository implements UserRepositoryInterface
     public function roleNamesOf(User $user): array
     {
         return $user->getRoleNames()->values()->all();
+    }
+
+    public function unknownRoles(array $roles): array
+    {
+        if ($roles === []) {
+            return [];
+        }
+
+        $existing = Role::query()
+            ->where('guard_name', 'web')
+            ->whereIn('name', $roles)
+            ->pluck('name')
+            ->all();
+
+        return array_values(array_diff($roles, $existing));
     }
 
     public function countActiveAdministrators(User $except): int

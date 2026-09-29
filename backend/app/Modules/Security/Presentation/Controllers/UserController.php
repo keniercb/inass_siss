@@ -45,7 +45,7 @@ final class UserController
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\QueryParameter(name: 'q', required: false, schema: new OA\Schema(type: 'string', maxLength: 120), description: 'Texto libre sobre nombre o email (palabras en AND)'),
-            new OA\QueryParameter(name: 'role', required: false, schema: new OA\Schema(type: 'string', enum: ['admin', 'director', 'specialist', 'operator', 'auditor']), description: 'Rol institucional exacto'),
+            new OA\QueryParameter(name: 'role', required: false, schema: new OA\Schema(type: 'string'), description: 'Rol exacto del directorio (institucional de la sección 2.2 o personalizado, ADR-26)'),
             new OA\QueryParameter(name: 'status', required: false, schema: new OA\Schema(type: 'string', enum: ['active', 'inactive', 'all'], default: 'active')),
             new OA\QueryParameter(name: 'page', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\QueryParameter(name: 'per_page', required: false, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 15)),
@@ -135,7 +135,7 @@ final class UserController
                     new OA\Property(property: 'name', type: 'string', maxLength: 255, example: 'María Operadora'),
                     new OA\Property(property: 'email', type: 'string', format: 'email', maxLength: 255, example: 'maria@sgp.local'),
                     new OA\Property(property: 'password', type: 'string', format: 'password', example: 'Segura2026', description: 'Sujeta a la política (longitud mínima y complejidad)'),
-                    new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', enum: ['admin', 'director', 'specialist', 'operator', 'auditor']), example: ['operator']),
+                    new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', example: 'operator'), example: ['operator'], description: 'Roles del directorio: institucionales de la sección 2.2 o personalizados (ADR-26)'),
                 ],
             ),
         ),
@@ -186,7 +186,7 @@ final class UserController
                 properties: [
                     new OA\Property(property: 'name', type: 'string', maxLength: 255, example: 'María Especialista'),
                     new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Solo se acepta igual al actual (inmutabilidad)'),
-                    new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', enum: ['admin', 'director', 'specialist', 'operator', 'auditor']), example: ['specialist']),
+                    new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', example: 'specialist'), example: ['specialist'], description: 'Asignación completa: institucionales de la sección 2.2 o personalizados (ADR-26)'),
                 ],
             ),
         ),

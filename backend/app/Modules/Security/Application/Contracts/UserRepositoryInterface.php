@@ -171,6 +171,18 @@ interface UserRepositoryInterface
     public function roleNamesOf(User $user): array;
 
     /**
+     * Which of the candidate role names do not exist in the role
+     * directory (guard web). Role assignment accepts institutional
+     * AND custom roles (RF-SEG-002, ADR-26), so the catalog is the
+     * database itself; unknown names answer 422 with the offending
+     * entries instead of silently granting nothing.
+     *
+     * @param  list<string>  $roles
+     * @return list<string> the unknown names, in arrival order
+     */
+    public function unknownRoles(array $roles): array;
+
+    /**
      * Number of ACTIVE accounts holding the admin role, excluding
      * the given one (last-administrator guard).
      */

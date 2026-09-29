@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(
             property: 'roles',
             type: 'array',
-            description: 'Roles institucionales asignados (sección 2.2)',
+            description: 'Roles asignados del directorio: institucionales (sección 2.2) o personalizados (ADR-26)',
             items: new OA\Items(type: 'string', example: 'operator'),
         ),
         new OA\Property(
