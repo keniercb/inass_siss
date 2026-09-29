@@ -8,7 +8,6 @@ use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\Contracts\UserServiceInterface;
 use App\Modules\Security\Application\Exceptions\PersonAlreadyLinkedException;
 use App\Modules\Security\Domain\Authentication\PasswordPolicy;
-use App\Modules\Security\Domain\Authorization\PermissionMatrix;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Shared\Contracts\ClockInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -197,23 +196,24 @@ final class UserService implements UserServiceInterface
     }
 
     /**
-     * Defense in depth: the FormRequest validates against the same
-     * catalog, but the service re-checks so any caller gets the
-     * guarantee. Roles outside the PermissionMatrix can never enter
-     * the pivot tables.
+     * Defense in depth: the FormRequest validates against the role
+     * directory (exists rule), but the service re-checks so any caller
+     * gets the guarantee. The catalog is the database itself —
+     * institutional AND custom roles (RF-SEG-002, ADR-26) — so a role
+     * name that was never created through the management surface can
+     * never enter the pivot tables.
      *
      * @param  list<string>  $roles
      */
     private function guardRoles(array $roles): void
     {
-        $unknown = array_diff($roles, PermissionMatrix::roles());
+        $unknown = $this->users->unknownRoles($roles);
 
         if ($unknown !== []) {
             throw ValidationException::withMessages([
                 'roles' => sprintf(
-                    'Unknown institutional roles: %s. Valid roles: %s.',
+                    'Unknown roles: %s. Only roles that exist in the role directory (institutional or custom) can be assigned.',
                     implode(', ', $unknown),
-                    implode(', ', PermissionMatrix::roles()),
                 ),
             ]);
         }

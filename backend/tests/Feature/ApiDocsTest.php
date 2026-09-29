@@ -117,6 +117,19 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/pension-cases/{id}/salary-records']['post']['tags'])->toBe(['Expedientes'])
             ->and($spec['paths']['/api/v1/pension-cases/{id}/work-cycles/{record}']['delete']['tags'])->toBe(['Expedientes'])
             ->and($spec['paths']['/api/v1/pension-cases']['get']['security'])->toBe([['sanctumAuth' => []]])
+            // Roles (RF-SEG-002, ADR-26): custom role management with
+            // the institutional matrix immutable.
+            ->and($spec['paths'])->toHaveKey('/api/v1/roles')
+            ->and($spec['paths'])->toHaveKey('/api/v1/roles/{id}')
+            ->and($spec['paths']['/api/v1/roles'])->toHaveKeys(['get', 'post'])
+            ->and($spec['paths']['/api/v1/roles/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            ->and($spec['paths']['/api/v1/roles']['get']['tags'])->toBe(['Roles'])
+            ->and($spec['paths']['/api/v1/roles/{id}']['patch']['tags'])->toBe(['Roles'])
+            ->and($spec['paths']['/api/v1/roles']['get']['security'])->toBe([['sanctumAuth' => []]])
+            ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('name')
+            ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('is_system')
+            ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('permissions')
+            ->and($spec['components']['schemas']['Role']['properties'])->toHaveKey('users_count')
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
             // Estado de seguridad derivado de la sesión (S3.6, ADR-24).
@@ -200,7 +213,7 @@ describe('API documentation (Swagger)', function () {
 
         // Phantom tags spawn description-less groups in Swagger UI; every
         // operation must reference a tag registered in ApiDoc.
-        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Estructura', 'Base legal', 'Expedientes'])
+        expect($declaredTags)->toBe(['Auth', 'Catalogs', 'Settings', 'Auditoría', 'Personas', 'Usuarios', 'Roles', 'Estructura', 'Base legal', 'Expedientes'])
             ->and($undeclaredTags)->toBe([]);
     });
 

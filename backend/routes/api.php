@@ -13,6 +13,7 @@ use App\Modules\PensionCases\Presentation\Controllers\PensionCaseController;
 use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
+use App\Modules\Security\Presentation\Controllers\RoleController;
 use App\Modules\Security\Presentation\Controllers\UserController;
 use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -189,6 +190,33 @@ Route::middleware(['auth:sanctum', 'permission:users.manage'])->group(function (
     Route::delete('/users/{id}/person', [UserController::class, 'unlinkPerson'])
         ->whereNumber('id')
         ->name('users.unlink-person');
+});
+
+// Gestión de roles (RF-SEG-002, ADR-26): the directory answers to
+// roles.view (Administrador + Auditor — strictly read-only for the
+// Auditor, who resolves bitácora subjects), while the custom role
+// lifecycle —creation, edition, deletion— answers to roles.manage
+// (Administrador). Institutional roles are immutable: the writes
+// answer 422 before touching the database. Every write lands in the
+// append-only bitácora, with explicit entries for the permission
+// pivots the Eloquent events cannot see.
+Route::middleware(['auth:sanctum', 'permission:roles.view'])->group(function (): void {
+    Route::get('/roles', [RoleController::class, 'index'])
+        ->name('roles.index');
+    Route::get('/roles/{id}', [RoleController::class, 'show'])
+        ->whereNumber('id')
+        ->name('roles.show');
+});
+
+Route::middleware(['auth:sanctum', 'permission:roles.manage'])->group(function (): void {
+    Route::post('/roles', [RoleController::class, 'store'])
+        ->name('roles.store');
+    Route::patch('/roles/{id}', [RoleController::class, 'update'])
+        ->whereNumber('id')
+        ->name('roles.update');
+    Route::delete('/roles/{id}', [RoleController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('roles.destroy');
 });
 
 // Estructura organizacional (Fase 2 Sprint 4, RF-ENT-001..005):

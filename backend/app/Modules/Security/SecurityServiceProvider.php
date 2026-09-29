@@ -7,13 +7,18 @@ namespace App\Modules\Security;
 use App\Modules\Security\Application\Authentication\SecurityPolicies;
 use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
+use App\Modules\Security\Application\Contracts\RoleRepositoryInterface;
+use App\Modules\Security\Application\Contracts\RoleServiceInterface;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Application\Contracts\UserServiceInterface;
 use App\Modules\Security\Application\Services\AuthService;
+use App\Modules\Security\Application\Services\RoleService;
 use App\Modules\Security\Application\Services\UserService;
 use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
+use App\Modules\Security\Infrastructure\Persistence\EloquentRoleRepository;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
+use App\Modules\Security\Infrastructure\Persistence\Models\Role;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Shared\Contracts\ClockInterface;
 use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
@@ -63,6 +68,19 @@ final class SecurityServiceProvider extends ServiceProvider
             EloquentUserRepository::class,
         );
 
+        // Role management (RF-SEG-002, ADR-26): custom roles bundle
+        // permission subsets of the matrix catalog; the institutional
+        // five stay immutable.
+        $this->app->bind(
+            RoleServiceInterface::class,
+            RoleService::class,
+        );
+
+        $this->app->bind(
+            RoleRepositoryInterface::class,
+            EloquentRoleRepository::class,
+        );
+
         // Audit actor port (ADR-14): stamping needs to know who performs
         // every write; the port is Shared so any module's observer can
         // consume it without depending on Security (deptrac topology).
@@ -90,5 +108,11 @@ final class SecurityServiceProvider extends ServiceProvider
         // in the append-only bitácora too (toda escritura crítica), with
         // secret columns redacted (RedactsAuditAttributes, ADR-24).
         User::observe(AuditTrailObserver::class);
+
+        // Role writes join the same trail (ADR-26): row events land
+        // through the observer, permission pivots — invisible to
+        // Eloquent events — through the explicit entries the role
+        // repository records with the previous grant set.
+        Role::observe(AuditTrailObserver::class);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Modules\Security\Tests\Fakes;
 
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Domain\Authentication\LockoutState;
+use App\Modules\Security\Domain\Authorization\PermissionMatrix;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use DateTimeImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -31,6 +32,9 @@ final class InMemoryUserRepository implements UserRepositoryInterface
 
     /** @var array<int, list<string>> */
     public array $roles = [];
+
+    /** @var list<string> */
+    public array $extraKnownRoles = [];
 
     public int $issuedTokens = 0;
 
@@ -282,6 +286,36 @@ final class InMemoryUserRepository implements UserRepositoryInterface
     public function roleNamesOf(User $user): array
     {
         return $this->roles[(int) $user->id] ?? [];
+    }
+
+    /**
+     * The fake resolves the catalog from the institutional matrix
+     * (seeded in every environment) plus the roles registered through
+     * seed() and any extra names the test promotes with
+     * recognizeRole(): unit suites control the directory exactly like
+     * the database would (ADR-26).
+     *
+     * @param  list<string>  $roles
+     * @return list<string>
+     */
+    public function unknownRoles(array $roles): array
+    {
+        $known = array_merge(PermissionMatrix::roles(), $this->extraKnownRoles);
+
+        foreach ($this->roles as $assigned) {
+            $known = array_merge($known, $assigned);
+        }
+
+        return array_values(array_diff($roles, array_unique($known)));
+    }
+
+    /**
+     * Registers a role name as existing in the directory without
+     * wiring it to any account.
+     */
+    public function recognizeRole(string $name): void
+    {
+        $this->extraKnownRoles[] = $name;
     }
 
     public function countActiveAdministrators(User $except): int

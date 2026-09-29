@@ -46,6 +46,8 @@ final class PermissionMatrixTest extends TestCase
                 'people.delete',
                 'people.edit',
                 'people.view',
+                'roles.manage',
+                'roles.view',
                 'settings.manage',
                 'settings.view',
                 'users.manage',
@@ -86,6 +88,7 @@ final class PermissionMatrixTest extends TestCase
                 'organizations.manage' => true, 'organizations.view' => true,
                 'people.create' => true, 'people.delete' => true,
                 'people.edit' => true, 'people.view' => true,
+                'roles.manage' => true, 'roles.view' => true,
                 'settings.manage' => true, 'settings.view' => true,
                 'users.manage' => true, 'users.view' => true,
             ],
@@ -96,6 +99,7 @@ final class PermissionMatrixTest extends TestCase
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
+                'roles.manage' => false, 'roles.view' => false,
                 'settings.manage' => false, 'settings.view' => true,
                 'users.manage' => false, 'users.view' => false,
             ],
@@ -106,6 +110,7 @@ final class PermissionMatrixTest extends TestCase
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
+                'roles.manage' => false, 'roles.view' => false,
                 'settings.manage' => false, 'settings.view' => true,
                 'users.manage' => false, 'users.view' => false,
             ],
@@ -116,6 +121,7 @@ final class PermissionMatrixTest extends TestCase
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => true, 'people.delete' => false,
                 'people.edit' => true, 'people.view' => true,
+                'roles.manage' => false, 'roles.view' => false,
                 'settings.manage' => false, 'settings.view' => false,
                 'users.manage' => false, 'users.view' => false,
             ],
@@ -126,6 +132,7 @@ final class PermissionMatrixTest extends TestCase
                 'organizations.manage' => false, 'organizations.view' => true,
                 'people.create' => false, 'people.delete' => false,
                 'people.edit' => false, 'people.view' => true,
+                'roles.manage' => false, 'roles.view' => true,
                 'settings.manage' => false, 'settings.view' => true,
                 'users.manage' => false, 'users.view' => true,
             ],
@@ -160,7 +167,7 @@ final class PermissionMatrixTest extends TestCase
     {
         $writing = [
             'catalogs.manage', 'settings.manage', 'users.manage',
-            'organizations.manage', 'legalbases.manage',
+            'organizations.manage', 'legalbases.manage', 'roles.manage',
             'people.create', 'people.edit', 'people.delete',
         ];
 
@@ -172,13 +179,15 @@ final class PermissionMatrixTest extends TestCase
         }
 
         // Read-only also means reading: the Auditor keeps the account
-        // directory (users.view, ADR-24) for bitácora cross-reading.
+        // directory (users.view, ADR-24) and the role directory
+        // (roles.view) for bitácora cross-reading.
         self::assertTrue(PermissionMatrix::roleHasPermission('auditor', 'users.view'));
+        self::assertTrue(PermissionMatrix::roleHasPermission('auditor', 'roles.view'));
     }
 
     public function test_catalog_and_settings_management_is_admin_exclusive(): void
     {
-        foreach (['catalogs.manage', 'settings.manage', 'users.manage', 'organizations.manage', 'legalbases.manage'] as $permission) {
+        foreach (['catalogs.manage', 'settings.manage', 'users.manage', 'organizations.manage', 'legalbases.manage', 'roles.manage'] as $permission) {
             foreach (PermissionMatrix::roles() as $role) {
                 if ($role === 'admin') {
                     continue;

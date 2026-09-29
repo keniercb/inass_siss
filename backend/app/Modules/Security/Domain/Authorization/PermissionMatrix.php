@@ -45,9 +45,10 @@ final class PermissionMatrix
     /**
      * Initial permission catalog for the modules that exist today
      * (Catalogs, Settings, People, audit trail, user management, the
-     * Fase 2 organizational and legal structure and the Fase 3 case
-     * aggregate); pensioners/payments/reports join in their own
-     * phases. Alphabetical on purpose: the matrix stays diff-friendly.
+     * Fase 2 organizational and legal structure, the Fase 3 case
+     * aggregate and the role management surface itself); pensioners/
+     * payments/reports join in their own phases. Alphabetical on
+     * purpose: the matrix stays diff-friendly.
      */
     private const array PERMISSIONS = [
         'audit.export',
@@ -65,6 +66,8 @@ final class PermissionMatrix
         'people.delete',
         'people.edit',
         'people.view',
+        'roles.manage',
+        'roles.view',
         'settings.manage',
         'settings.view',
         'users.manage',
@@ -83,6 +86,7 @@ final class PermissionMatrix
             'legalbases.manage', 'legalbases.view',
             'organizations.manage', 'organizations.view',
             'people.create', 'people.delete', 'people.edit', 'people.view',
+            'roles.manage', 'roles.view',
             'settings.manage', 'settings.view',
             'users.manage', 'users.view',
         ],
@@ -116,6 +120,7 @@ final class PermissionMatrix
             'legalbases.view',
             'organizations.view',
             'people.view',
+            'roles.view',
             'settings.view',
             // Account directory read (ADR-24): the Auditor resolves
             // bitácora causers (who acted) and needs the account
