@@ -36,6 +36,9 @@ final class InMemoryUserRepository implements UserRepositoryInterface
     /** @var list<string> */
     public array $extraKnownRoles = [];
 
+    /** @var array<int, true> office ids the fake considers ACTIVE (ADR-29) */
+    public array $activeOffices = [];
+
     public int $issuedTokens = 0;
 
     public bool $revokedCurrentToken = false;
@@ -195,13 +198,20 @@ final class InMemoryUserRepository implements UserRepositoryInterface
         return false;
     }
 
-    public function createUser(string $name, string $email, string $password, array $roles, DateTimeImmutable $passwordChangedAt): User
-    {
+    public function createUser(
+        string $name,
+        string $email,
+        string $password,
+        array $roles,
+        DateTimeImmutable $passwordChangedAt,
+        ?int $officeId = null,
+    ): User {
         $user = new User;
         $user->name = $name;
         $user->email = $email;
         $user->password = $password;
         $user->password_changed_at = $passwordChangedAt;
+        $user->office_id = $officeId;
         $user->id = $this->nextId;
 
         $this->lastCreated = $user;
@@ -209,10 +219,20 @@ final class InMemoryUserRepository implements UserRepositoryInterface
         return $this->seed($user, $roles);
     }
 
-    public function updateUser(User $user, ?string $name, ?array $roles): User
-    {
+    public function updateUser(
+        User $user,
+        ?string $name,
+        ?array $roles,
+        ?int $officeId = null,
+        bool $officeIdPresent = false,
+    ): User {
         if ($name !== null) {
             $user->name = $name;
+        }
+
+        // PATCH semantics (ADR-29): only a PRESENT key writes.
+        if ($officeIdPresent) {
+            $user->office_id = $officeId;
         }
 
         if ($roles !== null) {
@@ -220,6 +240,11 @@ final class InMemoryUserRepository implements UserRepositoryInterface
         }
 
         return $user;
+    }
+
+    public function officeIsActive(int $officeId): bool
+    {
+        return isset($this->activeOffices[$officeId]);
     }
 
     public function deactivate(User $user): void

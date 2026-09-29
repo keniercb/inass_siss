@@ -44,10 +44,21 @@ interface OfficeServiceInterface
 
     /**
      * Hierarchy tree (RF-ENT-005), same depth contract as entities.
+     * Each node carries the case counts of the office itself and of
+     * its ámbito (itself + active descendants, ADR-28).
      *
      * @return list<array<string, mixed>>
      */
     public function tree(): array;
+
+    /**
+     * Case counts of one office (RF-ENT-005 second part, ADR-28):
+     * expedientes tramitados by the office and by its ámbito
+     * (itself + active descendant offices).
+     *
+     * @return array{cases_count: int, scope_cases_count: int}
+     */
+    public function caseCountSummary(Office $office): array;
 
     /**
      * Soft delete (deactivation): refuses while active children hang

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security\Infrastructure\Persistence;
 
+use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use App\Modules\Security\Application\Contracts\UserRepositoryInterface;
 use App\Modules\Security\Domain\Authentication\LockoutState;
 use App\Modules\Security\Infrastructure\Persistence\Models\Role;
@@ -91,7 +92,11 @@ final class EloquentUserRepository implements UserRepositoryInterface
 
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
-        $query = User::query()->orderBy('email');
+        // Office relations travel with the directory rows (ADR-29):
+        // UserResource renders the territorial scope of each account.
+        $query = User::query()
+            ->with(['office.officeType', 'office.province', 'office.municipality'])
+            ->orderBy('email');
 
         if (isset($filters['q']) && $filters['q'] !== '') {
             // Free text over the account's two textual fields; words
@@ -133,14 +138,28 @@ final class EloquentUserRepository implements UserRepositoryInterface
         return User::withTrashed()->where('email', $email)->exists();
     }
 
-    public function createUser(string $name, string $email, string $password, array $roles, DateTimeImmutable $passwordChangedAt): User
+    public function officeIsActive(int $officeId): bool
     {
+        // Active-only probe (ADR-29): the Office model soft-deletes, so
+        // the default scope answers "present in the active map".
+        return Office::query()->whereKey($officeId)->exists();
+    }
+
+    public function createUser(
+        string $name,
+        string $email,
+        string $password,
+        array $roles,
+        DateTimeImmutable $passwordChangedAt,
+        ?int $officeId = null,
+    ): User {
         $user = User::create([
             'name' => $name,
             'email' => $email,
             // The hashed cast takes care of the secret at assignment.
             'password' => $password,
             'password_changed_at' => $passwordChangedAt,
+            'office_id' => $officeId,
         ]);
 
         $this->syncRolesAndAudit($user, $roles, initial: true);
@@ -148,10 +167,24 @@ final class EloquentUserRepository implements UserRepositoryInterface
         return $user->refresh();
     }
 
-    public function updateUser(User $user, ?string $name, ?array $roles): User
-    {
+    public function updateUser(
+        User $user,
+        ?string $name,
+        ?array $roles,
+        ?int $officeId = null,
+        bool $officeIdPresent = false,
+    ): User {
         if ($name !== null && $name !== $user->name) {
             $user->name = $name;
+            $user->save();
+        }
+
+        // PATCH semantics (ADR-29): only a PRESENT key writes — an
+        // absent office_id leaves the current scope untouched, an
+        // explicit null clears it. The save pipeline keeps the office
+        // change inside the audited attribute diff.
+        if ($officeIdPresent && $officeId !== $user->office_id) {
+            $user->office_id = $officeId;
             $user->save();
         }
 

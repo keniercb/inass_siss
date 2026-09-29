@@ -88,6 +88,11 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['paths']['/api/v1/offices/tree']['get']['tags'])->toBe(['Estructura'])
             ->and($spec['paths']['/api/v1/authorized-signatures']['get']['tags'])->toBe(['Estructura'])
             ->and($spec['paths']['/api/v1/authorized-signatures/{id}'])->toHaveKeys(['get', 'patch', 'delete'])
+            // Conteo de expedientes por oficina (RF-ENT-005 segunda
+            // parte, ADR-28): the Office schema documents both counts.
+            ->and($spec['components']['schemas']['Office']['properties'])->toHaveKey('cases_count')
+            ->and($spec['components']['schemas']['Office']['properties'])->toHaveKey('scope_cases_count')
+            ->and($spec['components']['schemas']['Office']['properties']['scope_cases_count']['type'])->toBe('integer')
             // Base legal (Fase 2 Sprint 4, RF-LEG-002..004).
             ->and($spec['paths'])->toHaveKey('/api/v1/legal-bases')
             ->and($spec['paths'])->toHaveKey('/api/v1/legal-bases/{id}')
@@ -147,6 +152,10 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['Permission']['properties'])->toHaveKey('users_count')
             // El resumen de persona vinculada (S3.5) cuelga del schema User.
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('person')
+            // Oficina de pertenencia del usuario (ADR-29): visible en
+            // /auth/me y en la superficie de gestión de cuentas.
+            ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('office')
+            ->and($spec['components']['schemas']['User']['properties']['office']['nullable'])->toBe(true)
             // Estado de seguridad derivado de la sesión (S3.6, ADR-24).
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('status')
             ->and($spec['components']['schemas']['User']['properties'])->toHaveKey('locked')

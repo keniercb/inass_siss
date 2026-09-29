@@ -48,24 +48,37 @@ interface UserServiceInterface
      * RF-SEG-001). The email is reserved by active AND deactivated
      * accounts (natural-key reservation), the password must satisfy
      * the password policy and the roles must be institutional roles
-     * of the PermissionMatrix. Semantic failures throw 422.
+     * of the PermissionMatrix. The optional territorial office
+     * (ADR-29) must reference an ACTIVE office — validated on the
+     * wire and probed here so the service is safe to call from any
+     * entry point. Semantic failures throw 422.
      *
      * @param  list<string>  $roles
      *
-     * @throws ValidationException 422 (email reserved, weak password, unknown role)
+     * @throws ValidationException 422 (email reserved, weak password, unknown role, unknown/deactivated office)
      */
-    public function createUser(string $name, string $email, string $password, array $roles): User;
+    public function createUser(string $name, string $email, string $password, array $roles, ?int $officeId = null): User;
 
     /**
-     * Edits an active account: display name and role assignment.
-     * The email is immutable (identity key of the account). Returns
-     * null when the account does not exist.
+     * Edits an active account: display name, role assignment and
+     * territorial office. The email is immutable (identity key of the
+     * account). officeId follows PATCH semantics (ADR-29): the flag
+     * marks whether the client sent the key at all — present with a
+     * null it reassigns to "no office", absent it stays untouched.
+     * Returns null when the account does not exist.
      *
      * @param  list<string>|null  $roles  null leaves the assignment untouched
      *
-     * @throws ValidationException 422 (email change, unknown role, demoting the last active administrator)
+     * @throws ValidationException 422 (email change, unknown role, demoting the last active administrator, unknown/deactivated office)
      */
-    public function updateUser(int $userId, ?string $name, ?array $roles, ?string $email = null): ?User;
+    public function updateUser(
+        int $userId,
+        ?string $name,
+        ?array $roles,
+        ?string $email = null,
+        ?int $officeId = null,
+        bool $officeIdPresent = false,
+    ): ?User;
 
     /**
      * Deactivates the account (soft delete, RF-AUD-004) and revokes

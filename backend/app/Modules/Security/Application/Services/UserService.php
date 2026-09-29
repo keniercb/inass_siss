@@ -79,7 +79,7 @@ final class UserService implements UserServiceInterface
         return $this->users->unlinkPerson($user);
     }
 
-    public function createUser(string $name, string $email, string $password, array $roles): User
+    public function createUser(string $name, string $email, string $password, array $roles, ?int $officeId = null): User
     {
         if ($this->users->emailTaken($email)) {
             throw ValidationException::withMessages([
@@ -89,12 +89,19 @@ final class UserService implements UserServiceInterface
 
         $this->guardPasswordPolicy($password);
         $this->guardRoles($roles);
+        $this->guardOfficeIsAssignable($officeId);
 
-        return $this->users->createUser($name, $email, $password, $roles, $this->clock->now());
+        return $this->users->createUser($name, $email, $password, $roles, $this->clock->now(), $officeId);
     }
 
-    public function updateUser(int $userId, ?string $name, ?array $roles, ?string $email = null): ?User
-    {
+    public function updateUser(
+        int $userId,
+        ?string $name,
+        ?array $roles,
+        ?string $email = null,
+        ?int $officeId = null,
+        bool $officeIdPresent = false,
+    ): ?User {
         $user = $this->users->findById($userId);
 
         if ($user === null) {
@@ -112,7 +119,29 @@ final class UserService implements UserServiceInterface
             $this->guardNotLastAdministrator($user, $roles);
         }
 
-        return $this->users->updateUser($user, $name, $roles);
+        if ($officeIdPresent) {
+            $this->guardOfficeIsAssignable($officeId);
+        }
+
+        return $this->users->updateUser($user, $name, $roles, $officeId, $officeIdPresent);
+    }
+
+    /**
+     * The territorial office must exist and stay active (ADR-29):
+     * same doctrine as the roles guard — the wire rule is the first
+     * line, this probe keeps the service safe from any caller.
+     */
+    private function guardOfficeIsAssignable(?int $officeId): void
+    {
+        if ($officeId === null) {
+            return;
+        }
+
+        if (! $this->users->officeIsActive($officeId)) {
+            throw ValidationException::withMessages([
+                'office_id' => 'The selected office does not exist or is deactivated.',
+            ]);
+        }
     }
 
     public function deactivate(int $userId, int $actingUserId): ?User

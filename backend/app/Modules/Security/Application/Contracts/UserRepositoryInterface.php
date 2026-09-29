@@ -95,20 +95,44 @@ interface UserRepositoryInterface
     public function emailTaken(string $email): bool;
 
     /**
-     * Creates the account with its initial roles and the password
-     * baseline. Audited (created event, password redacted).
+     * Whether the office exists and is ACTIVE (ADR-29): the
+     * assignment guard for the territorial scope of accounts. The
+     * offices soft-delete, so "active" means present in the default
+     * query scope of the Organizations model.
+     */
+    public function officeIsActive(int $officeId): bool;
+
+    /**
+     * Creates the account with its initial roles, the password
+     * baseline and the optional territorial office. Audited
+     * (created event, password redacted).
      *
      * @param  list<string>  $roles
      */
-    public function createUser(string $name, string $email, string $password, array $roles, DateTimeImmutable $passwordChangedAt): User;
+    public function createUser(
+        string $name,
+        string $email,
+        string $password,
+        array $roles,
+        DateTimeImmutable $passwordChangedAt,
+        ?int $officeId = null,
+    ): User;
 
     /**
-     * Edits the display name and/or the role assignment. Audited
-     * (profile update + explicit roles entry with previous values).
+     * Edits the display name, the role assignment and/or the
+     * territorial office. Audited (profile update + explicit roles
+     * entry with previous values; office changes travel inside the
+     * attribute diff of the updated event).
      *
      * @param  list<string>|null  $roles
      */
-    public function updateUser(User $user, ?string $name, ?array $roles): User;
+    public function updateUser(
+        User $user,
+        ?string $name,
+        ?array $roles,
+        ?int $officeId = null,
+        bool $officeIdPresent = false,
+    ): User;
 
     /**
      * Soft-deletes the account and revokes every token (the

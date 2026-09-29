@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases;
 
+use App\Modules\Organizations\Application\Contracts\OfficeCaseCountQueryInterface;
 use App\Modules\PensionCases\Application\Contracts\PensionCaseRepositoryInterface;
 use App\Modules\PensionCases\Application\Contracts\PensionCaseServiceInterface;
 use App\Modules\PensionCases\Application\Services\PensionCaseService;
@@ -12,6 +13,7 @@ use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\WorkCycle;
+use App\Modules\PensionCases\Infrastructure\Persistence\OfficeCaseCountQuery;
 use App\Modules\Shared\Support\AuditableObserver;
 use App\Modules\Shared\Support\AuditTrailObserver;
 use Illuminate\Support\ServiceProvider;
@@ -36,6 +38,16 @@ final class PensionCasesServiceProvider extends ServiceProvider
         $this->app->bind(
             PensionCaseServiceInterface::class,
             PensionCaseService::class,
+        );
+
+        // Cross-module read projection (ADR-28): the Organizations
+        // module owns the office counts surface but must not import
+        // PensionCases, so it declares the port and this module — the
+        // data owner — binds the implementation. Same inversion the
+        // service already uses for its own office/entity probes.
+        $this->app->bind(
+            OfficeCaseCountQueryInterface::class,
+            OfficeCaseCountQuery::class,
         );
     }
 

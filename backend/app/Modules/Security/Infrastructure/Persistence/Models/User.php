@@ -2,6 +2,7 @@
 
 namespace App\Modules\Security\Infrastructure\Persistence\Models;
 
+use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use App\Modules\People\Infrastructure\Persistence\Models\Person;
 use App\Modules\Shared\Contracts\RedactsAuditAttributes;
 use Database\Factories\UserFactory;
@@ -35,9 +36,11 @@ use Spatie\Permission\Traits\HasRoles;
  * @property DateTimeImmutable|null $locked_at
  * @property DateTimeImmutable|null $password_changed_at
  * @property int|null $person_id
+ * @property int|null $office_id
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property Person|null $person
+ * @property Office|null $office
  * @property DateTimeImmutable|null $deleted_at
  */
 class User extends Authenticatable implements RedactsAuditAttributes
@@ -57,6 +60,7 @@ class User extends Authenticatable implements RedactsAuditAttributes
         'failed_login_attempts',
         'locked_at',
         'password_changed_at',
+        'office_id',
         'created_by',
         'updated_by',
     ];
@@ -108,6 +112,21 @@ class User extends Authenticatable implements RedactsAuditAttributes
     public function person(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'person_id')->withTrashed();
+    }
+
+    /**
+     * Territorial office the account belongs to (ADR-29): ONE office
+     * at most, validated against the active directory at write time.
+     * Resolves null against a deactivated office — the deactivation
+     * guard refuses while active users are assigned, so a null here
+     * can only come from legacy rows or a user restored after the
+     * office left the map. Contrast with person(): a deactivated
+     * person STAYS registered (withTrashed), an office leaving the
+     * active map ceases to be anyone's scope.
+     */
+    public function office(): BelongsTo
+    {
+        return $this->belongsTo(Office::class, 'office_id');
     }
 
     /**

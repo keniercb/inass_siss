@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Security;
 
+use App\Modules\Organizations\Application\Contracts\OfficeAssignmentQueryInterface;
 use App\Modules\Security\Application\Authentication\SecurityPolicies;
 use App\Modules\Security\Application\Contracts\AuditLogQueryInterface;
 use App\Modules\Security\Application\Contracts\AuthServiceInterface;
@@ -24,6 +25,7 @@ use App\Modules\Security\Infrastructure\Persistence\EloquentRoleRepository;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
 use App\Modules\Security\Infrastructure\Persistence\Models\Role;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
+use App\Modules\Security\Infrastructure\Persistence\OfficeAssignmentQuery;
 use App\Modules\Shared\Contracts\ClockInterface;
 use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
 use App\Modules\Shared\Support\AuditableObserver;
@@ -70,6 +72,15 @@ final class SecurityServiceProvider extends ServiceProvider
         $this->app->bind(
             UserRepositoryInterface::class,
             EloquentUserRepository::class,
+        );
+
+        // Cross-module read projection (ADR-29): Organizations owns
+        // the office deactivation guard but must not import Security,
+        // so it declares the port and this module binds the count of
+        // active users per office.
+        $this->app->bind(
+            OfficeAssignmentQueryInterface::class,
+            OfficeAssignmentQuery::class,
         );
 
         // Role management (RF-SEG-002, ADR-26): custom roles bundle

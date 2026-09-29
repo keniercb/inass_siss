@@ -454,6 +454,7 @@ erDiagram
         string email "Unico"
         string password "hash"
         bigint person_id FK "NULL, unico: una persona respalda a lo sumo una cuenta (RF-SEG-004, ADR-21); FK RESTRICT y el UNIQUE cubre cuentas desactivadas (reserva)"
+        bigint office_id FK "NULL: una oficina territorial a lo sumo (ADR-29); FK RESTRICT; validada contra el directorio ACTIVO y guard de desactivacion 422 mientras queden usuarios activos asignados"
         datetime email_verified_at "NULL"
     }
     ROLES {
@@ -998,6 +999,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 | 1.9 | 2026-09-28 | Entrada `users` extendida (ADR-24, S3.6/RF-SEG-001): migración `add_lockout_and_password_lifecycle_to_users_table` con `failed_login_attempts`, `locked_at` (estado de bloqueo derivado al leer, sin unlocked_at) y `password_changed_at` (línea base de caducidad opcional, backfill desde created_at); secretos redactados en `activity_log` vía `RedactsAuditAttributes` | Arq. Backend |
 | 1.10 | 2026-09-28 | Sección 5.7 implementada (ADR-25, S5.1-S5.5/RF-EXP-001..004): migraciones `pension_cases`/`salary_records`/`service_records`/`work_cycles` con CHECK de estado normativo, columna generada `open_case_key` + UNIQUE (un expediente abierto por persona), par caso-año único, CHECKs RN-005/RN-006, marcador coletilla y UNSIGNED en ciclos; subregistros sin autoría propia con bajas físicas auditadas; `pension_case_histories` diferida a S6 | Arq. Backend |
 | 1.11 | 2026-09-29 | Entrada `roles` ampliada (ADR-26): columnas `description` (VARCHAR 255 NULL) e `is_system` (BOOLEAN con backfill de los cinco institucionales) añadidas por la gestión de roles — institucionales inmutables vía API (la matriz los re-sincroniza) y personalizados como subconjuntos del catálogo (21 permisos); conteo de uso para la guarda de borrado = pivotes de `model_has_roles` (desactivadas incluidas) | Arq. Backend |
+| 1.12 | 2026-09-30 | Entrada `users` ampliada (ADR-29): migración `add_office_id_to_users_table` con `office_id` BIGINT NULL FK RESTRICT → `offices` e índice — pertenencia territorial de la cuenta (una a lo sumo), validada contra el directorio activo y protegida por el guard de desactivación de oficinas | Arq. Backend |
 
 
 

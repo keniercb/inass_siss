@@ -124,7 +124,7 @@ final class UserController
         operationId: 'usersStore',
         tags: ['Usuarios'],
         summary: 'Registrar una cuenta',
-        description: 'Crea la cuenta con contraseña inicial sujeta a la política de contraseñas (RF-SEC-001) y al menos un rol institucional. El email queda reservado: una cuenta activa o desactivada con esa dirección responde 422. Requiere users.manage (Administrador); la creación queda en la bitácora (contraseña redactada).',
+        description: 'Crea la cuenta con contraseña inicial sujeta a la política de contraseñas (RF-SEC-001), al menos un rol del directorio y la oficina territorial opcional (ADR-29, debe estar activa). El email queda reservado: una cuenta activa o desactivada con esa dirección responde 422. Requiere users.manage (Administrador); la creación queda en la bitácora (contraseña redactada).',
         security: [['sanctumAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
@@ -136,6 +136,7 @@ final class UserController
                     new OA\Property(property: 'email', type: 'string', format: 'email', maxLength: 255, example: 'maria@sgp.local'),
                     new OA\Property(property: 'password', type: 'string', format: 'password', example: 'Segura2026', description: 'Sujeta a la política (longitud mínima y complejidad)'),
                     new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', example: 'operator'), example: ['operator'], description: 'Roles del directorio: institucionales de la sección 2.2 o personalizados (ADR-26)'),
+                    new OA\Property(property: 'office_id', type: 'integer', format: 'int64', nullable: true, example: 3, description: 'Oficina territorial de pertenencia (ADR-29); debe estar activa'),
                 ],
             ),
         ),
@@ -154,7 +155,7 @@ final class UserController
     )]
     public function store(StoreUserRequest $request): JsonResponse
     {
-        /** @var array{name: string, email: string, password: string, roles: list<string>} $payload */
+        /** @var array{name: string, email: string, password: string, roles: list<string>, office_id?: int|null} $payload */
         $payload = $request->validated();
 
         $user = $this->users->createUser(
@@ -162,6 +163,7 @@ final class UserController
             $payload['email'],
             $payload['password'],
             $payload['roles'],
+            $payload['office_id'] ?? null,
         );
 
         return response()->json([
@@ -174,7 +176,7 @@ final class UserController
         operationId: 'usersUpdate',
         tags: ['Usuarios'],
         summary: 'Editar una cuenta (nombre y roles)',
-        description: 'Actualiza el nombre y/o la asignación completa de roles. El email es inmutable: enviar uno distinto responde 422. El sistema impide dejarlo sin ningún administrador activo (422). Requiere users.manage; la edición y el cambio de roles quedan en la bitácora con los valores previos.',
+        description: 'Actualiza el nombre, la asignación completa de roles y/o la oficina territorial (ADR-29: presente — incluso null — reasigna o limpia; ausente queda intacta). El email es inmutable: enviar uno distinto responde 422. El sistema impide dejarlo sin ningún administrador activo (422). Requiere users.manage; la edición, el cambio de roles y el de oficina quedan en la bitácora con los valores previos.',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', required: true, schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -187,6 +189,7 @@ final class UserController
                     new OA\Property(property: 'name', type: 'string', maxLength: 255, example: 'María Especialista'),
                     new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Solo se acepta igual al actual (inmutabilidad)'),
                     new OA\Property(property: 'roles', type: 'array', minItems: 1, items: new OA\Items(type: 'string', example: 'specialist'), example: ['specialist'], description: 'Asignación completa: institucionales de la sección 2.2 o personalizados (ADR-26)'),
+                    new OA\Property(property: 'office_id', type: 'integer', format: 'int64', nullable: true, example: 5, description: 'Oficina territorial (ADR-29): null limpia la pertenencia; ausente la deja intacta; debe estar activa'),
                 ],
             ),
         ),
@@ -206,7 +209,7 @@ final class UserController
     )]
     public function update(UpdateUserRequest $request, int $id): JsonResponse
     {
-        /** @var array{name?: string, email?: string, roles?: list<string>} $payload */
+        /** @var array{name?: string, email?: string, roles?: list<string>, office_id?: int|null} $payload */
         $payload = $request->validated();
 
         $user = $this->users->updateUser(
@@ -214,6 +217,8 @@ final class UserController
             $payload['name'] ?? null,
             $payload['roles'] ?? null,
             $payload['email'] ?? null,
+            $payload['office_id'] ?? null,
+            array_key_exists('office_id', $payload),
         );
 
         abort_if($user === null, 404, 'User not found.');
