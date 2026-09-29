@@ -843,3 +843,19 @@ Stage Summary:
 - Superficie estrictamente de solo lectura: sin rutas de escritura — la matriz es la única fuente de verdad y se extiende por código (fase 6 crece solo); gate roles.view (admin + auditor, sin permiso 22º que no añada seguridad); el dataset unit de la matriz quedó completo (105 celdas: se recuperaron las 15 de cases.*)
 - Suite completa: 913 tests / 2854 aserciones contra MySQL real; ADR-27 + changelogs (arquitectura 1.17, plan 1.9)
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011)
+---
+Task ID: 24-cierre
+Agent: Super Z (agente principal)
+Task: Cierre de los endpoints de permisos — PR #20, CI y merge a main
+
+Work Log:
+- PR #20 creada por API: https://github.com/keniercb/inass_siss/pull/20 (rama feat/SGP-19-permissions-catalog, 4 commits: feat 22eeefc + tests 2814e0b + docs ADR-27/changelogs 957e7ae + worklog 03eefaa)
+- Incidente del daemon recurrente pero contenido: volteó HEAD a main DOS veces entre comandos de commit — la verificación de rama DENTRO del mismo comando (lección de Tasks 22/23) lo atrapó ambas veces sin pérdida ni commit erróneo: checkout + verificación + add + commit + push en un solo encadenado por commit
+- CI #1 (03eefaa) SUCCESS a la primera — job «Quality gate (PHP 8.3)»: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (913/2854), puerta Shared ≥95% y build Docker
+- PR #20 mergeeada a main como 69862d0 con merge commit; main local sincronizado y regresión final sobre main en verde: 913 tests / 2854 aserciones
+
+Stage Summary:
+- ENDPOINTS DE PERMISOS EN MAIN (RF-SEG-002, ADR-27): GET /api/v1/permissions + GET /api/v1/permissions/{permission} — catálogo de solo lectura con descomposición módulo/acción, tenedores institucionales desde la matriz, roles personalizados desde los pivotes y users_count con desactivadas incluidas; sin rutas de escritura (la matriz es la única fuente de verdad) y gate roles.view
+- Suite completa: 913 tests / 2854 aserciones contra MySQL real; dataset de la matriz completo (105 celdas); ADR-27 + changelogs (arquitectura 1.17, plan 1.9)
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum (sección 2.4), POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada con volumen (RF-EXP-011)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
