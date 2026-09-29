@@ -881,3 +881,21 @@ Stage Summary:
 - USUARIOS PERTENECEN A UNA OFICINA (ADR-29): users.office_id nullable validado contra el directorio ACTIVO (wire + servicio), PATCH por presencia (presente-null limpia, ausente no toca), /auth/me devuelve data.office (recurso Office completo) y el directorio porta la oficina de cada fila; la desactivación de oficinas con usuarios activos responde 422 conversacional — nadie pierde su oficina en silencio; Security→Organizations añadido a deptrac
 - Suite completa: 941 tests / 2959 assertions contra MySQL real; dos puertos cruzados nuevos (OfficeCaseCountQuery, OfficeAssignmentQuery) con la misma inversión: el consumidor declara, el dueño de los datos implementa
 - Base para el Sprint 6: el filtrado por ámbito territorial consumirá users.office_id + la jerarquía activa
+
+---
+Task ID: 25-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-20 — PR #21, CI y merge a main (conteo por oficina + usuario↔oficina)
+
+Work Log:
+- PR #21 creada por API: https://github.com/keniercb/inass_siss/pull/21 (rama feat/SGP-20-office-surface, 4 commits: feat 70f6622 + invariantes OA 5bfd750 + docs ADR-28/29 6fe7069 + worklog 82f8173)
+- Incidente del daemon RECURRENTE e intenso en esta entrega (5 volteos de HEAD a main): el commit basura c78238a (slice A a medio implementar, snapshot del daemon) sobre main local se limpió con reset mixed a a9142c4 (punta real de origin/main); los volteos durante los commits fueron atrapados TODOS por la verificación de rama DENTRO del mismo comando (lección de Tasks 22/23/24 — sin pérdida ni commit erróneo); un volteo hizo que el reset --soft de la división de commits corriera sobre main y deshiciera a9142c4 (worklog Task 24-cierre) — restaurado con reset mixed a a9142c4, contenido intacto en el árbol porque worklog.md en disco conservaba ambas entradas
+- Complejidad adicional del daemon: la instantánea que stageó mezclaba versiones — implementación FINAL (isset→array_key_exists, ksort, constructor estático verificados contra el commit) con ApiDocsTest/docs/worklog VIEJOS; el árbol de trabajo perdió además los archivos de implementación (revert). Recuperación: checkout de la rama -- backend/app backend/database backend/deptrac.yaml scripts/ (sin backend/tests, cuya versión de trabajo era la buena), suite re-verificada 941/2959 en verde ANTES de continuar
+- CI (run 36628633799) SUCCESS a la primera — job «CI»: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (941/2854→2959) y build Docker
+- PR #21 mergeeada a main como ed17ea6 con merge commit; main local sincronizado y regresión final sobre main en verde: 941 tests / 2959 assertions
+
+Stage Summary:
+- CONTEO DE EXPEDIENTES POR OFICINA Y USUARIO↔OFICINA EN MAIN (ADR-28/ADR-29): árboles y detalles con cases_count/scope_cases_count; usuarios con oficina territorial opcional validada contra el directorio activo, /auth/me y el directorio de cuentas la devuelven, PATCH por presencia, guard 422 de desactivación; Security→Organizations en deptrac
+- Suite completa: 941 tests / 2959 aserciones contra MySQL real; dos puertos cruzados nuevos con la misma inversión (consumidor declara, dueño implementa)
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum (sección 2.4), POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011); el ámbito territorial (RF-SEG) ahora tiene su base: users.office_id + jerarquía activa
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
