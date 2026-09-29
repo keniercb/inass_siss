@@ -13,6 +13,7 @@ use App\Modules\PensionCases\Presentation\Controllers\PensionCaseController;
 use App\Modules\People\Presentation\Controllers\PersonController;
 use App\Modules\Security\Presentation\Controllers\AuditLogController;
 use App\Modules\Security\Presentation\Controllers\AuthController;
+use App\Modules\Security\Presentation\Controllers\PermissionController;
 use App\Modules\Security\Presentation\Controllers\RoleController;
 use App\Modules\Security\Presentation\Controllers\UserController;
 use App\Modules\Settings\Presentation\Controllers\GeneralSettingsController;
@@ -206,6 +207,22 @@ Route::middleware(['auth:sanctum', 'permission:roles.view'])->group(function ():
     Route::get('/roles/{id}', [RoleController::class, 'show'])
         ->whereNumber('id')
         ->name('roles.show');
+
+    // Catálogo de permisos (RF-SEG-002, ADR-27): the read-only
+    // surface the role editor consumes — every assignable permission
+    // with its module.action decomposition, the institutional
+    // holders (from the matrix) and the custom holders (live
+    // pivots), plus the count of accounts that can act on it.
+    // Permissions are code artifacts — the PermissionMatrix is
+    // their single source of truth — so no write route exists:
+    // creating one at runtime would desynchronize code from
+    // database. The route pattern only admits lowercase
+    // modulo.accion names; anything else 404s at routing.
+    Route::get('/permissions', [PermissionController::class, 'index'])
+        ->name('permissions.index');
+    Route::get('/permissions/{permission}', [PermissionController::class, 'show'])
+        ->where('permission', '[a-z][a-z0-9_]*\.[a-z]+')
+        ->name('permissions.show');
 });
 
 Route::middleware(['auth:sanctum', 'permission:roles.manage'])->group(function (): void {
