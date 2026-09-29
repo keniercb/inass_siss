@@ -16,8 +16,10 @@ use Tests\TestCase;
 /**
  * Person registration and edition /api/v1/people (RF-PER-001,
  * RF-PER-002, RN-001): mandatory fields, the Cuban identity validator
- * as a request rule, immutable identity after creation, soft delete
- * and the audited trail with the previous values.
+ * as a request rule (11 digits, month/day ranges and the digit-10 sex
+ * parity cross-checked against the declared sex), immutable identity
+ * after creation, soft delete and the audited trail with the previous
+ * values.
  */
 final class PersonCrudApiTest extends TestCase
 {
@@ -41,7 +43,7 @@ final class PersonCrudApiTest extends TestCase
     private function payload(array $overrides = []): array
     {
         return array_merge([
-            'identity_number' => '18506150012',
+            'identity_number' => '85061510002',
             'first_name' => 'Juan',
             'middle_name' => 'Carlos',
             'first_surname' => 'Pérez',
@@ -67,7 +69,7 @@ final class PersonCrudApiTest extends TestCase
         $response = $this->postJson('/api/v1/people', $this->payload());
 
         $response->assertCreated()
-            ->assertJsonPath('data.identity_number', '18506150012')
+            ->assertJsonPath('data.identity_number', '85061510002')
             ->assertJsonPath('data.first_name', 'Juan')
             ->assertJsonPath('data.first_surname', 'Pérez')
             ->assertJsonPath('data.sex', 'M')
@@ -76,7 +78,7 @@ final class PersonCrudApiTest extends TestCase
             ->assertJsonPath('data.death_date', null);
 
         $this->assertDatabaseHas('people', [
-            'identity_number' => '18506150012',
+            'identity_number' => '85061510002',
             'created_by' => $this->user->id,
         ]);
     }
@@ -104,12 +106,13 @@ final class PersonCrudApiTest extends TestCase
     public static function invalidIdentityProvider(): array
     {
         return [
-            'too short' => ['850615001', '10 digits'],
-            'too long' => ['185061500123', '12 digits'],
-            'letters' => ['18506A5001', 'non-numeric'],
-            'invalid prefix' => ['98506150012', 'prefix 9 is not a century/gender code'],
-            'impossible month' => ['10230012345', 'month 23 cannot exist'],
-            'february 30th' => ['10202300345', 'February never has 30 days'],
+            'too short' => ['8506151002', '10 digits'],
+            'too long' => ['850615100023', '12 digits'],
+            'letters' => ['8506151000a', 'non-numeric'],
+            'impossible month' => ['85133112345', 'month 13 cannot exist'],
+            'month zero' => ['85003112345', 'month 00 cannot exist'],
+            'day 32' => ['85063212345', 'no month has 32 days'],
+            'day zero' => ['85060012345', 'day 00 cannot exist'],
             'empty' => ['', 'required'],
         ];
     }
@@ -126,6 +129,27 @@ final class PersonCrudApiTest extends TestCase
             'birth_date format' => ['birth_date', '15-06-1985'],
             'address' => ['address', ''],
         ];
+    }
+
+    public function test_accepts_identity_numbers_with_any_leading_digits(): void
+    {
+        // The two leading digits are the birth year and stay
+        // unvalidated: numbers that the old century-prefix rule
+        // rejected (anything not starting with 1-6) now pass as
+        // long as the month/day ranges and the digit-10 sex parity
+        // hold.
+        $this->postJson('/api/v1/people', $this->payload(['identity_number' => '98061510001']))
+            ->assertCreated()
+            ->assertJsonPath('data.identity_number', '98061510001');
+    }
+
+    public function test_rejects_a_sex_that_does_not_match_the_identity_number(): void
+    {
+        // 85061510002 encodes a male (digit 10 is even); the
+        // declared sex contradicts it.
+        $this->postJson('/api/v1/people', $this->payload(['sex' => 'F']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['identity_number']);
     }
 
     #[DataProvider('invalidMandatoryProvider')]
@@ -235,7 +259,7 @@ final class PersonCrudApiTest extends TestCase
         $person = Person::factory()->create();
 
         $this->patchJson("/api/v1/people/{$person->id}", [
-            'identity_number' => '19506150012',
+            'identity_number' => '95061510002',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['identity_number']);
 
@@ -255,6 +279,32 @@ final class PersonCrudApiTest extends TestCase
             'death_date' => '2024-03-10',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['death_date']);
+    }
+
+    public function test_update_rejects_a_sex_that_contradicts_the_identity_number(): void
+    {
+        // The identity number is immutable and its digit 10 encodes
+        // the sex (even male): a PATCH may restate the same sex, but
+        // never contradict the number.
+        $person = Person::factory()->create(); // male factory identity
+
+        $this->patchJson("/api/v1/people/{$person->id}", ['sex' => 'F'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['sex']);
+
+        $this->assertDatabaseHas('people', [
+            'id' => $person->id,
+            'sex' => 'M',
+        ]);
+    }
+
+    public function test_update_allows_restating_the_sex_encoded_by_the_identity_number(): void
+    {
+        $person = Person::factory()->create();
+
+        $this->patchJson("/api/v1/people/{$person->id}", ['sex' => 'M'])
+            ->assertOk()
+            ->assertJsonPath('data.sex', 'M');
     }
 
     public function test_update_returns_404_for_an_unknown_person(): void

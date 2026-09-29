@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Shared\Support;
 
-use DateTimeImmutable;
 use InvalidArgumentException;
 use Stringable;
 
@@ -13,37 +12,22 @@ use Stringable;
  *
  * The 11-digit number is structured as:
  *
- *  [1]      century & gender prefix:
- *           1 = male born 1900-1999, 2 = female born 1900-1999,
- *           3 = male born 2000-2099, 4 = female born 2000-2099,
- *           5 = male born 1800-1899, 6 = female born 1800-1899
- *  [2..7]   birth date YYMMDD (validated against the real calendar,
- *           including leap years)
- *  [8..10]  issuance sequence number
- *  [11]     registry check digit
+ *  [1..2]   birth year YY (NOT validated: the century is not
+ *           encoded in the number, so these digits are free)
+ *  [3..4]   birth month MM (01-12)
+ *  [5..6]   birth day DD (01-31, flat range)
+ *  [7..11]  registry sequence, unverified
  *
- * The constructor enforces the full structural validation. The check digit
- * (position 11) is NOT structurally verified yet: no official public
- * algorithm is verifiable for it, so enforcement is deferred to a checksum
- * policy once the Ministry confirms the rule (open question P-08, tracked in
- * Requisitos funcionales.md section 7).
+ * The sex is encoded by digit 10: even means male, odd means
+ * female — gender() resolves it. The registry check digit (P-08,
+ * open question) stays unverified, as does the year block: those
+ * validations were deliberately dropped (the century cannot be
+ * resolved from a 2-digit year and no official algorithm for the
+ * check digit is public), so the structural policy above is the
+ * whole contract.
  */
 final class CubanIdentityNumber implements \JsonSerializable, Stringable
 {
-    /** @var array<int, int> leading digit => base century (e.g. 1 => 1900) */
-    private const array CENTURY_BY_PREFIX = [
-        1 => 1900, 2 => 1900,
-        3 => 2000, 4 => 2000,
-        5 => 1800, 6 => 1800,
-    ];
-
-    /** @var array<int, non-empty-string> leading digit => gender (RN-002) */
-    private const array GENDER_BY_PREFIX = [
-        1 => 'M', 2 => 'F',
-        3 => 'M', 4 => 'F',
-        5 => 'M', 6 => 'F',
-    ];
-
     /** @var non-empty-string 11 digits, validated */
     private readonly string $number;
 
@@ -55,21 +39,18 @@ final class CubanIdentityNumber implements \JsonSerializable, Stringable
             );
         }
 
-        $prefix = (int) $number[0];
-        if (! isset(self::CENTURY_BY_PREFIX[$prefix])) {
+        $month = (int) substr($number, 2, 2);
+        $day = (int) substr($number, 4, 2);
+
+        if ($month < 1 || $month > 12) {
             throw new InvalidArgumentException(
-                sprintf('Identity number prefix "%d" is not a valid century/gender code (expected 1-6).', $prefix)
+                sprintf('Identity number "%s" encodes an invalid month (%02d) in digits 3-4.', $number, $month)
             );
         }
 
-        $century = self::CENTURY_BY_PREFIX[$prefix];
-        $year = $century + (int) substr($number, 1, 2);
-        $month = (int) substr($number, 3, 2);
-        $day = (int) substr($number, 5, 2);
-
-        if (! checkdate($month, $day, $year)) {
+        if ($day < 1 || $day > 31) {
             throw new InvalidArgumentException(
-                sprintf('Identity number "%s" encodes an invalid birth date (%04d-%02d-%02d).', $number, $year, $month, $day)
+                sprintf('Identity number "%s" encodes an invalid day (%02d) in digits 5-6.', $number, $day)
             );
         }
 
@@ -87,21 +68,15 @@ final class CubanIdentityNumber implements \JsonSerializable, Stringable
         return $this->number;
     }
 
-    /** Birth date resolved to its real century. */
-    public function birthDate(): DateTimeImmutable
-    {
-        $prefix = (int) $this->number[0];
-        $year = self::CENTURY_BY_PREFIX[$prefix] + (int) substr($this->number, 1, 2);
-
-        return new DateTimeImmutable(
-            sprintf('%04d-%s-%s', $year, substr($this->number, 3, 2), substr($this->number, 5, 2))
-        );
-    }
-
-    /** @return 'M'|'F' */
+    /**
+     * The sex encoded by digit 10: even means male, odd means
+     * female.
+     *
+     * @return 'M'|'F'
+     */
     public function gender(): string
     {
-        return self::GENDER_BY_PREFIX[(int) $this->number[0]];
+        return ((int) $this->number[9]) % 2 === 0 ? 'M' : 'F';
     }
 
     public function equals(self $other): bool

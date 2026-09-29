@@ -106,15 +106,15 @@ final class PersonSearchApiTest extends TestCase
 
     public function test_identity_prefix_matches_several_people(): void
     {
-        // The century/sex digit alone groups a whole population
-        // cohort: every 1900s male in the seed (Juan, Luis).
-        $this->getJson('/api/v1/people?identity=1')
+        // The leading birth-year digit alone groups a population
+        // cohort: every 1980s person in the seed (Juan, Juanita).
+        $this->getJson('/api/v1/people?identity=8')
             ->assertOk()
             ->assertJsonCount(2, 'data');
 
-        $this->getJson('/api/v1/people?identity=2')
+        $this->getJson('/api/v1/people?identity=9')
             ->assertOk()
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_identity_search_is_a_prefix_not_a_substring(): void
@@ -141,7 +141,8 @@ final class PersonSearchApiTest extends TestCase
 
     public function test_identity_prefix_with_no_match_returns_an_empty_page(): void
     {
-        // No seeded CI starts with 3..6 (century digits not in use).
+        // No seeded CI starts with 3 (the seeded birth years are
+        // 1975, 1980, 1983 and 1990).
         $this->getJson('/api/v1/people?identity=3')
             ->assertOk()
             ->assertJsonCount(0, 'data')

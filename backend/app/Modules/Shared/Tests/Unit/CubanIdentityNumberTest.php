@@ -5,42 +5,45 @@ declare(strict_types=1);
 use App\Modules\Shared\Support\CubanIdentityNumber;
 
 dataset('valid identity numbers', [
-    // century(1) + YYMMDD(6) + sequence(3) + check(1) = 11 digits
-    'male born 1958-04-13' => ['15804131234', '1958-04-13', 'M'],
-    'female born 1962-11-30' => ['26211304567', '1962-11-30', 'F'],
-    'male born 2005-06-23' => ['30506231235', '2005-06-23', 'M'],
-    'female born 2010-01-01' => ['41001011235', '2010-01-01', 'F'],
-    'male born 1899-12-31' => ['59912311235', '1899-12-31', 'M'],
-    'leap day in 2000 (leap year)' => ['30002291235', '2000-02-29', 'M'],
+    // year(2) + month(2) + day(2) + sequence(3) + sex(1) + filler(1) = 11 digits
+    'male born 1985-06-15' => ['85061510002', 'M'],
+    'female born 1962-11-30' => ['62113045671', 'F'],
+    'female born 2010-01-01' => ['10010178931', 'F'],
+    'leap day is a plain day now (year not validated)' => ['00022912341', 'M'],
+    'june 31st passes under the flat day range' => ['99063156782', 'M'],
+    'the old forbidden prefix 9 is just a year digit' => ['98061510001', 'M'],
 ]);
 
-it('accepts structurally valid identity numbers and resolves birth data', function (
+it('accepts structurally valid identity numbers and derives the sex', function (
     string $number,
-    string $expectedBirthDate,
-    string $expectedGender,
+    string $expectedSex,
 ) {
     $identity = CubanIdentityNumber::fromString($number);
 
     expect($identity->number())->toBe($number)
-        ->and($identity->birthDate()->format('Y-m-d'))->toBe($expectedBirthDate)
-        ->and($identity->gender())->toBe($expectedGender)
+        ->and($identity->gender())->toBe($expectedSex)
         ->and($identity->__toString())->toBe($number)
         ->and($identity->equals(CubanIdentityNumber::fromString($number)))->toBeTrue();
 })->with('valid identity numbers');
 
+it('derives the sex from the parity of digit 10', function () {
+    foreach (range(0, 9) as $digit) {
+        $number = '850615123'.$digit.'7';
+
+        expect(CubanIdentityNumber::fromString($number)->gender())
+            ->toBe($digit % 2 === 0 ? 'M' : 'F');
+    }
+});
+
 dataset('invalid identity numbers', [
-    'too short' => ['1580413123'],
-    'too long' => ['158041312345'],
-    'not only digits' => ['1580413123a'],
+    'too short' => ['8506151002'],
+    'too long' => ['850615100023'],
+    'not only digits' => ['8506151000a'],
     'empty' => [''],
-    'invalid prefix 0' => ['05804131234'],
-    'invalid prefix 7' => ['75804131234'],
-    'invalid prefix 9' => ['95804131234'],
-    'invalid month 13' => ['15813131234'],
-    'invalid month 00' => ['15800131234'],
-    'invalid day 32' => ['15801321234'],
-    'february 30' => ['15802301234'],
-    'february 29 in non-leap 1900' => ['10002291234'],
+    'month 13' => ['85133112345'],
+    'month 00' => ['85003112345'],
+    'day 32' => ['85063212345'],
+    'day 00' => ['85060012345'],
 ]);
 
 it('rejects structurally invalid identity numbers', function (string $number) {
@@ -48,14 +51,15 @@ it('rejects structurally invalid identity numbers', function (string $number) {
 })->with('invalid identity numbers');
 
 it('serializes as its plain number', function () {
-    $identity = CubanIdentityNumber::fromString('15804131234');
+    $identity = CubanIdentityNumber::fromString('85061510002');
 
-    expect(json_encode(['ci' => $identity]))->toBe('{"ci":"15804131234"}');
+    expect(json_encode(['ci' => $identity]))->toBe('{"ci":"85061510002"}');
 });
 
 /*
- * P-08 (open question): the 11th digit is the registry check digit, but no
- * officially verifiable public algorithm exists for it. Once the Ministry
- * confirms the rule, a checksum policy will be added here and enforced in
- * the constructor. Until then, structural validation is authoritative.
+ * P-08 (open question): the registry check digit is still not
+ * verified — no officially public algorithm exists for it. The
+ * structural validation above (digits, month, day) plus the
+ * digit-10 sex parity is the whole policy until the Ministry
+ * confirms the checksum rule.
  */
