@@ -953,3 +953,19 @@ Stage Summary:
 - Suite completa: 975 tests / 3100 aserciones contra MySQL real; scripts/smoke_office_structure.php como fumiga repetible de las 7 reglas
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada; el ámbito territorial tiene ahora su base normalizada: users.office_id + jerarquía de tres niveles exactos
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 27-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-22 — PR #23, CI y merge a main (estructura territorial de oficinas)
+
+Work Log:
+- PR #23 creada por API: https://github.com/keniercb/inass_siss/pull/23 (rama feat/SGP-22-office-structure-rules, 4 commits: feat 3d639e0 + tests f7d2397 + docs ADR-31 6d8994b + worklog ce14b2e)
+- Incidente del daemon recurrente pero contenido: volteó HEAD a main DOS veces (antes del primer commit y durante el sondeo del SHA de CI — rev-parse HEAD devolvió la punta de main); ambos atrapados por la verificación de rama DENTRO del mismo comando encadenado y por resolver el sondeo contra la punta de la RAMA (lección de Tasks 22-26), sin pérdida ni commit erróneo
+- CI (run 36650750788) SUCCESS a la primera — job «CI»: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (975/3100) y build Docker
+- PR #23 mergeeada a main como 588fb6d con merge commit; main local sincronizado y regresión final sobre main en verde: 975 tests / 3100 assertions
+
+Stage Summary:
+- ESTRUCTURA TERRITORIAL DE OFICINAS EN MAIN (ADR-31): una sola nacional / una provincial por provincia / una municipal por provincia y municipio (entre activas, el soft delete libera el ámbito); parent_office_id derivado del tipo con 422 por campo ante contradicciones; prerrequisitos del superior (422 en office_type_id); PATCH re-deriva excluyéndose y bloquea re-tipo/re-ubicación con hijas activas; tipos fuera de la tríada conservan RN-003; NationalOfficeSeeder garantiza la nacional al arranque (regla 7)
+- Suite completa: 975 tests / 3100 aserciones contra MySQL real; fumiga HTTP scripts/smoke_office_structure.php (25 comprobaciones) como artefacto repetible
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5) de la Fase 3: matriz de transiciones como dataset de Pest ANTES del enum (sección 2.4), POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión (RF-EXP-006), denegación con base legal (RF-EXP-008), reapertura admin (RF-EXP-010), historial append-only (RF-EXP-009/RF-AUD-002) y búsqueda afinada (RF-EXP-011); el árbol de oficinas de tres niveles exactos normaliza la base del ámbito territorial
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
