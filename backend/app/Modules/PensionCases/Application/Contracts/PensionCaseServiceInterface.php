@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Application\Contracts;
 
 use App\Modules\PensionCases\Application\Exceptions\CaseNotEditableException;
+use App\Modules\PensionCases\Application\Exceptions\DuplicateIncomeConceptException;
 use App\Modules\PensionCases\Application\Exceptions\DuplicateSalaryYearException;
 use App\Modules\PensionCases\Application\Exceptions\OpenCaseExistsException;
 use App\Modules\PensionCases\Application\Exceptions\PersonNotEligibleException;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -15,11 +17,18 @@ use App\Modules\PensionCases\Infrastructure\Persistence\Models\WorkCycle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
- * Use cases of the PensionCases module for Sprint 5 (RF-EXP-001..004):
- * case creation with sequential number and atomic subrecords, the
- * subrecord highs/removals gated by the editable state, and the
- * advisory analysis the responses carry (missing salary years,
- * overlapping and open services).
+ * Use cases of the PensionCases module for Sprint 5 (RF-EXP-001..004)
+ * plus the user rules 0-5 (ADR-32/ADR-33): case creation with the
+ * composed annual number PP-YYYY-CCCCC and atomic subrecords —
+ * salaries capped at fifteen, services, cycles and income concept
+ * records —, the subrecord highs/removals gated by the editable
+ * state, and the advisory analysis the responses carry (missing
+ * salary years, overlapping and open services).
+ *
+ * The OFFICE of a new case is the registering user's — the
+ * Presentation layer resolves it through the Shared office port and
+ * injects it into the attributes (user rule 0/ADR-33): never a
+ * client-supplied value.
  *
  * Missing cases surface as null — the controller translates that to
  * HTTP 404; the service layer never speaks HTTP.
@@ -27,13 +36,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 interface PensionCaseServiceInterface
 {
     /**
-     * Creates the case (RF-EXP-001) with its sequential number and,
-     * when the payload carries them, its subrecords — everything or
-     * nothing (plan S5.5): the number may end up burned by a
-     * rollback, which RN-009 accepts by design.
+     * Creates the case (RF-EXP-001) with its composed number —
+     * registering office's province code, current year and annual
+     * consecutive, PP-YYYY-CCCCC (user rule 2/ADR-32) — and, when the
+     * payload carries them, its subrecords — everything or nothing
+     * (plan S5.5): the number may end up burned by a rollback, which
+     * RN-009 accepts by design.
      *
-     * @param  array<string, mixed>  $attributes  case fields plus the optional
-     *                                            salary_records / service_records / work_cycles arrays
+     * @param  array<string, mixed>  $attributes  case fields (office_id resolved from the acting user by the controller) plus the optional salary_records / service_records / work_cycles / income_concept_records arrays
      *
      * @throws PersonNotEligibleException deceased or deactivated applicant (422)
      * @throws OpenCaseExistsException the person already holds an open case (409)
@@ -106,4 +116,21 @@ interface PensionCaseServiceInterface
      * @throws CaseNotEditableException
      */
     public function removeWorkCycle(int $caseId, int $recordId): ?bool;
+
+    /**
+     * Declares the value of one income concept (user rule 5).
+     *
+     * @return null when the case does not exist (controller: 404)
+     *
+     * @throws CaseNotEditableException
+     * @throws DuplicateIncomeConceptException the concept is already declared (422)
+     */
+    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount): ?IncomeConceptRecord;
+
+    /**
+     * @return null when the case does not exist; false when the row was not found
+     *
+     * @throws CaseNotEditableException
+     */
+    public function removeIncomeConceptRecord(int $caseId, int $recordId): ?bool;
 }

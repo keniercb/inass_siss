@@ -21,6 +21,15 @@ final class SalarySeries
 {
     private const int FIRST_VALID_YEAR = 1950;
 
+    /**
+     * Ceiling of declared salary rows per case (user rule 1): a case
+     * registers AT MOST FIFTEEN salaries — the pension calculation
+     * works with a bounded window, so the series is bounded too. The
+     * FormRequest guards the nested payload, the service guards the
+     * individual highs: both consult this single domain constant.
+     */
+    public const int MAX_RECORDS = 15;
+
     private function __construct() {}
 
     /**

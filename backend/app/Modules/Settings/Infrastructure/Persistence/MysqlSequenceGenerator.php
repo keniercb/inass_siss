@@ -61,4 +61,50 @@ final class MysqlSequenceGenerator implements SequenceGeneratorInterface
 
         return (int) $value;
     }
+
+    public function nextForYear(string $baseScope, int $year): int
+    {
+        $scope = $baseScope.':'.$year;
+
+        $connection = $this->connections->connection(NumberingSequence::CONNECTION_NAME);
+
+        $value = $connection->transaction(function () use ($scope, $connection): int {
+            // A year without a row is BORN at 1 (ADR-32): the insert
+            // is idempotent (INSERT IGNORE), so two concurrent
+            // first-emitters of a new year converge on a single row
+            // instead of racing an UnknownSequenceException — the
+            // annual rollover needs no operator.
+            $connection->table((new NumberingSequence)->getTable())
+                ->insertOrIgnore([
+                    'scope' => $scope,
+                    'next_value' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            // Same pessimistic protocol as next(): the row is locked,
+            // the read value is handed out and the increment is
+            // committed on this dedicated session, independent of the
+            // caller's business transaction.
+            $row = NumberingSequence::query()
+                ->where('scope', $scope)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $row instanceof NumberingSequence) {
+                // Unreachable under the insert above; kept so the
+                // type of $row is provably non-null for the static
+                // analyzer and any future storage swap.
+                throw UnknownSequenceException::forScope($scope);
+            }
+
+            $current = (int) $row->next_value;
+            $row->next_value = $current + 1;
+            $row->save();
+
+            return $current;
+        });
+
+        return (int) $value;
+    }
 }

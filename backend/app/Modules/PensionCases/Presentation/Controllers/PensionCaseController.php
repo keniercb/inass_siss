@@ -6,27 +6,34 @@ namespace App\Modules\PensionCases\Presentation\Controllers;
 
 use App\Modules\PensionCases\Application\Contracts\PensionCaseServiceInterface;
 use App\Modules\PensionCases\Application\Exceptions\CaseNotEditableException;
+use App\Modules\PensionCases\Application\Exceptions\DuplicateIncomeConceptException;
 use App\Modules\PensionCases\Application\Exceptions\DuplicateSalaryYearException;
 use App\Modules\PensionCases\Application\Exceptions\OpenCaseExistsException;
 use App\Modules\PensionCases\Application\Exceptions\PersonNotEligibleException;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\WorkCycle;
 use App\Modules\PensionCases\Presentation\Requests\PensionCaseIndexRequest;
+use App\Modules\PensionCases\Presentation\Requests\StoreIncomeConceptRecordRequest;
 use App\Modules\PensionCases\Presentation\Requests\StorePensionCaseRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreSalaryRecordRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreServiceRecordRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreWorkCycleRequest;
+use App\Modules\PensionCases\Presentation\Resources\IncomeConceptRecordResource;
 use App\Modules\PensionCases\Presentation\Resources\PensionCaseResource;
 use App\Modules\PensionCases\Presentation\Resources\SalaryRecordResource;
 use App\Modules\PensionCases\Presentation\Resources\ServiceRecordResource;
 use App\Modules\PensionCases\Presentation\Resources\WorkCycleResource;
+use App\Modules\Shared\Contracts\CurrentUserOfficeProviderInterface;
 use Closure;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
 
 /**
- * HTTP surface for pension cases, Sprint 5 (RF-EXP-001..004).
+ * HTTP surface for pension cases, Sprint 5 (RF-EXP-001..004) plus
+ * the user rules 0-5 (ADR-32/ADR-33).
  *
  * Deliberately thin (ADR-11): validation arrives through the
  * FormRequests, the creation, eligibility, uniqueness and
@@ -36,18 +43,26 @@ use OpenApi\Attributes as OA;
  * services, RF-EXP-002/003) travels as a sibling `warnings` object
  * of the envelope: evidence for the specialist, never case state.
  *
+ * User rule 0 (ADR-33): store() never reads office_id from the
+ * payload — the Shared office port resolves the REGISTERING USER's
+ * office and the controller injects it into the attributes, so the
+ * assumption is explicit at the boundary and the service keeps
+ * validating it like any other reference.
+ *
  * Conventions of the module's error surface: a deceased or
  * deactivated applicant answers 422 (PersonNotEligibleException), a
  * person already holding an open case answers 409 with that case
- * (OpenCaseExistsException), a repeated (case, year) answers 422
- * (DuplicateSalaryYearException) and subrecord writes on a case that
- * already left `submitted` answer 409 with its current status
+ * (OpenCaseExistsException), a repeated (case, year) or (case,
+ * concept) answers 422 (DuplicateSalaryYearException /
+ * DuplicateIncomeConceptException) and subrecord writes on a case
+ * that already left `submitted` answer 409 with its current status
  * (CaseNotEditableException).
  */
 final class PensionCaseController
 {
     public function __construct(
         private readonly PensionCaseServiceInterface $cases,
+        private readonly CurrentUserOfficeProviderInterface $registeringOffices,
     ) {}
 
     #[OA\Get(
@@ -55,7 +70,7 @@ final class PensionCaseController
         operationId: 'pensionCasesIndex',
         tags: ['Expedientes'],
         summary: 'Listado de expedientes',
-        description: 'Listado filtrable por estado, oficina, persona, número y rango de fechas de solicitud, paginado (RF-EXP-011; la búsqueda afinada con volumen llega en S6).',
+        description: 'Listado filtrable por estado, oficina, persona, número y rango de fechas de solicitud, paginado (RF-EXP-011; la búsqueda afinada con volumen llega en S6). Cada fila viaja con la proyección COMPLETA del promovente (regla de usuario 3).',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\QueryParameter(name: 'status', schema: new OA\Schema(type: 'string', enum: ['submitted', 'under_review', 'approved', 'rejected'])),
@@ -155,26 +170,31 @@ final class PensionCaseController
         operationId: 'pensionCasesStore',
         tags: ['Expedientes'],
         summary: 'Apertura de un expediente',
-        description: 'Alta del expediente (RF-EXP-001) con número secuencial único (RN-009) y estado inicial submitted. El proponente debe estar vivo y activo (RF-SEG-003: 422 si falleció o está desactivado) y no puede tener otro expediente abierto (409 con el expediente abierto). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; el par año-expediente es único (422). Las advertencias (huecos salariales, solapamientos de servicios, vínculos abiertos) viajan junto a data.',
+        description: 'Alta del expediente (RF-EXP-001, reglas de usuario 0-5/ADR-32/33): el expediente ASUME la oficina del usuario que lo registra — office_id no se envía en el POST (422 si llega) — y el número se compone PP-YYYY-CCCCC (código de provincia de la oficina registrante, año en curso y consecutivo anual rellenado con ceros, secciones separadas por guion). El proponente debe estar vivo y activo (RF-SEG-003: 422) y no puede tener otro expediente abierto (409). La serie salarial admite máximo 15 filas (regla 1); el par de Ejército Rebelde exige la fecha de alta cuando el booleano es true y la rechaza cuando es false (regla 4); los conceptos de ingreso se declaran como subregistros anidados (regla 5). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; los pares año-expediente y concepto-expediente son únicos (422). Las advertencias viajan junto a data.',
         security: [['sanctumAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['applicant_person_id', 'office_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'last_salary'],
+                required: ['applicant_person_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary'],
                 properties: [
                     new OA\Property(property: 'applicant_person_id', type: 'integer', example: 7),
-                    new OA\Property(property: 'office_id', type: 'integer', example: 1),
+                    new OA\Property(property: 'office_id', type: 'integer', nullable: true, example: null, description: 'PROHIBIDO (regla 0): el expediente asume la oficina del usuario autenticado'),
                     new OA\Property(property: 'employer_entity_id', type: 'integer', example: 3),
                     new OA\Property(property: 'position_id', type: 'integer', example: 2),
                     new OA\Property(property: 'occupational_category_id', type: 'integer', example: 1),
                     new OA\Property(property: 'educational_level_id', type: 'integer', example: 4),
                     new OA\Property(property: 'scientific_category_id', type: 'integer', example: 2),
+                    new OA\Property(property: 'pension_type_id', type: 'integer', example: 1, description: 'Tipo de pensión del catálogo (regla 4)'),
+                    new OA\Property(property: 'pension_regime_id', type: 'integer', example: 1, description: 'Régimen de pensión del catálogo (regla 4)'),
+                    new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'Pertenece al Ejército Rebelde (regla 4)'),
+                    new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'Fecha de alta en el Ejército Rebelde: obligatoria si rebel_army_member=true, rechazada si false'),
                     new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, decimal exacto no negativo (RN-005)'),
-                    new OA\Property(property: 'requested_at', type: 'string', format: 'date', nullable: true, example: '2026-09-28', description: 'Opcional; por defecto hoy; nunca futura'),
+                    new OA\Property(property: 'requested_at', type: 'string', format: 'date', nullable: true, example: '2026-09-30', description: 'Opcional; por defecto hoy; nunca futura'),
                     new OA\Property(
                         property: 'salary_records',
                         type: 'array',
-                        description: 'Serie salarial inicial (todo o nada)',
+                        maxItems: 15,
+                        description: 'Serie salarial inicial, máximo 15 filas (regla 1, todo o nada)',
                         items: new OA\Items(
                             properties: [
                                 new OA\Property(property: 'year', type: 'integer', example: 2024),
@@ -206,6 +226,18 @@ final class PensionCaseController
                                 new OA\Property(property: 'planned_days', type: 'integer', example: 300),
                                 new OA\Property(property: 'actual_days', type: 'integer', example: 280),
                                 new OA\Property(property: 'cycles_count', type: 'integer', example: 1),
+                            ],
+                            type: 'object',
+                        ),
+                    ),
+                    new OA\Property(
+                        property: 'income_concept_records',
+                        type: 'array',
+                        description: 'Conceptos de ingreso declarados (regla 5, todo o nada): un valor por concepto',
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'income_concept_id', type: 'integer', example: 3),
+                                new OA\Property(property: 'amount', type: 'string', example: '150.00'),
                             ],
                             type: 'object',
                         ),
@@ -244,8 +276,23 @@ final class PensionCaseController
     )]
     public function store(StorePensionCaseRequest $request): JsonResponse
     {
+        // User rule 0 (ADR-33): the case assumes the REGISTERING
+        // USER's office — never a client-supplied value. The wire
+        // contract already rejected a payload office_id (422), so
+        // the only source left is the actor's assignment.
+        $officeId = $this->registeringOffices->currentOfficeId();
+
+        if ($officeId === null) {
+            throw ValidationException::withMessages([
+                'office_id' => 'The authenticated user has no office assigned; a case assumes the registering user\'s office.',
+            ]);
+        }
+
+        $attributes = $request->validated();
+        $attributes['office_id'] = $officeId;
+
         try {
-            $case = $this->cases->create($request->validated());
+            $case = $this->cases->create($attributes);
         } catch (OpenCaseExistsException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -517,12 +564,97 @@ final class PensionCaseController
         );
     }
 
+    #[OA\Post(
+        path: '/api/v1/pension-cases/{id}/income-concept-records',
+        operationId: 'pensionCasesAddIncomeConceptRecord',
+        tags: ['Expedientes'],
+        summary: 'Alta de un concepto de ingreso',
+        description: 'Declara el valor de un concepto de ingreso del expediente (regla de usuario 5) mientras el expediente está en submitted. El par concepto-expediente es único (422 semántico) y el importe es decimal exacto no negativo (RN-005).',
+        security: [['sanctumAuth' => []]],
+        parameters: [
+            new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['income_concept_id', 'amount'],
+                properties: [
+                    new OA\Property(property: 'income_concept_id', type: 'integer', example: 3, description: 'Concepto del catálogo de conceptos de ingreso'),
+                    new OA\Property(property: 'amount', type: 'string', example: '150.00', description: 'Importe exacto con dos decimales (RN-005)'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Concepto declarado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', ref: '#/components/schemas/IncomeConceptRecord'),
+                        new OA\Property(property: 'warnings', type: 'object'),
+                    ],
+                ),
+            ),
+            new OA\Response(ref: '#/components/responses/Unauthorized', response: 401),
+            new OA\Response(ref: '#/components/responses/Forbidden', response: 403),
+            new OA\Response(ref: '#/components/responses/ValidationError', response: 422),
+            new OA\Response(response: 404, description: 'Expediente inexistente'),
+            new OA\Response(response: 409, description: 'Expediente ya no editable (devuelve estado actual)'),
+        ],
+    )]
+    public function addIncomeConceptRecord(StoreIncomeConceptRecordRequest $request, int $id): JsonResponse
+    {
+        $validated = $request->validated();
+
+        return $this->addSubrecord(
+            fn (): ?IncomeConceptRecord => $this->cases->addIncomeConceptRecord(
+                $id,
+                (int) $validated['income_concept_id'],
+                (string) $validated['amount'],
+            ),
+            $id,
+        );
+    }
+
+    #[OA\Delete(
+        path: '/api/v1/pension-cases/{id}/income-concept-records/{record}',
+        operationId: 'pensionCasesRemoveIncomeConceptRecord',
+        tags: ['Expedientes'],
+        summary: 'Baja de un concepto de ingreso',
+        description: 'Elimina el valor declarado de un concepto de ingreso (regla de usuario 5) mientras el expediente está en submitted. La bitácora conserva los valores previos (ADR-19).',
+        security: [['sanctumAuth' => []]],
+        parameters: [
+            new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
+            new OA\PathParameter(name: 'record', schema: new OA\Schema(type: 'integer', format: 'int64')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Concepto eliminado (con advertencias actualizadas)', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Income concept record removed.'),
+                    new OA\Property(property: 'warnings', type: 'object'),
+                ],
+            )),
+            new OA\Response(ref: '#/components/responses/Unauthorized', response: 401),
+            new OA\Response(ref: '#/components/responses/Forbidden', response: 403),
+            new OA\Response(response: 404, description: 'Expediente o registro inexistente'),
+            new OA\Response(response: 409, description: 'Expediente ya no editable (devuelve estado actual)'),
+        ],
+    )]
+    public function removeIncomeConceptRecord(int $id, int $record): JsonResponse
+    {
+        return $this->removeSubrecord(
+            fn (): ?bool => $this->cases->removeIncomeConceptRecord($id, $record),
+            $id,
+            'Income concept record removed.',
+        );
+    }
+
     /**
      * Uniform 201 for subrecord highs: the row plus the refreshed
      * warnings of the case. Missing case (null) answers 404; the
      * not-editable conflict answers 409 with the current status.
      *
-     * @param  Closure(): (SalaryRecord|ServiceRecord|WorkCycle|null)  $operation
+     * @param  Closure(): (SalaryRecord|ServiceRecord|WorkCycle|IncomeConceptRecord|null)  $operation
      */
     private function addSubrecord(Closure $operation, int $caseId): JsonResponse
     {
@@ -538,6 +670,13 @@ final class PensionCaseController
                 'message' => $exception->getMessage(),
                 'errors' => ['year' => [$exception->getMessage()]],
             ], 422);
+        } catch (DuplicateIncomeConceptException $exception) {
+            // User rule 5 semantic probe: the pair (case, concept)
+            // is unique — same 422 convention.
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => ['income_concept_id' => [$exception->getMessage()]],
+            ], 422);
         }
 
         abort_if($record === null, 404, 'Case not found.');
@@ -545,6 +684,7 @@ final class PensionCaseController
         $resource = match (true) {
             $record instanceof SalaryRecord => new SalaryRecordResource($record),
             $record instanceof ServiceRecord => new ServiceRecordResource($record),
+            $record instanceof IncomeConceptRecord => new IncomeConceptRecordResource($record),
             default => new WorkCycleResource($record),
         };
 
