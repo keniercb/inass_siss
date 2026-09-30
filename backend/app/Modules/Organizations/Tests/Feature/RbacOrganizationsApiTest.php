@@ -41,13 +41,16 @@ final class RbacOrganizationsApiTest extends TestCase
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $type = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
         $officeType = OfficeType::query()->create(['code' => 'NAC', 'name' => 'Nacional']);
+        // Generic type for the write payloads: the RBAC matrix must
+        // stay orthogonal to the territorial structure rules.
+        $genericOfficeType = OfficeType::query()->create(['code' => 'REG', 'name' => 'Regional']);
 
         $this->refs = [
             'province_id' => $province->id,
             'municipality_id' => $municipality->id,
             'organization_id' => $organization->id,
             'entity_type_id' => $type->id,
-            'office_type_id' => $officeType->id,
+            'office_type_id' => $genericOfficeType->id,
         ];
 
         $this->entity = Entity::query()->create([

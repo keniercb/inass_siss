@@ -59,15 +59,17 @@ final class StructureTreeApiTest extends TestCase
             'parent_entity_id' => $child->id,
         ]);
 
-        $officeType = OfficeType::query()
+        $nationalType = OfficeType::query()
             ->create(['code' => 'NAC', 'name' => 'Nacional']);
+        $provincialType = OfficeType::query()
+            ->create(['code' => 'PRO', 'name' => 'Provincial']);
 
         $national = Office::query()->create([
-            'office_type_id' => $officeType->id, 'province_id' => $province->id,
+            'office_type_id' => $nationalType->id, 'province_id' => $province->id,
             'municipality_id' => $municipality->id, 'address' => 'Nacional',
         ]);
         Office::query()->create([
-            'office_type_id' => $officeType->id, 'province_id' => $province->id,
+            'office_type_id' => $provincialType->id, 'province_id' => $province->id,
             'municipality_id' => $municipality->id, 'address' => 'Provincial',
             'parent_office_id' => $national->id,
         ]);
