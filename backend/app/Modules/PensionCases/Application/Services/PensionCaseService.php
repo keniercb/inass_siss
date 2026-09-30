@@ -56,12 +56,13 @@ use Illuminate\Validation\ValidationException;
  * 409 with the open case, backed physically by the open_case_key
  * generated column.
  *
- * The NUMBER (user rule 2/ADR-32) is composed of the registering
- * office's province code (2), the current year (4) and the ANNUAL
- * consecutive of the shared sequence (5, zero padded) — PP-YYYY-CCCCC
+ * The NUMBER (user rule 2/ADR-34) is eleven contiguous digits: the
+ * registering office's province (2) and municipality (2) codes, the
+ * last two digits of the current year (2) and the TERRITORIAL
+ * consecutive of the shared sequence (5, zero padded) — PPMMAACCCCC
  * — emitted before the business transaction, so a failed insert may
  * burn it: holes are accepted by design, reuse never (RN-009).
- * Each year keeps its own consecutive.
+ * Each year, province and municipality keep their own consecutive.
  *
  * Atomicity (S5.5): the case row plus every declared subrecord —
  * salaries (at most FIFTEEN, user rule 1), services, cycles and
@@ -142,10 +143,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
         $cycleRows = $this->cycleRows($attributes['work_cycles'] ?? []);
         $incomeRows = $this->incomeConceptRows($attributes['income_concept_records'] ?? []);
 
-        // User rule 2: the province section of the number comes from
-        // the REGISTERING office (which the Presentation layer took
-        // from the acting user, user rule 0).
-        $provinceCode = $this->provinceCodeOfRegisteringOffice((int) $payload['office_id']);
+        // User rule 2: the province and municipality sections of the
+        // number come from the REGISTERING office (which the
+        // Presentation layer took from the acting user, user rule 0).
+        $territory = $this->territoryCodesOfRegisteringOffice((int) $payload['office_id']);
 
         $rebelArmyMember = (bool) $payload['rebel_army_member'];
         $rebelArmyJoinDate = $rebelArmyMember && isset($payload['rebel_army_join_date']) && $payload['rebel_army_join_date'] !== ''
@@ -154,10 +155,16 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         // The number is emitted BEFORE the business transaction: a
         // failed insert burns it (hole accepted by RN-009), but two
-        // concurrent creations can never share it (ADR-17/ADR-32).
+        // concurrent creations can never share it (ADR-17/ADR-34).
         $year = (int) $this->clock->now()->format('Y');
-        $consecutive = $this->sequences->nextForYear(self::CASE_SEQUENCE, $year);
-        $number = CaseNumber::fromParts($provinceCode, $year, $consecutive)->__toString();
+        $consecutive = $this->sequences->nextForTerritory(
+            self::CASE_SEQUENCE,
+            $year,
+            $territory['province'],
+            $territory['municipality'],
+        );
+        $number = CaseNumber::fromParts($territory['province'], $territory['municipality'], $year, $consecutive)
+            ->__toString();
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
@@ -558,11 +565,13 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * User rule 2: the province section of the case number is the
-     * registering office's province code — resolved through the
-     * Organizations directory the service already probes.
+     * User rule 2: the province and municipality sections of the case
+     * number are the registering office's territory codes — resolved
+     * through the Organizations directory the service already probes.
+     *
+     * @return array{province: string, municipality: string}
      */
-    private function provinceCodeOfRegisteringOffice(int $officeId): string
+    private function territoryCodesOfRegisteringOffice(int $officeId): array
     {
         $office = $this->offices->find($officeId);
 
@@ -574,13 +583,21 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         $provinceCode = $office->province?->code;
 
-        if (is_string($provinceCode) && preg_match('/^\d{2}$/', $provinceCode) === 1) {
-            return $provinceCode;
+        if (! is_string($provinceCode) || preg_match('/^\d{2}$/', $provinceCode) !== 1) {
+            throw ValidationException::withMessages([
+                'office_id' => 'The registering office must sit on a province with a two-digit code to derive the case number.',
+            ]);
         }
 
-        throw ValidationException::withMessages([
-            'office_id' => 'The registering office must sit on a province with a two-digit code to derive the case number.',
-        ]);
+        $municipalityCode = $office->municipality?->code;
+
+        if (! is_string($municipalityCode) || preg_match('/^\d{2}$/', $municipalityCode) !== 1) {
+            throw ValidationException::withMessages([
+                'office_id' => 'The registering office must sit on a municipality with a two-digit code to derive the case number.',
+            ]);
+        }
+
+        return ['province' => $provinceCode, 'municipality' => $municipalityCode];
     }
 
     private function assertNoOpenCase(int $personId): void

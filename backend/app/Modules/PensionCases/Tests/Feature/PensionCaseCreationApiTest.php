@@ -33,14 +33,16 @@ use Tests\TestCase;
 
 /**
  * Case creation POST /api/v1/pension-cases (RF-EXP-001, plan S5.2/S5.5,
- * user rules 0-5/ADR-32/ADR-33):
+ * user rules 0-5/ADR-32/ADR-33/ADR-34):
  *
  *  0. the case takes the OFFICE OF THE REGISTERING USER — office_id
  *     is not accepted in the payload anymore;
  *  1. at most FIFTEEN salary records per case;
- *  2. the number is composed of the registering office's province
- *     code (2), the current year (4) and the ANNUAL consecutive (5,
- *     zero padded), each section separated by a hyphen;
+ *  2. the number is eleven contiguous digits: the registering
+ *     office's province (2) and municipality (2) codes, the last two
+ *     digits of the current year (2) and the TERRITORIAL consecutive
+ *     (5, zero padded — one counter per year, province and
+ *     municipality);
  *  3. the listing carries the FULL applicant projection;
  *  4. pension type/regime plus the rebel army membership pair
  *     (join date required when the membership is true, rejected
@@ -54,6 +56,10 @@ use Tests\TestCase;
 final class PensionCaseCreationApiTest extends TestCase
 {
     use RefreshDatabase, ResetsCaseSequence;
+
+    private Province $province;
+
+    private OfficeType $officeType;
 
     private Person $applicant;
 
@@ -83,14 +89,15 @@ final class PensionCaseCreationApiTest extends TestCase
     {
         parent::setUp();
 
-        // Declares the ANNUAL `pension_case:{year}` sequence scopes
-        // (ADR-17/ADR-32: scopes are seeded ahead; the generator
-        // refuses undeclared plain scopes).
+        // Declares the declared-scope sequences (ADR-17: bank control
+        // numbers). The case consecutive needs NO pre-declaration
+        // since ADR-34: territorial scopes are born at their first
+        // emission.
         $this->seed(SettingsSeeder::class);
 
-        $province = Province::query()->create(['code' => '11', 'name' => 'La Habana']);
-        $municipality = Municipality::query()->create(['province_id' => $province->id, 'code' => '03', 'name' => 'Playa']);
-        $officeType = OfficeType::query()->create(['code' => 'MUN', 'name' => 'Municipal']);
+        $this->province = Province::query()->create(['code' => '11', 'name' => 'La Habana']);
+        $municipality = Municipality::query()->create(['province_id' => $this->province->id, 'code' => '03', 'name' => 'Playa']);
+        $this->officeType = OfficeType::query()->create(['code' => 'MUN', 'name' => 'Municipal']);
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $entityType = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 
@@ -102,8 +109,8 @@ final class PensionCaseCreationApiTest extends TestCase
         ]);
 
         $this->office = Office::query()->create([
-            'office_type_id' => $officeType->id,
-            'province_id' => $province->id,
+            'office_type_id' => $this->officeType->id,
+            'province_id' => $this->province->id,
             'municipality_id' => $municipality->id,
             'address' => 'Calle 42 #7, Playa',
         ]);
@@ -112,7 +119,7 @@ final class PensionCaseCreationApiTest extends TestCase
             'code' => 'ENT-01',
             'tax_id_number' => '11000012345',
             'organization_id' => $organization->id,
-            'province_id' => $province->id,
+            'province_id' => $this->province->id,
             'municipality_id' => $municipality->id,
             'entity_type_id' => $entityType->id,
             'address' => 'Calle 100 #0',
@@ -239,22 +246,23 @@ final class PensionCaseCreationApiTest extends TestCase
             ->assertJsonValidationErrors(['office_id']);
     }
 
-    public function test_the_number_is_composed_of_province_year_and_annual_consecutive(): void
+    public function test_the_number_is_composed_of_territory_year_and_territorial_consecutive(): void
     {
-        // Rule 2: PP-YYYY-CCCCC — province code of the registering
-        // office, current year, annual consecutive padded to five.
+        // Rule 2: PPMMAACCCCC — province and municipality codes of the
+        // registering office, last two digits of the current year and
+        // the territorial consecutive padded to five.
         $number = (string) $this->postJson('/api/v1/pension-cases', $this->payload())
             ->assertStatus(201)
             ->json('data.number');
 
-        $this->assertMatchesRegularExpression('/^\d{2}-\d{4}-\d{5}$/', $number);
+        $this->assertMatchesRegularExpression('/^\d{11}$/', $number);
         $this->assertSame('11', substr($number, 0, 2));
-        $this->assertSame(now()->format('Y'), substr($number, 3, 4));
-        $this->assertSame('00001', substr($number, 8));
-        $this->assertSame(11, strlen(str_replace('-', '', $number)));
+        $this->assertSame('03', substr($number, 2, 2));
+        $this->assertSame(now()->format('y'), substr($number, 4, 2));
+        $this->assertSame('00001', substr($number, 6));
     }
 
-    public function test_the_annual_consecutive_advances_per_creation(): void
+    public function test_the_territorial_consecutive_advances_per_creation(): void
     {
         $first = (string) $this->postJson('/api/v1/pension-cases', $this->payload())
             ->assertStatus(201)
@@ -268,9 +276,44 @@ final class PensionCaseCreationApiTest extends TestCase
             ->assertStatus(201)
             ->json('data.number');
 
-        $this->assertSame((int) substr($first, 8) + 1, (int) substr($second, 8));
-        // Same province and year: only the consecutive moved.
-        $this->assertSame(substr($first, 0, 8), substr($second, 0, 8));
+        $this->assertSame((int) substr($first, 6) + 1, (int) substr($second, 6));
+        // Same territory and year: only the consecutive moved.
+        $this->assertSame(substr($first, 0, 6), substr($second, 0, 6));
+    }
+
+    public function test_the_consecutive_is_independent_per_municipality(): void
+    {
+        // Rule 2: the consecutive belongs to the (year, province,
+        // municipality) triple — a second office in ANOTHER
+        // municipality of the same province counts from one again.
+        $first = (string) $this->postJson('/api/v1/pension-cases', $this->payload())
+            ->assertStatus(201)
+            ->json('data.number');
+
+        $municipality = Municipality::query()->create([
+            'province_id' => $this->province->id,
+            'code' => '04',
+            'name' => 'Plaza de la Revolución',
+        ]);
+        $office = Office::query()->create([
+            'office_type_id' => $this->officeType->id,
+            'province_id' => $this->province->id,
+            'municipality_id' => $municipality->id,
+            'address' => 'Calle 13 #1, Vedado',
+        ]);
+        $this->operator->forceFill(['office_id' => $office->id])->save();
+
+        $secondPerson = Person::factory()->create();
+        $second = (string) $this->postJson(
+            '/api/v1/pension-cases',
+            $this->payload(['applicant_person_id' => $secondPerson->id]),
+        )
+            ->assertStatus(201)
+            ->json('data.number');
+
+        $this->assertSame('04', substr($second, 2, 2));
+        $this->assertSame('00001', substr($second, 6));
+        $this->assertSame(substr($first, 0, 2), substr($second, 0, 2));
     }
 
     public function test_the_registering_office_province_must_carry_a_two_digit_code(): void
@@ -289,6 +332,42 @@ final class PensionCaseCreationApiTest extends TestCase
         ]);
 
         $this->operator->forceFill(['office_id' => $office->id])->save();
+
+        $this->postJson('/api/v1/pension-cases', $this->payload())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['office_id']);
+    }
+
+    public function test_the_registering_office_municipality_must_carry_a_two_digit_code(): void
+    {
+        // The number derives its second section from the registering
+        // office's municipality: a malformed catalog code answers 422
+        // on office_id instead of a broken number.
+        $province = Province::query()->create(['code' => '12', 'name' => 'Matanzas']);
+        $odd = Municipality::query()->create(['province_id' => $province->id, 'code' => '9', 'name' => 'Impar']);
+        $office = Office::query()->create([
+            'office_type_id' => $this->officeType->id,
+            'province_id' => $province->id,
+            'municipality_id' => $odd->id,
+            'address' => 'Calle 1 #1',
+        ]);
+
+        $this->operator->forceFill(['office_id' => $office->id])->save();
+
+        $this->postJson('/api/v1/pension-cases', $this->payload())
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['office_id']);
+    }
+
+    public function test_the_registering_office_municipality_must_survive(): void
+    {
+        // Every office carries full geography (NOT NULL columns), so
+        // the missing-municipality path is only reachable when the
+        // municipality is soft-deleted: the BelongsTo no longer
+        // resolves a code, and the creation answers 422 on office_id
+        // instead of emitting a broken number.
+        $municipality = Municipality::query()->where('code', '03')->firstOrFail();
+        $municipality->delete();
 
         $this->postJson('/api/v1/pension-cases', $this->payload())
             ->assertStatus(422)
@@ -660,13 +739,13 @@ final class PensionCaseCreationApiTest extends TestCase
     }
 
     /**
-     * PP-YYYY-CCCCC arithmetic helper: the next consecutive of the
-     * same province and year.
+     * PPMMAACCCCC arithmetic helper: the next consecutive of the
+     * same territory and year.
      */
     private function nextConsecutive(string $number): string
     {
-        $consecutive = (int) substr($number, 8) + 1;
+        $consecutive = (int) substr($number, 6) + 1;
 
-        return substr($number, 0, 8).str_pad((string) $consecutive, 5, '0', STR_PAD_LEFT);
+        return substr($number, 0, 6).str_pad((string) $consecutive, 5, '0', STR_PAD_LEFT);
     }
 }

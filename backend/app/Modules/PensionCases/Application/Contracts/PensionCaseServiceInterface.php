@@ -18,8 +18,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /**
  * Use cases of the PensionCases module for Sprint 5 (RF-EXP-001..004)
- * plus the user rules 0-5 (ADR-32/ADR-33): case creation with the
- * composed annual number PP-YYYY-CCCCC and atomic subrecords —
+ * plus the user rules 0-5 (ADR-32/ADR-33/ADR-34): case creation with
+ * the composed territorial number PPMMAACCCCC and atomic subrecords —
  * salaries capped at fifteen, services, cycles and income concept
  * records —, the subrecord highs/removals gated by the editable
  * state, and the advisory analysis the responses carry (missing
@@ -37,8 +37,9 @@ interface PensionCaseServiceInterface
 {
     /**
      * Creates the case (RF-EXP-001) with its composed number —
-     * registering office's province code, current year and annual
-     * consecutive, PP-YYYY-CCCCC (user rule 2/ADR-32) — and, when the
+     * registering office's province and municipality codes, the last
+     * two digits of the current year and the territorial consecutive,
+     * PPMMAACCCCC (user rule 2/ADR-34) — and, when the
      * payload carries them, its subrecords — everything or nothing
      * (plan S5.5): the number may end up burned by a rollback, which
      * RN-009 accepts by design.

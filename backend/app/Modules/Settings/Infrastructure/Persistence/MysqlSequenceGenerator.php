@@ -62,18 +62,19 @@ final class MysqlSequenceGenerator implements SequenceGeneratorInterface
         return (int) $value;
     }
 
-    public function nextForYear(string $baseScope, int $year): int
+    public function nextForTerritory(string $baseScope, int $year, string $provinceCode, string $municipalityCode): int
     {
-        $scope = $baseScope.':'.$year;
+        $scope = $baseScope.':'.$year.':'.$provinceCode.':'.$municipalityCode;
 
         $connection = $this->connections->connection(NumberingSequence::CONNECTION_NAME);
 
         $value = $connection->transaction(function () use ($scope, $connection): int {
-            // A year without a row is BORN at 1 (ADR-32): the insert
-            // is idempotent (INSERT IGNORE), so two concurrent
-            // first-emitters of a new year converge on a single row
-            // instead of racing an UnknownSequenceException — the
-            // annual rollover needs no operator.
+            // A territory without a row is BORN at 1 (ADR-34): the
+            // insert is idempotent (INSERT IGNORE), so two concurrent
+            // first-emitters of a new territory converge on a single
+            // row instead of racing an UnknownSequenceException —
+            // neither the year nor the territorial rollover needs an
+            // operator.
             $connection->table((new NumberingSequence)->getTable())
                 ->insertOrIgnore([
                     'scope' => $scope,
