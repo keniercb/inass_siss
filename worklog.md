@@ -1062,3 +1062,35 @@ Stage Summary:
 - Entrega: rama feat/SGP-25-entity-name-catalog-codes (4 commits: feat + test + docs + worklog), push con PAT, PR y merge a main
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada; deuda documental de Task 29 pendiente (changelogs/entrada 5.7 de la proyección de entidad en service-records)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 31-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-25 — push, PR y merge a main (nombre de la entidad + código universal de catálogo)
+
+Work Log:
+- Incidente daemon durante el ciclo de commits: volteó HEAD a main ANTES de los 4 commits de la Task 31 (los aterrizó sobre main local) y reseteó feat/SGP-25 a 695123d; el push inicial subió la rama VACÍA y el PR respondió 422 «No commits between main and feat»
+- Recuperación verificada por reflog: los 4 commits estaban íntegros sobre main local; commit adicional para las fumigas trackeadas (smoke_case_registration/smoke_office_counts con el name del fixture); feat movida al tip (979ace1, 5 commits), main realineado a 695123d y push fast-forward
+- PR #26 creado por API («SGP-25: nombre de la entidad y codigo en todos los listados de catalogo (Task 31)») y mergeado a main: sha 8549bda, merged true
+- Post-merge: daemon volteó HEAD a main otra vez (resuelto con reset --hard origin/main); main local = main remoto = 8549bda; feat/SGP-25 local = remoto = 979ace1; este cierre queda como journal vivo
+
+Stage Summary:
+- NOMBRE DE ENTIDAD + CÓDIGO UNIVERSAL DE CATÁLOGOS (Task 31) EN MAIN vía PR #26: entities.name VARCHAR(120) NOT NULL y los 16 listados de catálogo devolviendo el campo código
+- Suite 1040/3442 en verde al momento del merge; el CI del runner queda como válvula final
+
+---
+Task ID: 32
+Agent: Super Z (agente principal)
+Task: Corrección de usuario sobre el CRUD de expediente: agregar al modelo de tiempo de servicio el campo forma de declaración — enum con valores Documental o Testifical, por defecto Documental
+
+Work Log:
+- Sesión de plataforma inestable (403 persistente en el canal directo de tools/call): todo el trabajo se canalizó por subagentes con scripts persistidos en scripts/ y mega-comandos; el toolchain local (PHP estático, MySQL 13306) seguía caído al momento del commit, con lo que la entrega sigue el precedente de la Task 29 — subida sin suite local y el CI del PR como válvula final
+- Higiene git previa: el daemon dejó otro commit basura sobre main (b2b1687, mensaje UUID: scripts de las Tasks 30/31 + journal de cierre) — respaldado en scripts/backup-b2b1687-task31-closure.patch, main realineado a 8549bda (origin/main, PR #26) con reset --soft y los scripts restaurados como untracked con el journal vivo (Task 31-cierre) preservado
+- Rama feat/SGP-26-service-declaration-form desde 8549bda; parche de código idempotente con aserciones de unicidad (scripts/implement_task32_code.py): Domain ServiceDeclarationForm (backed enum Documental|Testifical al estilo CaseStatus); migración 2026_10_01_120000_add_forma_declaracion_to_service_records_table (VARCHAR(20) NOT NULL DEFAULT 'Documental' tras is_appendix + CHECK chk_service_records_forma_declaracion — las filas existentes heredan el DEFAULT, sin backfill); ServiceRecord con @property/fillable/cast al enum; StoreServiceRecordRequest con in:Documental,Testifical (nullable: el default lo resuelve la presentación); PensionCaseController::addServiceRecord inyecta el default ServiceDeclarationForm::Documental->value y su OA requestBody gana la propiedad; PensionCaseService pasa el campo al repositorio con default defensivo; ServiceRecordResource proyecta forma_declaracion + OA schema y description ampliadas
+- TDD: PensionCaseSubrecordsApiTest con tres tests nuevos (default Documental cuando el wire omite el campo, Testifical aceptada y proyectada en el 201, valor desconocido 422 sobre forma_declaracion) y la fumiga de solapamientos asertando el default en su primer alta
+- Docs (scripts/patch_docs_task32.py con aserciones de ancla/unicidad): RF-EXP-003 con la forma de declaración, entrada 5.7 con la columna nueva y changelog del Modelo de datos, changelog del Diseño de arquitectura y changelog del Plan de desarrollo
+- Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-26-service-declaration-form, push con PAT, PR y merge a main
+
+Stage Summary:
+- FORMA DE DECLARACIÓN DEL TIEMPO DE SERVICIO (Task 32): service_records.forma_declaracion VARCHAR(20) NOT NULL DEFAULT 'Documental' con CHECK de los dos valores legales; POST /pension-cases/{id}/service-records acepta forma_declaracion opcional (Documental|Testifical; cualquier otro valor 422) y la omisión cae en Documental; el campo viaja en el 201, en el detalle del expediente y en el schema OA
+- LA SUITE NO SE EJECUTÓ EN ESTA SESIÓN (toolchain caído; precedente Task 29): la validación queda en el CI del PR
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
