@@ -309,7 +309,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool}  $attributes
+     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion?: string}  $attributes
      */
     public function addServiceRecord(int $caseId, array $attributes): ?ServiceRecord
     {
