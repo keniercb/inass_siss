@@ -227,15 +227,25 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 
 ### 4.5 Módulo EXP — Expedientes
 
-**RF-EXP-001 (M) — Creación del expediente (MO)**
-- [ ] Expediente con número único generado por el sistema, fecha de solicitud y estado inicial `submitted`.
-- [ ] Datos del proponente (persona), oficina tramitadora, centro de trabajo, cargo, categoría ocupacional, nivel educacional, categoría científica y último salario.
+**RF-EXP-001 (M) — Creación del expediente (MO) — reglas de usuario 0-5, ADR-32/33**
+- [ ] Expediente con número único COMPUESTO generado por el sistema: once dígitos en tres secciones separadas por guion medio — dos del código de provincia de la oficina que registra, cuatro del año en curso y cinco del consecutivo del año rellenado con ceros a la izquierda (PP-YYYY-CCCCC), con el consecutivo anual persistido en una tabla propia por año que se incrementa con cada número emitido.
+- [ ] El expediente ASUME la oficina del usuario que lo registra: `office_id` no se envía en el POST (rechazado con 422 si llega; 422 si el actor no tiene oficina o su oficina está desactivada).
+- [ ] Datos del proponente (persona), oficina tramitadora, centro de trabajo, cargo, categoría ocupacional, nivel educacional, categoría científica, TIPO de pensión, RÉGIMEN de pensión y último salario.
+- [ ] Clasificación de Ejército Rebelde: booleano «pertenece» y fecha de alta, la cual es OBLIGATORIA cuando el booleano es true y se rechaza cuando es false.
 - [ ] El último salario es no negativo y se expresa con dos decimales.
+- [ ] El listado de expedientes devuelve la proyección COMPLETA de la persona promovente (todos sus campos), no un resumen.
 
-**RF-EXP-002 (M) — Subregistro de salarios (MO)**
+**RF-EXP-002 (M) — Subregistro de salarios (MO, regla de usuario 1)**
 - [ ] Registro anual de salario devengado por expediente; el par expediente-año es único.
+- [ ] Se registran como máximo QUINCE salarios por expediente (el 16º responde 422; eliminar una fila libera el cupo).
 - [ ] El año es válido (rango configurable, p. ej. 1950–actual+1) y el importe no negativo.
 - [ ] Se advierte ante años consecutivos ausentes en la serie declarada.
+
+**RF-EXP-002b (M) — Subregistro de conceptos de ingreso (MO, regla de usuario 5)**
+- [ ] Cada expediente declara conceptos de ingreso del catálogo con un VALOR decimal exacto (dos decimales, no negativo).
+- [ ] El par expediente-concepto es único: un valor por concepto (422 semántico).
+- [ ] El concepto debe existir y estar activo; las altas y bajas solo en `submitted` como el resto de los subregistros.
+- [ ] Los conceptos viajan anidados en la creación del expediente (todo o nada) y con endpoints propios de alta/baja.
 
 **RF-EXP-003 (M) — Subregistro de servicios (MO)**
 - [ ] Cada servicio declara entidad, fecha de inicio, fecha de fin opcional y marcador de coletilla.
