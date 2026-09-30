@@ -26,6 +26,7 @@ use App\Modules\PensionCases\Domain\CaseNumber;
 use App\Modules\PensionCases\Domain\CaseStatus;
 use App\Modules\PensionCases\Domain\DeclaredService;
 use App\Modules\PensionCases\Domain\SalarySeries;
+use App\Modules\PensionCases\Domain\ServiceDeclarationForm;
 use App\Modules\PensionCases\Domain\ServicePeriods;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
@@ -345,6 +346,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'is_appendix' => $attributes['is_appendix'],
+                'forma_declaracion' => (string) ($attributes['forma_declaracion'] ?? ServiceDeclarationForm::Documental->value),
             ]),
         );
     }

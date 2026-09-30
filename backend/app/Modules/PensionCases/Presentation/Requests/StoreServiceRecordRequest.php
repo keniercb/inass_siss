@@ -30,6 +30,9 @@ final class StoreServiceRecordRequest extends FormRequest
             'end_date' => ['nullable', 'date_format:Y-m-d'],
             // Coletilla: recognized additional service.
             'is_appendix' => ['nullable', 'boolean'],
+            // Forma de declaración: Documental por defecto o Testifical
+            // (RF-EXP-003, Task 32). El default lo resuelve la presentación.
+            'forma_declaracion' => ['nullable', 'string', 'in:Documental,Testifical'],
         ];
     }
 }

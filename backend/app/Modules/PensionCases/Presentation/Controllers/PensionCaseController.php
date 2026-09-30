@@ -10,6 +10,7 @@ use App\Modules\PensionCases\Application\Exceptions\DuplicateIncomeConceptExcept
 use App\Modules\PensionCases\Application\Exceptions\DuplicateSalaryYearException;
 use App\Modules\PensionCases\Application\Exceptions\OpenCaseExistsException;
 use App\Modules\PensionCases\Application\Exceptions\PersonNotEligibleException;
+use App\Modules\PensionCases\Domain\ServiceDeclarationForm;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -409,6 +410,7 @@ final class PensionCaseController
                     new OA\Property(property: 'start_date', type: 'string', format: 'date', example: '2000-01-01'),
                     new OA\Property(property: 'end_date', type: 'string', format: 'date', nullable: true, example: null, description: 'null = vínculo vigente'),
                     new OA\Property(property: 'is_appendix', type: 'boolean', example: false, description: 'Coletilla'),
+                    new OA\Property(property: 'forma_declaracion', type: 'string', enum: ['Documental', 'Testifical'], example: 'Documental', description: 'Forma de declaración del vínculo; por defecto Documental'),
                 ],
             ),
         ),
@@ -440,6 +442,7 @@ final class PensionCaseController
                 'start_date' => (string) $validated['start_date'],
                 'end_date' => $validated['end_date'] ?? null,
                 'is_appendix' => (bool) ($validated['is_appendix'] ?? false),
+                'forma_declaracion' => (string) ($validated['forma_declaracion'] ?? ServiceDeclarationForm::Documental->value),
             ]),
             $id,
         );
