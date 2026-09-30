@@ -108,65 +108,70 @@ final class SequenceGeneratorTest extends TestCase
         $this->assertSame('sequences', $model->getConnectionName());
     }
 
-    public function test_next_for_year_emits_consecutive_values_and_persists_the_increment(): void
+    public function test_next_for_territory_emits_consecutive_values_and_persists_the_increment(): void
     {
         $emitted = [
-            $this->generator->nextForYear('annual_probe', 2026),
-            $this->generator->nextForYear('annual_probe', 2026),
-            $this->generator->nextForYear('annual_probe', 2026),
+            $this->generator->nextForTerritory('territorial_probe', 2026, '11', '03'),
+            $this->generator->nextForTerritory('territorial_probe', 2026, '11', '03'),
+            $this->generator->nextForTerritory('territorial_probe', 2026, '11', '03'),
         ];
 
         $this->assertSame([1, 2, 3], $emitted);
         $this->assertSame(
             4,
-            (int) NumberingSequence::query()->where('scope', 'annual_probe:2026')->value('next_value'),
+            (int) NumberingSequence::query()->where('scope', 'territorial_probe:2026:11:03')->value('next_value'),
         );
     }
 
-    public function test_next_for_year_births_the_new_year_at_one(): void
+    public function test_next_for_territory_births_a_new_territory_at_one(): void
     {
-        // No seeded row: the first emission of a new year creates the
-        // scope row at 1 — the annual rollover needs no operator.
-        $this->assertSame(1, $this->generator->nextForYear('fresh_year_probe', 2031));
+        // No seeded row: the first emission of a new territory creates
+        // the scope row at 1 — neither the year nor the territorial
+        // rollover needs an operator.
+        $this->assertSame(1, $this->generator->nextForTerritory('fresh_territory_probe', 2031, '09', '01'));
 
         $this->assertSame(
             2,
-            (int) NumberingSequence::query()->where('scope', 'fresh_year_probe:2031')->value('next_value'),
+            (int) NumberingSequence::query()->where('scope', 'fresh_territory_probe:2031:09:01')->value('next_value'),
         );
     }
 
-    public function test_next_for_year_keeps_one_consecutive_per_year(): void
+    public function test_next_for_territory_keeps_one_consecutive_per_year_province_and_municipality(): void
     {
-        $this->assertSame(1, $this->generator->nextForYear('multi_year_probe', 2026));
-        $this->assertSame(2, $this->generator->nextForYear('multi_year_probe', 2026));
+        $this->assertSame(1, $this->generator->nextForTerritory('multi_territory_probe', 2026, '11', '03'));
+        $this->assertSame(2, $this->generator->nextForTerritory('multi_territory_probe', 2026, '11', '03'));
 
-        // The new year restarts its own consecutive at 1.
-        $this->assertSame(1, $this->generator->nextForYear('multi_year_probe', 2027));
-        $this->assertSame(2, $this->generator->nextForYear('multi_year_probe', 2027));
+        // A different municipality restarts its own consecutive at 1...
+        $this->assertSame(1, $this->generator->nextForTerritory('multi_territory_probe', 2026, '11', '04'));
+        // ...a different province does too...
+        $this->assertSame(1, $this->generator->nextForTerritory('multi_territory_probe', 2026, '15', '03'));
+        // ...and so does a different year.
+        $this->assertSame(1, $this->generator->nextForTerritory('multi_territory_probe', 2027, '11', '03'));
 
-        // ...and the previous year is untouched by the rollover.
-        $this->assertSame(3, $this->generator->nextForYear('multi_year_probe', 2026));
+        // ...and the original territory is untouched by every rollover.
+        $this->assertSame(3, $this->generator->nextForTerritory('multi_territory_probe', 2026, '11', '03'));
     }
 
-    public function test_next_for_year_does_not_disturb_the_declared_base_scope(): void
+    public function test_next_for_territory_does_not_disturb_the_declared_base_scope(): void
     {
-        $this->declareSequence('base_probe', 1);
+        $this->declareSequence('base_territory_probe', 1);
 
-        $this->assertSame(1, $this->generator->next('base_probe'));
-        $this->assertSame(1, $this->generator->nextForYear('base_probe', 2026));
+        $this->assertSame(1, $this->generator->next('base_territory_probe'));
+        $this->assertSame(1, $this->generator->nextForTerritory('base_territory_probe', 2026, '11', '03'));
 
-        // The plain scope keeps its own consecutive: the annual scope
-        // is a different row (base_probe:2026), never the same one.
-        $this->assertSame(2, $this->generator->next('base_probe'));
+        // The plain scope keeps its own consecutive: the territorial
+        // scope is a different row (base_territory_probe:2026:11:03),
+        // never the same one.
+        $this->assertSame(2, $this->generator->next('base_territory_probe'));
     }
 
-    public function test_annual_emissions_survive_a_business_rollback(): void
+    public function test_territorial_emissions_survive_a_business_rollback(): void
     {
         $burned = null;
 
         try {
             DB::transaction(function () use (&$burned): void {
-                $burned = $this->generator->nextForYear('annual_rollback_probe', 2026);
+                $burned = $this->generator->nextForTerritory('territorial_rollback_probe', 2026, '11', '03');
 
                 throw new RuntimeException('business data rejected');
             });
@@ -175,7 +180,7 @@ final class SequenceGeneratorTest extends TestCase
         }
 
         $this->assertSame(1, $burned);
-        $this->assertSame(2, $this->generator->nextForYear('annual_rollback_probe', 2026));
+        $this->assertSame(2, $this->generator->nextForTerritory('territorial_rollback_probe', 2026, '11', '03'));
     }
 
     public function test_emit_command_prints_numbers_and_exits_successfully(): void
