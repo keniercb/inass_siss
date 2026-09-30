@@ -24,6 +24,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
         new OA\Property(property: 'code', type: 'string', example: 'ENT-0001', description: 'Código único; queda reservado tras desactivar'),
+        new OA\Property(property: 'name', type: 'string', example: 'Empresa Nacional de Servicios Técnicos', description: 'Nombre denominativo de la entidad'),
         new OA\Property(property: 'tax_id_number', type: 'string', example: '11000012345', description: 'NIT único e inmutable'),
         new OA\Property(
             property: 'organization',
@@ -84,6 +85,7 @@ final class EntityResource extends JsonResource
         return [
             'id' => $this->id,
             'code' => $this->code,
+            'name' => $this->name,
             'tax_id_number' => $this->tax_id_number,
             'organization' => $this->whenLoaded('organization', fn () => [
                 'id' => $this->organization?->id,
@@ -115,6 +117,7 @@ final class EntityResource extends JsonResource
             'parent' => $this->whenLoaded('parent', fn () => $this->parent === null ? null : [
                 'id' => $this->parent->id,
                 'code' => $this->parent->code,
+                'name' => $this->parent->name,
                 'tax_id_number' => $this->parent->tax_id_number,
             ]),
             'social_purpose' => $this->social_purpose,

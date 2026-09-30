@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
  * no Security types (deptrac: Catalogs depends on Shared only).
  *
  * @property int $id
+ * @property string|null $code
  * @property string $name
  * @property string|null $description
  * @property bool $applies_base_salary
@@ -28,6 +29,7 @@ class IncomeConcept extends CatalogModel
 {
     /** @var list<string> */
     protected $fillable = [
+        'code',
         'name',
         'description',
         'applies_base_salary',

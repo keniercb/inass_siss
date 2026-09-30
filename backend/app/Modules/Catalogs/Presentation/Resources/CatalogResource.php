@@ -28,7 +28,7 @@ use OpenApi\Attributes as OA;
     description: 'Entrada de un catálogo uniforme servida por /api/v1/catalogs/{type}. Los campos opcionales dependen del catálogo.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
-        new OA\Property(property: 'code', type: 'string', nullable: true, example: 'EDAD', description: 'Clave natural inmutable; presente solo en catálogos con código'),
+        new OA\Property(property: 'code', type: 'string', nullable: true, example: 'EDAD', description: 'Clave natural inmutable presente en TODOS los catálogos (Task 31); null solo en filas legadas previas al código'),
         new OA\Property(property: 'name', type: 'string', example: 'Por edad'),
         new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Pensión por edad'),
         new OA\Property(property: 'months_per_year', type: 'integer', nullable: true, example: 12, description: 'Solo pension-regimes'),

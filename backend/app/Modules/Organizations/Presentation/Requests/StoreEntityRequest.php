@@ -26,6 +26,7 @@ final class StoreEntityRequest extends FormRequest
     {
         return [
             'code' => ['required', 'string', 'max:15'],
+            'name' => ['required', 'string', 'max:120'],
             'tax_id_number' => ['required', 'string', 'max:20'],
             'organization_id' => ['required', 'integer', 'min:1'],
             'province_id' => ['required', 'integer', 'min:1'],

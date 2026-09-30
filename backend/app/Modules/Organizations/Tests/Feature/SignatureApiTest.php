@@ -51,7 +51,7 @@ final class SignatureApiTest extends TestCase
         $type = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 
         $this->entity = Entity::query()->create([
-            'code' => 'ENT-0001', 'tax_id_number' => '11000000001',
+            'code' => 'ENT-0001', 'name' => 'Empresa de Servicios', 'tax_id_number' => '11000000001',
             'organization_id' => $organization->id,
             'province_id' => $province->id, 'municipality_id' => $municipality->id,
             'entity_type_id' => $type->id,

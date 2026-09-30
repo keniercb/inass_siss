@@ -11,9 +11,9 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 /**
  * Eloquent persistence for entities (ADR-11): the single data-access
  * point of the Organizations module for entities. Search implements
- * the RF-ENT-005 surface — fragments against code, NIT and social
- * purpose plus exact reference filters — ordered by code for stable
- * listings. Uniqueness probes include soft-deleted rows because the
+ * the RF-ENT-005 surface — fragments against code, name, NIT and
+ * social purpose plus exact reference filters — ordered by code for
+ * stable listings. Uniqueness probes include soft-deleted rows because the
  * code and the NIT stay reserved after deactivation, and the
  * hierarchy snapshot feeds both the tree and the RN-003 parent map.
  */
@@ -32,6 +32,7 @@ final class EloquentEntityRepository implements EntityRepositoryInterface
             $fragment = '%'.mb_strtolower((string) $filters['q']).'%';
             $query->where(function ($group) use ($fragment): void {
                 $group->whereRaw('LOWER(code) LIKE ?', [$fragment])
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$fragment])
                     ->orWhereRaw('LOWER(tax_id_number) LIKE ?', [$fragment])
                     ->orWhereRaw('LOWER(social_purpose) LIKE ?', [$fragment]);
             });
