@@ -219,7 +219,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
             'end_date' => '2005-12-31',
-        ])->assertStatus(201)->assertJsonPath('data.is_appendix', false);
+        ])->assertStatus(201)->assertJsonPath('data.is_appendix', false)->assertJsonPath('data.forma_declaracion', 'Documental');
 
         // A later open link: no overlap with the closed one above…
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
@@ -262,6 +262,34 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => 999999,
             'start_date' => '2010-01-01',
         ])->assertStatus(422)->assertJsonValidationErrors(['entity_id']);
+    }
+
+    public function test_adds_a_service_record_with_the_default_documental_form(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2000-01-01',
+            'end_date' => '2005-12-31',
+        ])->assertStatus(201)->assertJsonPath('data.forma_declaracion', 'Documental');
+    }
+
+    public function test_adds_a_service_record_declared_by_testimony(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2000-01-01',
+            'end_date' => '2005-12-31',
+            'forma_declaracion' => 'Testifical',
+        ])->assertStatus(201)->assertJsonPath('data.forma_declaracion', 'Testifical');
+    }
+
+    public function test_rejects_an_unknown_declaration_form(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2010-01-01',
+            'forma_declaracion' => 'Oral',
+        ])->assertStatus(422)->assertJsonValidationErrors(['forma_declaracion']);
     }
 
     public function test_removes_a_service_record(): void

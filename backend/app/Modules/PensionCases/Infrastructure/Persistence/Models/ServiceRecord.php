@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Infrastructure\Persistence\Models;
 
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Entity;
+use App\Modules\PensionCases\Domain\ServiceDeclarationForm;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $start_date
  * @property CarbonImmutable|null $end_date
  * @property bool $is_appendix
+ * @property ServiceDeclarationForm $forma_declaracion
  * @property Entity|null $entity
  */
 class ServiceRecord extends Model
@@ -36,6 +38,7 @@ class ServiceRecord extends Model
         'start_date',
         'end_date',
         'is_appendix',
+        'forma_declaracion',
     ];
 
     /**
@@ -47,6 +50,7 @@ class ServiceRecord extends Model
             'start_date' => 'immutable_date',
             'end_date' => 'immutable_date',
             'is_appendix' => 'boolean',
+            'forma_declaracion' => ServiceDeclarationForm::class,
         ];
     }
 
