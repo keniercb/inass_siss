@@ -227,8 +227,8 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 
 ### 4.5 Módulo EXP — Expedientes
 
-**RF-EXP-001 (M) — Creación del expediente (MO) — reglas de usuario 0-5, ADR-32/33**
-- [ ] Expediente con número único COMPUESTO generado por el sistema: once dígitos en tres secciones separadas por guion medio — dos del código de provincia de la oficina que registra, cuatro del año en curso y cinco del consecutivo del año rellenado con ceros a la izquierda (PP-YYYY-CCCCC), con el consecutivo anual persistido en una tabla propia por año que se incrementa con cada número emitido.
+**RF-EXP-001 (M) — Creación del expediente (MO) — reglas de usuario 0-5, ADR-32/33/34**
+- [ ] Expediente con número único COMPUESTO generado por el sistema: once dígitos CONTIGUOS en cuatro secciones — dos del código de provincia de la oficina que registra, dos del código de su municipio, dos de los últimos dígitos del año en curso y cinco del consecutivo del año, provincia y municipio, rellenado con ceros a la izquierda (PPMMAACCCCC) —, con el consecutivo persistido en una tabla propia por AÑO, PROVINCIA Y MUNICIPIO que se incrementa con cada número emitido.
 - [ ] El expediente ASUME la oficina del usuario que lo registra: `office_id` no se envía en el POST (rechazado con 422 si llega; 422 si el actor no tiene oficina o su oficina está desactivada).
 - [ ] Datos del proponente (persona), oficina tramitadora, centro de trabajo, cargo, categoría ocupacional, nivel educacional, categoría científica, TIPO de pensión, RÉGIMEN de pensión y último salario.
 - [ ] Clasificación de Ejército Rebelde: booleano «pertenece» y fecha de alta, la cual es OBLIGATORIA cuando el booleano es true y se rechaza cuando es false.
