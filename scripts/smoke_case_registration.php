@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 /**
  * Smoke HTTP del registro de expedientes (reglas de usuario 0-5,
- * ADR-32/ADR-33) contra la BD principal (sgp) ya sembrada:
+ * ADR-32/ADR-33/ADR-34) contra la BD principal (sgp) ya sembrada:
  *
  *  0. el expediente asume la oficina del usuario que lo registra
  *     (POST sin office_id; 422 si el campo llega; 422 si el actor no
  *     tiene oficina; la oficina desactivada del actor también 422);
  *  1. máximo 15 salarios (16 filas en el payload 422; el 16º alta
  *     individual 422; borrar una libera el cupo);
- *  2. número PP-YYYY-CCCCC (provincia de la oficina registrante,
- *     año en curso, consecutivo anual rellenado con ceros, secciones
- *     separadas por guion) que avanza por creación;
+ *  2. número PPMMAACCCCC — once dígitos contiguos: provincia y
+ *     municipio de la oficina registrante, últimos dos dígitos del
+ *     año en curso y consecutivo por año/provincia/municipio
+ *     rellenado con ceros — que avanza por creación;
  *  3. el listado devuelve la proyección COMPLETA del promovente;
  *  4. tipo/régimen de pensión obligatorios y el par de Ejército
  *     Rebelde coherente (fecha obligatoria con true, rechazada con
@@ -182,12 +183,12 @@ try {
     $forbidden = $base('POST', '/pension-cases', array_merge($payload, ['office_id' => $municipalId]));
     check('regla 0: office_id en el payload responde 422', $forbidden->status() === 422, detail($forbidden));
 
-    // ---- Regla 2: número PP-YYYY-CCCCC de la oficina del actor ----
+    // ---- Regla 2: número PPMMAACCCCC de la oficina del actor ----
     $first = $base('POST', '/pension-cases', $payload);
     $number = (string) ($first->json('data.number') ?? '');
-    $expectedShape = '/^03-'.date('Y').'-\d{5}$/';
+    $expectedShape = '/^'.preg_quote('03'.$municipality->code.date('y'), '/').'\d{5}$/';
     check(
-        'regla 2: número PP-YYYY-CCCCC (03-'.date('Y').'-NNNNN)',
+        'regla 2: número PPMMAACCCCC (03'.$municipality->code.date('y').'NNNNN)',
         $first->status() === 201 && preg_match($expectedShape, $number) === 1,
         detail($first).' número='.$number,
     );
@@ -204,13 +205,13 @@ try {
         detail($first),
     );
 
-    // ---- Regla 2: el consecutivo anual avanza ----
+    // ---- Regla 2: el consecutivo territorial avanza ----
     $second = $base('POST', '/pension-cases', array_merge($payload, ['applicant_person_id' => $secondApplicant->id]));
     $secondNumber = (string) ($second->json('data.number') ?? '');
-    $consecutive = (int) substr($number, 8);
+    $consecutive = (int) substr($number, 6);
     check(
-        'regla 2: el consecutivo anual avanza por creación',
-        $second->status() === 201 && $secondNumber === substr($number, 0, 8).sprintf('%05d', $consecutive + 1),
+        'regla 2: el consecutivo territorial avanza por creación',
+        $second->status() === 201 && $secondNumber === substr($number, 0, 6).sprintf('%05d', $consecutive + 1),
         'primero='.$number.' segundo='.$secondNumber,
     );
 

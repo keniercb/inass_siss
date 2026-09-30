@@ -23,18 +23,21 @@ interface SequenceGeneratorInterface
     public function next(string $sequenceName): int;
 
     /**
-     * Returns the next value of the ANNUAL variant of the named
-     * sequence (ADR-32: case numbers PP-YYYY-CCCCC consume one
-     * consecutive PER YEAR).
+     * Returns the next value of the TERRITORIAL variant of the named
+     * sequence (ADR-34: case numbers PPMMAACCCCC consume one
+     * consecutive PER YEAR, PROVINCE AND MUNICIPALITY).
      *
-     * The scope row is "{base}:{year}": unlike next() — where scopes
-     * must be declared up front and an undeclared one fails loudly —
-     * a year that has no row yet is BORN at 1 inside the same
-     * pessimistic-lock transaction, so the annual rollover needs no
-     * operator and never hands out a duplicate. Each year keeps its
-     * own consecutive; the base scope is never disturbed.
+     * The scope row is "{base}:{year}:{province}:{municipality}":
+     * unlike next() — where scopes must be declared up front and an
+     * undeclared one fails loudly — a territory that has no row yet
+     * is BORN at 1 inside the same pessimistic-lock transaction, so
+     * neither the year nor the territorial rollover needs an
+     * operator and never hands out a duplicate. Each territory keeps
+     * its own consecutive; the base scope is never disturbed.
      *
      * @param  non-empty-string  $baseScope
+     * @param  string  $provinceCode  two digits of the ONEI province catalog
+     * @param  string  $municipalityCode  two digits of the ONEI municipality catalog
      */
-    public function nextForYear(string $baseScope, int $year): int;
+    public function nextForTerritory(string $baseScope, int $year, string $provinceCode, string $municipalityCode): int;
 }

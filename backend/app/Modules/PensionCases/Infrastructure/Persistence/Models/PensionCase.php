@@ -20,9 +20,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Infrastructure layer; the creation, eligibility and subrecord
  * rules live in the Application service fed by the pure Domain
  * analysis values (SalarySeries, ServicePeriods). The number is
- * composed of the registering office's province code, the current
- * year and the ANNUAL consecutive of the shared sequence
- * (PP-YYYY-CCCCC, user rule 2/ADR-32), the status is the normative
+ * composed of the registering office's province and municipality
+ * codes, the last two digits of the current year and the TERRITORIAL
+ * consecutive of the shared sequence (PPMMAACCCCC, user rule
+ * 2/ADR-34), the status is the normative
  * CaseStatus enum (section 2.4) and the one-open-case-per-person
  * guarantee is physical: the stored generated column `open_case_key`
  * is NULL on terminal states so the UNIQUE index admits many

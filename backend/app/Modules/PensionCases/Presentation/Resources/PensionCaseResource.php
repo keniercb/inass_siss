@@ -28,10 +28,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PensionCase',
     title: 'Expediente de pensión',
-    description: 'Expediente de pensión (RF-EXP-001): número compuesto PP-YYYY-CCCCC — provincia de la oficina registrante, año en curso y consecutivo anual, separados por guion (regla de usuario 2/ADR-32) —, estado de la sección 2.4, clasificación de pensión y par de Ejército Rebelde (regla 4) y subregistros declarados. Los campos de decisión quedan null hasta las transiciones de S6.',
+    description: 'Expediente de pensión (RF-EXP-001): número compuesto PPMMAACCCCC — provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio, once dígitos contiguos (regla de usuario 2/ADR-34) —, estado de la sección 2.4, clasificación de pensión y par de Ejército Rebelde (regla 4) y subregistros declarados. Los campos de decisión quedan null hasta las transiciones de S6.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
-        new OA\Property(property: 'number', type: 'string', example: '11-2026-00001', description: 'Número del expediente: PP-YYYY-CCCCC (provincia-año-consecutivo anual), único'),
+        new OA\Property(property: 'number', type: 'string', example: '11032600001', description: 'Número del expediente: PPMMAACCCCC (provincia-municipio-año-consecutivo territorial), único'),
         new OA\Property(property: 'requested_at', type: 'string', format: 'date', example: '2026-09-30'),
         new OA\Property(property: 'status', type: 'string', enum: ['submitted', 'under_review', 'approved', 'rejected'], example: 'submitted', description: 'Estado normativo de la sección 2.4'),
         new OA\Property(property: 'applicant_person_id', type: 'integer', format: 'int64', example: 7),

@@ -5,20 +5,21 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Domain;
 
 /**
- * Case number value object (user rule 2, ADR-32): eleven digits in
- * three sections separated by a hyphen (minus sign) —
+ * Case number value object (user rule 2, ADR-34): eleven contiguous
+ * digits in four sections —
  *
- *      PP-YYYY-CCCCC
- *      │    │    └── annual consecutive, zero padded to five
- *      │    └─────── current year, four digits
+ *      PPMMAACCCCC
+ *      ││   │   └── territorial consecutive, zero padded to five
+ *      ││   └─────── last two digits of the current year
+ *      │└─────────── municipality code of the registering office, two digits
  *      └──────────── province code of the registering office, two digits
  *
  * The value object owns the SHAPE only: where each section comes
- * from (province of the registering office, the domain clock, the
- * shared annual sequence) is the service's decision, so formatting
- * and validation can never drift apart between call sites. Pure and
- * immutable like its siblings (Money, Period): no I/O, no clock, no
- * sequence — construct, validate, read.
+ * from (territory of the registering office, the domain clock, the
+ * shared territorial sequence) is the service's decision, so
+ * formatting and validation can never drift apart between call
+ * sites. Pure and immutable like its siblings (Money, Period): no
+ * I/O, no clock, no sequence — construct, validate, read.
  */
 final class CaseNumber
 {
@@ -35,18 +36,25 @@ final class CaseNumber
      * The SHAPE rules live INSIDE this constructor gate, so the
      * docblock stays unannotated by design: callers pass plain
      * ints/strings and the value object itself rejects anything
-     * outside two digits of province code, four digits of year and
-     * a consecutive between 1 and 99999.
+     * outside two digits of province and municipality codes, four
+     * digits of year and a consecutive between 1 and 99999.
      *
      * @param  string  $provinceCode  province of the registering office (ONEI catalog: 01-15, 99)
-     * @param  int  $year  current year, four digits
-     * @param  int  $consecutive  annual consecutive starting at 1
+     * @param  string  $municipalityCode  municipality of the registering office (ONEI catalog: two digits)
+     * @param  int  $year  current year, four digits (the number keeps its last two)
+     * @param  int  $consecutive  territorial consecutive starting at 1
      */
-    public static function fromParts(string $provinceCode, int $year, int $consecutive): self
+    public static function fromParts(string $provinceCode, string $municipalityCode, int $year, int $consecutive): self
     {
         if (preg_match('/^\d{2}$/', $provinceCode) !== 1) {
             throw new \InvalidArgumentException(
                 "The case number province code must be exactly two digits, '{$provinceCode}' given.",
+            );
+        }
+
+        if (preg_match('/^\d{2}$/', $municipalityCode) !== 1) {
+            throw new \InvalidArgumentException(
+                "The case number municipality code must be exactly two digits, '{$municipalityCode}' given.",
             );
         }
 
@@ -62,7 +70,7 @@ final class CaseNumber
             );
         }
 
-        return new self(sprintf('%s-%04d-%05d', $provinceCode, $year, $consecutive));
+        return new self(sprintf('%s%s%02d%05d', $provinceCode, $municipalityCode, $year % 100, $consecutive));
     }
 
     public function __toString(): string
