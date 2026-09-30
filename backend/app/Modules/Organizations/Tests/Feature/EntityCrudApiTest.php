@@ -71,6 +71,7 @@ final class EntityCrudApiTest extends TestCase
     {
         return array_merge([
             'code' => 'ENT-0001',
+            'name' => 'Empresa Nacional de Servicios Técnicos',
             'tax_id_number' => '11000012345',
             'organization_id' => $this->organization->id,
             'province_id' => $this->holguin->id,
@@ -96,6 +97,7 @@ final class EntityCrudApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.code', 'ENT-0001')
+            ->assertJsonPath('data.name', 'Empresa Nacional de Servicios Técnicos')
             ->assertJsonPath('data.tax_id_number', '11000012345')
             ->assertJsonPath('data.organization.name', 'Ministerio de Trabajo y Seguridad Social')
             ->assertJsonPath('data.province.code', '12')
@@ -151,6 +153,7 @@ final class EntityCrudApiTest extends TestCase
     {
         return [
             'code' => ['code'],
+            'name' => ['name'],
             'tax_id_number' => ['tax_id_number'],
             'organization_id' => ['organization_id'],
             'province_id' => ['province_id'],
@@ -208,6 +211,7 @@ final class EntityCrudApiTest extends TestCase
 
         Entity::query()->create([
             'code' => 'ENT-BK',
+            'name' => 'Backstop',
             'tax_id_number' => '11000077777',
             'organization_id' => $this->organization->id,
             'province_id' => $this->holguin->id,
@@ -345,7 +349,7 @@ final class EntityCrudApiTest extends TestCase
     {
         $this->postJson('/api/v1/entities', $this->payload(['social_purpose' => 'Comercio mayorista de alimentos']))->assertCreated();
         $this->postJson('/api/v1/entities', $this->payload([
-            'code' => 'ENT-0002', 'tax_id_number' => '11000022222', 'province_id' => $this->santiago->id,
+            'code' => 'ENT-0002', 'name' => 'Transportista del Este', 'tax_id_number' => '11000022222', 'province_id' => $this->santiago->id,
             'municipality_id' => $this->santiagoMunicipality->id, 'social_purpose' => 'Transporte de carga',
         ]))->assertCreated();
 
@@ -361,6 +365,11 @@ final class EntityCrudApiTest extends TestCase
 
         // Search across social purpose.
         $this->getJson('/api/v1/entities?q=alimentos')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        // Search across the entity name (Task 31).
+        $this->getJson('/api/v1/entities?q=nacional')
             ->assertOk()
             ->assertJsonCount(1, 'data');
 

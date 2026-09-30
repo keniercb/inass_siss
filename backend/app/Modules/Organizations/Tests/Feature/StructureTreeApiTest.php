@@ -45,16 +45,16 @@ final class StructureTreeApiTest extends TestCase
         ];
 
         $root = Entity::query()->create($base + [
-            'code' => 'ENT-0001', 'tax_id_number' => '11000000001',
+            'code' => 'ENT-0001', 'name' => 'Entidad Raíz', 'tax_id_number' => '11000000001',
             'address' => 'Calle 1', 'social_purpose' => 'Raíz',
         ]);
         $child = Entity::query()->create($base + [
-            'code' => 'ENT-0002', 'tax_id_number' => '11000000002',
+            'code' => 'ENT-0002', 'name' => 'Entidad Hija', 'tax_id_number' => '11000000002',
             'address' => 'Calle 2', 'social_purpose' => 'Hija',
             'parent_entity_id' => $root->id,
         ]);
         Entity::query()->create($base + [
-            'code' => 'ENT-0003', 'tax_id_number' => '11000000003',
+            'code' => 'ENT-0003', 'name' => 'Entidad Nieta', 'tax_id_number' => '11000000003',
             'address' => 'Calle 3', 'social_purpose' => 'Nieta',
             'parent_entity_id' => $child->id,
         ]);
@@ -88,7 +88,9 @@ final class StructureTreeApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.code', 'ENT-0001')
+            ->assertJsonPath('data.0.name', 'Entidad Raíz')
             ->assertJsonPath('data.0.children.0.code', 'ENT-0002')
+            ->assertJsonPath('data.0.children.0.name', 'Entidad Hija')
             ->assertJsonPath('data.0.children.0.children.0.code', 'ENT-0003');
     }
 
@@ -119,7 +121,7 @@ final class StructureTreeApiTest extends TestCase
         $previous = $tip->id;
         for ($i = 4; $i <= 7; $i++) {
             $entity = Entity::query()->create([
-                'code' => "ENT-000{$i}", 'tax_id_number' => "1100000000{$i}",
+                'code' => "ENT-000{$i}", 'name' => "Entidad Nivel {$i}", 'tax_id_number' => "1100000000{$i}",
                 'organization_id' => $tip->organization_id, 'province_id' => $tip->province_id,
                 'municipality_id' => $tip->municipality_id, 'entity_type_id' => $tip->entity_type_id,
                 'address' => "Calle {$i}",

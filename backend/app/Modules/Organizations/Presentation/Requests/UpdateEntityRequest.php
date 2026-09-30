@@ -26,6 +26,7 @@ final class UpdateEntityRequest extends FormRequest
     {
         return [
             'code' => ['sometimes', 'string', 'max:15'],
+            'name' => ['sometimes', 'string', 'max:120'],
             'tax_id_number' => ['sometimes', 'string', 'max:20'],
             'organization_id' => ['sometimes', 'integer', 'min:1'],
             'province_id' => ['sometimes', 'integer', 'min:1'],

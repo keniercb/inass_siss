@@ -16,6 +16,14 @@ use App\Modules\Catalogs\Application\Exceptions\UnknownCatalogException;
  * and therefore get dedicated services and endpoints
  * (RF-CAT-002, RF-CAT-003).
  *
+ * Since the Task 31 correction EVERY uniform catalog declares a code
+ * as its natural integration key: the seven tables that used to be
+ * name-only (educational levels, beneficiary types, races, positions,
+ * pension regimes, payment types, income concepts) gained a nullable
+ * code column with a unique index, seeded reference codes and the same
+ * immutability/uniqueness rules of the rest — so every catalog listing
+ * answers with the code field.
+ *
  * The registry lives in the Application layer, not in Presentation,
  * so both the request rules and the service invariants are driven by
  * the same map; it is pure data and never touches the database.
@@ -186,8 +194,8 @@ final class CatalogRegistry
                 key: 'educational-levels',
                 label: 'educational levels',
                 model: self::MODELS.'EducationalLevel',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: [],
@@ -219,8 +227,8 @@ final class CatalogRegistry
                 key: 'beneficiary-types',
                 label: 'beneficiary types',
                 model: self::MODELS.'BeneficiaryType',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: [],
@@ -230,8 +238,8 @@ final class CatalogRegistry
                 key: 'races',
                 label: 'races',
                 model: self::MODELS.'Race',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: false,
                 extraRules: [],
@@ -241,8 +249,8 @@ final class CatalogRegistry
                 key: 'positions',
                 label: 'positions',
                 model: self::MODELS.'Position',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: [],
@@ -252,8 +260,8 @@ final class CatalogRegistry
                 key: 'pension-regimes',
                 label: 'pension regimes',
                 model: self::MODELS.'PensionRegime',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: ['months_per_year' => 'required|integer|min:1|max:12'],
@@ -263,8 +271,8 @@ final class CatalogRegistry
                 key: 'payment-types',
                 label: 'payment types',
                 model: self::MODELS.'PaymentType',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: [],
@@ -274,8 +282,8 @@ final class CatalogRegistry
                 key: 'income-concepts',
                 label: 'income concepts',
                 model: self::MODELS.'IncomeConcept',
-                hasCode: false,
-                codeMax: 0,
+                hasCode: true,
+                codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
                 extraRules: ['applies_base_salary' => 'boolean'],

@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * @property int $id
  * @property string $code
+ * @property string $name
  * @property string $tax_id_number
  * @property int $organization_id
  * @property int $province_id
@@ -63,6 +64,7 @@ class Entity extends Model
     /** @var list<string> */
     protected $fillable = [
         'code',
+        'name',
         'tax_id_number',
         'organization_id',
         'province_id',

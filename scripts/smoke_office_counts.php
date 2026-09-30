@@ -91,6 +91,7 @@ $organization = Organization::query()->first() ?? Organization::query()->create(
 $entityType = EntityType::query()->first() ?? EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 $entity = Entity::query()->where('code', 'ENT-SMOKE')->first() ?? Entity::query()->create([
     'code' => 'ENT-SMOKE',
+    'name' => 'Empresa de Humo',
     'tax_id_number' => '11000099999',
     'organization_id' => $organization->id,
     'province_id' => $province->id,

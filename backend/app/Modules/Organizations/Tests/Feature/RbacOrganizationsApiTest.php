@@ -54,7 +54,7 @@ final class RbacOrganizationsApiTest extends TestCase
         ];
 
         $this->entity = Entity::query()->create([
-            'code' => 'ENT-0001', 'tax_id_number' => '11000000001',
+            'code' => 'ENT-0001', 'name' => 'Empresa de Servicios', 'tax_id_number' => '11000000001',
             'organization_id' => $organization->id,
             'province_id' => $province->id, 'municipality_id' => $municipality->id,
             'entity_type_id' => $type->id,
@@ -74,6 +74,7 @@ final class RbacOrganizationsApiTest extends TestCase
     {
         return [
             'code' => 'ENT-RBAC',
+            'name' => 'Entidad RBAC',
             'tax_id_number' => '11000000099',
             'organization_id' => $this->refs['organization_id'],
             'province_id' => $this->refs['province_id'],

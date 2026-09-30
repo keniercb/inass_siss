@@ -90,6 +90,7 @@ final class OfficeCaseCountsApiTest extends TestCase
         $this->refs = [
             'employer_entity_id' => Entity::query()->create([
                 'code' => 'ENT-01',
+                'name' => 'Servicios Técnicos del Centro',
                 'tax_id_number' => '11000012345',
                 'organization_id' => $organization->id,
                 'province_id' => $province->id,

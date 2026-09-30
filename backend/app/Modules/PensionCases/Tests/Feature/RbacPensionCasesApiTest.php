@@ -77,6 +77,7 @@ final class RbacPensionCasesApiTest extends TestCase
 
         $entity = Entity::query()->create([
             'code' => 'ENT-01',
+            'name' => 'Servicios Técnicos',
             'tax_id_number' => '11000012345',
             'organization_id' => $organization->id,
             'province_id' => $province->id,

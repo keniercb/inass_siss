@@ -30,8 +30,9 @@ use Illuminate\Database\Seeder;
  * pension regimes with the functional area (P-02). The seeders are
  * versionable: adjusting a list never requires a migration.
  *
- * Idempotent: every catalog upserts by its natural key (code or
- * name), so re-running refreshes descriptions without duplicating.
+ * Idempotent: every catalog upserts by its natural key (the code,
+ * present in ALL catalogs since the Task 31 correction), so
+ * re-running refreshes descriptions without duplicating.
  */
 final class CatalogsSeeder extends Seeder
 {
@@ -138,77 +139,79 @@ final class CatalogsSeeder extends Seeder
     private function seedNameCatalogs(): void
     {
         EducationalLevel::upsert(
-            self::nameRows([
-                ['Primaria', 'Enseñanza primaria'],
-                ['Secundaria Básica', 'Enseñanza secundaria básica'],
-                ['Técnico Medio', 'Nivel técnico medio'],
-                ['Preuniversitario', 'Enseñanza preuniversitaria'],
-                ['Nivel Superior', 'Educación superior universitaria'],
+            self::codedRows([
+                ['PRIM', 'Primaria', 'Enseñanza primaria'],
+                ['SECB', 'Secundaria Básica', 'Enseñanza secundaria básica'],
+                ['TMED', 'Técnico Medio', 'Nivel técnico medio'],
+                ['PRE', 'Preuniversitario', 'Enseñanza preuniversitaria'],
+                ['SUP', 'Nivel Superior', 'Educación superior universitaria'],
             ]),
-            ['name'],
-            ['description'],
+            ['code'],
+            ['name', 'description'],
         );
 
         BeneficiaryType::upsert(
-            self::nameRows([
-                ['Titular', 'Beneficiario titular de la pensión'],
-                ['Viuda/o', 'Cónyuge sobreviviente'],
-                ['Huérfano', 'Hijo menor beneficiario'],
-                ['Otro', 'Otro tipo de beneficiario (uso futuro, P-04)'],
+            self::codedRows([
+                ['TIT', 'Titular', 'Beneficiario titular de la pensión'],
+                ['VIU', 'Viuda/o', 'Cónyuge sobreviviente'],
+                ['HRF', 'Huérfano', 'Hijo menor beneficiario'],
+                ['OTR', 'Otro', 'Otro tipo de beneficiario (uso futuro, P-04)'],
             ]),
-            ['name'],
-            ['description'],
+            ['code'],
+            ['name', 'description'],
         );
 
         Race::upsert(
-            array_map(
-                static fn (string $name): array => ['name' => $name],
-                ['Blanca', 'Negra', 'Mestiza o Mulata', 'China', 'Otra']
-            ),
+            self::codeRows([
+                ['BLA', 'Blanca'], ['NEG', 'Negra'], ['MUL', 'Mestiza o Mulata'],
+                ['CHN', 'China'], ['OTR', 'Otra'],
+            ]),
+            ['code'],
             ['name'],
         );
 
         Position::upsert(
-            self::nameRows([
-                ['Jefe de Departamento', null],
-                ['Jefe de Área', null],
-                ['Especialista', null],
-                ['Técnico', null],
-                ['Auxiliar de Servicios', null],
+            self::codedRows([
+                ['JDEPT', 'Jefe de Departamento', null],
+                ['JAREA', 'Jefe de Área', null],
+                ['ESP', 'Especialista', null],
+                ['TEC', 'Técnico', null],
+                ['ASERV', 'Auxiliar de Servicios', null],
             ]),
-            ['name'],
-            ['description'],
+            ['code'],
+            ['name', 'description'],
         );
 
         PensionRegime::upsert(
             [
                 [
+                    'code' => 'GEN',
                     'name' => 'General',
                     'description' => 'Régimen general: 12 meses de salario por año trabajado. Regímenes especiales pendientes de validación (P-02).',
                     'months_per_year' => 12,
                 ],
             ],
-            ['name'],
-            ['description', 'months_per_year'],
+            ['code'],
+            ['name', 'description', 'months_per_year'],
         );
 
         PaymentType::upsert(
-            self::nameRows([
-                ['Abono bancario', 'Abono en cuenta bancaria'],
-                ['Cheque', 'Pago por cheque'],
-                ['Efectivo', 'Pago en efectivo'],
+            self::codedRows([
+                ['ABN', 'Abono bancario', 'Abono en cuenta bancaria'],
+                ['CHQ', 'Cheque', 'Pago por cheque'],
+                ['EFE', 'Efectivo', 'Pago en efectivo'],
             ]),
-            ['name'],
-            ['description'],
+            ['code'],
+            ['name', 'description'],
         );
 
         IncomeConcept::upsert(
             [
-                ['name' => 'Salario base', 'description' => 'Salario base devengado', 'applies_base_salary' => true],
-                ['name' => 'Pagos por resultados', 'description' => 'Pagos por resultados y estimulación', 'applies_base_salary' => false],
+                ['code' => 'SALB', 'name' => 'Salario base', 'description' => 'Salario base devengado', 'applies_base_salary' => true],
+                ['code' => 'PGR', 'name' => 'Pagos por resultados', 'description' => 'Pagos por resultados y estimulación', 'applies_base_salary' => false],
             ],
-            ['name'],
-            ['description', 'applies_base_salary'],
+            ['code'],
+            ['name', 'description', 'applies_base_salary'],
         );
     }
 
@@ -228,10 +231,10 @@ final class CatalogsSeeder extends Seeder
      * @param  list<list<string|null>>  $rows
      * @return list<array<string, string|null>>
      */
-    private static function nameRows(array $rows): array
+    private static function codedRows(array $rows): array
     {
         return array_map(
-            static fn (array $row): array => ['name' => $row[0], 'description' => $row[1]],
+            static fn (array $row): array => ['code' => $row[0], 'name' => $row[1], 'description' => $row[2]],
             $rows
         );
     }

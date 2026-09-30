@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
  * no Security types (deptrac: Catalogs depends on Shared only).
  *
  * @property int $id
+ * @property string|null $code
  * @property string $name
  * @property string|null $description
  * @property int|null $created_by
@@ -27,6 +28,7 @@ class EducationalLevel extends CatalogModel
 {
     /** @var list<string> */
     protected $fillable = [
+        'code',
         'name',
         'description',
         'created_by',

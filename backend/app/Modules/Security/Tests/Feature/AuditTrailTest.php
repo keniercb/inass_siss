@@ -42,7 +42,7 @@ final class AuditTrailTest extends TestCase
 
     public function test_create_write_lands_in_the_trail_with_causer_and_request_id(): void
     {
-        $response = $this->postJson('/api/v1/catalogs/races', ['name' => 'Mestiza o Mulata']);
+        $response = $this->postJson('/api/v1/catalogs/races', ['code' => 'MUL', 'name' => 'Mestiza o Mulata']);
 
         $response->assertCreated();
 
@@ -62,7 +62,7 @@ final class AuditTrailTest extends TestCase
     public function test_forwarded_request_id_is_honored_for_correlation(): void
     {
         $this->withHeader('X-Request-Id', 'integrador-abc-123')
-            ->postJson('/api/v1/catalogs/races', ['name' => 'China']);
+            ->postJson('/api/v1/catalogs/races', ['code' => 'CHN', 'name' => 'China']);
 
         $entry = $this->latestActivity();
 
@@ -185,7 +185,7 @@ final class AuditTrailTest extends TestCase
         $this->patchJson("/api/v1/catalogs/races/{$first->id}", ['name' => 'Blanca editada'])->assertOk();
 
         // A write by another actor, to prove the causer filter works.
-        $this->actingAs($other)->postJson('/api/v1/catalogs/races', ['name' => 'China']);
+        $this->actingAs($other)->postJson('/api/v1/catalogs/races', ['code' => 'CHN', 'name' => 'China']);
 
         $response = $this->actingAs($this->admin)->getJson('/api/v1/audit-logs?event=updated')
             ->assertOk();
@@ -231,7 +231,7 @@ final class AuditTrailTest extends TestCase
 
     public function test_csv_export_answers_to_audit_export_roles(): void
     {
-        $this->postJson('/api/v1/catalogs/races', ['name' => 'China'])->assertCreated();
+        $this->postJson('/api/v1/catalogs/races', ['code' => 'CHN', 'name' => 'China'])->assertCreated();
 
         $response = $this->getJson('/api/v1/audit-logs/export');
         $response->assertOk();

@@ -34,7 +34,7 @@ use Illuminate\Validation\ValidationException;
 final class EntityService implements EntityServiceInterface
 {
     private const PAYLOAD_COLUMNS = [
-        'code', 'tax_id_number', 'organization_id', 'province_id', 'municipality_id',
+        'code', 'name', 'tax_id_number', 'organization_id', 'province_id', 'municipality_id',
         'entity_type_id', 'address', 'phone', 'fax', 'email',
         'director_person_id', 'economic_director_person_id', 'parent_entity_id',
         'social_purpose',
@@ -53,7 +53,7 @@ final class EntityService implements EntityServiceInterface
     {
         $payload = $this->acceptedPayload($attributes);
 
-        $this->assertMandatoryKeys($payload, ['code', 'tax_id_number', 'organization_id', 'province_id', 'municipality_id', 'entity_type_id', 'address', 'social_purpose']);
+        $this->assertMandatoryKeys($payload, ['code', 'name', 'tax_id_number', 'organization_id', 'province_id', 'municipality_id', 'entity_type_id', 'address', 'social_purpose']);
         $this->assertReferencesAreValid($payload);
         $this->assertDirectorsExist($payload);
         $this->assertNaturalKeysAreFree($payload, null);
@@ -379,6 +379,7 @@ final class EntityService implements EntityServiceInterface
             return [
                 'id' => $node->id,
                 'code' => $node->code,
+                'name' => $node->name,
                 'tax_id_number' => $node->tax_id_number,
                 'social_purpose' => $node->social_purpose,
                 // The cut is announced, never silent (RF-ENT-005).
@@ -389,6 +390,7 @@ final class EntityService implements EntityServiceInterface
         return [
             'id' => $node->id,
             'code' => $node->code,
+            'name' => $node->name,
             'tax_id_number' => $node->tax_id_number,
             'social_purpose' => $node->social_purpose,
             'children' => array_map(

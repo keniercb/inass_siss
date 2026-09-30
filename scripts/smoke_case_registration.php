@@ -137,6 +137,7 @@ try {
 
     $entity = Entity::query()->create([
         'code' => 'FUM-'.random_int(1000, 9999),
+        'name' => 'Empresa de Fumiga',
         'tax_id_number' => '11'.random_int(100000000, 999999999),
         'organization_id' => $organization->id,
         'province_id' => $habana->id,
