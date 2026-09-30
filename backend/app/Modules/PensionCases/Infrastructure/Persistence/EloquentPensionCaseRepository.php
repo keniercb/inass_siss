@@ -27,6 +27,20 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  */
 final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterface
 {
+    /**
+     * Nested employer projection every service row answers with
+     * (the service-records listing carries the full entity data):
+     * the canonical Organizations set — organization, geography,
+     * type and the direct parent.
+     */
+    private const ENTITY_RELATIONS = [
+        'entity.organization',
+        'entity.province',
+        'entity.municipality',
+        'entity.entityType',
+        'entity.parent',
+    ];
+
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
         $query = PensionCase::query()
@@ -72,7 +86,17 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
     public function findDetailed(int $id): ?PensionCase
     {
         return PensionCase::query()
-            ->with(['salaryRecords', 'serviceRecords', 'workCycles', 'incomeConceptRecords', 'applicant'])
+            ->with([
+                'salaryRecords',
+                'serviceRecords.entity.organization',
+                'serviceRecords.entity.province',
+                'serviceRecords.entity.municipality',
+                'serviceRecords.entity.entityType',
+                'serviceRecords.entity.parent',
+                'workCycles',
+                'incomeConceptRecords',
+                'applicant',
+            ])
             ->find($id);
     }
 
@@ -157,7 +181,13 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
 
     public function addServiceRecord(PensionCase $case, array $attributes): ServiceRecord
     {
-        return $case->serviceRecords()->create($attributes);
+        $record = $case->serviceRecords()->create($attributes);
+
+        // The 201 answers with the full employer projection — the
+        // same set findDetailed eager loads for the listing.
+        $record->load(self::ENTITY_RELATIONS);
+
+        return $record;
     }
 
     public function removeServiceRecord(PensionCase $case, int $recordId): bool
