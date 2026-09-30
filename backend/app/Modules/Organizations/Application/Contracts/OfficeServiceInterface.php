@@ -15,8 +15,10 @@ use Illuminate\Validation\ValidationException;
 interface OfficeServiceInterface
 {
     /**
-     * Register an office (RF-ENT-002) after validating the references
-     * and the RN-004 geographic coherence.
+     * Register an office (RF-ENT-002) after validating the references,
+     * the RN-004 geographic coherence and the territorial structure
+     * (ADR-31): per-scope uniqueness, existence of the required
+     * superior and the parent derived from the type.
      *
      * @param  array<string, mixed>  $attributes
      *
@@ -26,7 +28,10 @@ interface OfficeServiceInterface
 
     /**
      * Edit an office: the resulting state re-validates references,
-     * coherence and the RN-003 acyclicity of the new parent.
+     * coherence, the RN-003 acyclicity of the generic path and the
+     * territorial structure of ADR-31 (uniqueness excluding itself
+     * and the parent re-derived from the resulting type), while
+     * offices with active children keep their type and territory.
      *
      * @param  array<string, mixed>  $attributes
      *

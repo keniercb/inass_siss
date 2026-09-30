@@ -41,6 +41,17 @@ interface OfficeRepositoryInterface
     public function hasActiveChildren(int $officeId): bool;
 
     /**
+     * The active office of the given type code — optionally narrowed
+     * to a province and a municipality — excluding an office id: the
+     * lookup behind the territorial structure (ADR-31), which
+     * detects both the per-scope uniqueness conflicts (a second
+     * national, provincial or municipal office) and the required
+     * superior of each type. Resolves the type by code, so the
+     * office type catalog stays the single source of truth.
+     */
+    public function findActiveOfType(string $typeCode, ?int $provinceId = null, ?int $municipalityId = null, ?int $exceptId = null): ?Office;
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes): Office;
