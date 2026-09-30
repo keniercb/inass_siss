@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Infrastructure\Persistence\Models;
 
+use App\Modules\Organizations\Infrastructure\Persistence\Models\Entity;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * 5.7). End date NULL means the employment link is still open; the
  * date order is backed by a database CHECK (RN-006) and overlaps
  * are detected and advertised by the pure Domain ServicePeriods
- * analysis. No timestamps: the bitácora keeps the values of every
+ * analysis. No timestamps: the bitacora keeps the values of every
  * high and removal through the Shared AuditTrailObserver.
  *
  * @property int $id
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $start_date
  * @property CarbonImmutable|null $end_date
  * @property bool $is_appendix
+ * @property Entity|null $entity
  */
 class ServiceRecord extends Model
 {
@@ -54,5 +56,18 @@ class ServiceRecord extends Model
     public function pensionCase(): BelongsTo
     {
         return $this->belongsTo(PensionCase::class);
+    }
+
+    /**
+     * Employer entity the link was declared against: the service
+     * listing answers its full projection (user rule). Resolves
+     * null against a soft-deleted entity — deactivated history is
+     * surfaced, never hidden.
+     *
+     * @return BelongsTo<Entity, $this>
+     */
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class);
     }
 }

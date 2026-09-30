@@ -6,16 +6,20 @@ namespace App\Modules\PensionCases\Tests\Feature;
 
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\IncomeConcept;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OfficeType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Organization;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\ScientificCategory;
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Entity;
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use App\Modules\PensionCases\Domain\CaseStatus;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -30,11 +34,13 @@ use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 /**
- * Subrecord API inside the case (RF-EXP-002..004, plan S5.3/S5.4):
- * highs and removals gated by the editable state, semantic probes of
- * the uniqueness and date rules, and the advisory warnings (missing
- * salary years, overlapping and open services) that travel beside
- * every response.
+ * Subrecord API inside the case (RF-EXP-002..004, plan S5.3/S5.4,
+ * user rule 5): highs and removals gated by the editable state,
+ * semantic probes of the uniqueness and date rules, the FIFTEEN row
+ * ceiling of the salary series (user rule 1) and the income concept
+ * records — one declared value per (case, concept) pair — plus the
+ * advisory warnings (missing salary years, overlapping and open
+ * services) that travel beside every response.
  */
 final class PensionCaseSubrecordsApiTest extends TestCase
 {
@@ -46,11 +52,16 @@ final class PensionCaseSubrecordsApiTest extends TestCase
 
     private PensionCase $case;
 
+    private int $incomeConceptId;
+
+    private int $otherIncomeConceptId;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Declares the `pension_case` sequence scope (ADR-17).
+        // Declares the ANNUAL `pension_case:{year}` sequence scopes
+        // (ADR-17/ADR-32).
         $this->seed(SettingsSeeder::class);
 
         $this->actingAsRole('operator');
@@ -94,7 +105,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         ]);
 
         $case = PensionCase::query()->create([
-            'number' => '1',
+            'number' => '11-2026-90001',
             'requested_at' => now()->toDateString(),
             'status' => CaseStatus::Submitted->value,
             'applicant_person_id' => $applicant->id,
@@ -104,8 +115,26 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'occupational_category_id' => OccupationalCategory::query()->create(['code' => 'TC', 'name' => 'Técnico'])->id,
             'educational_level_id' => EducationalLevel::query()->create(['name' => 'Medio superior', 'description' => 'Bachiller'])->id,
             'scientific_category_id' => ScientificCategory::query()->create(['code' => 'NIN', 'name' => 'Ninguna'])->id,
+            'pension_type_id' => PensionType::query()->create(['code' => 'VEJ', 'name' => 'Vejez'])->id,
+            'pension_regime_id' => PensionRegime::query()->create([
+                'name' => 'Seguro social',
+                'description' => 'Régimen general',
+                'months_per_year' => 12,
+            ])->id,
+            'rebel_army_member' => false,
             'last_salary' => '5000.00',
         ]);
+
+        $this->incomeConceptId = IncomeConcept::query()->create([
+            'name' => 'Salario en divisas',
+            'description' => 'Estimulación en divisas',
+            'applies_base_salary' => false,
+        ])->id;
+        $this->otherIncomeConceptId = IncomeConcept::query()->create([
+            'name' => 'Antigüedad',
+            'description' => 'Pago por años de servicio',
+            'applies_base_salary' => false,
+        ])->id;
 
         return [$applicant, $entity, $case];
     }
@@ -368,7 +397,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $response = $this->getJson('/api/v1/pension-cases?status=submitted')
             ->assertStatus(200)
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.number', '1');
+            ->assertJsonPath('data.0.number', '11-2026-90001');
 
         $this->getJson('/api/v1/pension-cases?status=approved')
             ->assertStatus(200)
@@ -383,12 +412,184 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             ->assertJsonValidationErrors(['status']);
     }
 
+    public function test_the_salary_series_is_capped_at_fifteen_rows(): void
+    {
+        // Rule 1: fifteen declared years stand; the sixteenth is a
+        // 422 on the wire field, never a silent truncation.
+        for ($year = 2010; $year <= 2024; $year++) {
+            $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
+                'year' => $year, 'earned_salary' => '4800.00',
+            ])->assertStatus(201);
+        }
+
+        $liveRows = (int) SalaryRecord::query()->where('pension_case_id', $this->case->id)->count();
+        $this->assertSame(15, $liveRows);
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
+            'year' => 2025, 'earned_salary' => '4800.00',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['salary_records']);
+
+        $liveRows = (int) SalaryRecord::query()->where('pension_case_id', $this->case->id)->count();
+        $this->assertSame(15, $liveRows);
+    }
+
+    public function test_removing_a_row_frees_a_slot_of_the_salary_ceiling(): void
+    {
+        $firstId = null;
+
+        for ($year = 2010; $year <= 2024; $year++) {
+            $firstId ??= $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
+                'year' => $year, 'earned_salary' => '4800.00',
+            ])->json('data.id');
+        }
+
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/salary-records/{$firstId}")
+            ->assertStatus(200);
+
+        // The ceiling counts LIVE rows: with one removed, a new year
+        // enters the series again.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
+            'year' => 2025, 'earned_salary' => '4800.00',
+        ])->assertStatus(201);
+    }
+
+    public function test_adds_an_income_concept_record(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.income_concept_id', $this->incomeConceptId)
+            ->assertJsonPath('data.amount', '150.00')
+            ->assertJsonPath('data.pension_case_id', $this->case->id);
+
+        $this->assertSame(1, IncomeConceptRecord::query()->count());
+    }
+
+    public function test_rejects_a_declared_concept_twice(): void
+    {
+        // One value per (case, concept) pair: the semantic probe of
+        // the UNIQUE answers 422 on income_concept_id.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])->assertStatus(201);
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '200.00',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['income_concept_id']);
+
+        // A DIFFERENT concept still enters: the pair is the key, not
+        // the case alone.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->otherIncomeConceptId,
+            'amount' => '80.50',
+        ])->assertStatus(201);
+    }
+
+    public function test_rejects_an_unknown_or_deactivated_income_concept(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => 999999,
+            'amount' => '150.00',
+        ])->assertStatus(422)->assertJsonValidationErrors(['income_concept_id']);
+
+        $concept = IncomeConcept::query()->whereKey($this->otherIncomeConceptId)->firstOrFail();
+        $concept->delete();
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->otherIncomeConceptId,
+            'amount' => '80.50',
+        ])->assertStatus(422)->assertJsonValidationErrors(['income_concept_id']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidAmounts(): array
+    {
+        return [
+            'negative' => ['-1.00'],
+            'three decimals' => ['150.123'],
+            'not a number' => ['abc'],
+            'thousands separator' => ['1,000.00'],
+        ];
+    }
+
+    #[DataProvider('invalidAmounts')]
+    public function test_rejects_amounts_outside_the_money_shape(string $amount): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => $amount,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['amount']);
+    }
+
+    public function test_removes_an_income_concept_record(): void
+    {
+        $id = $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])->json('data.id');
+
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records/{$id}")
+            ->assertStatus(200)
+            ->assertJsonPath('message', 'Income concept record removed.');
+
+        $this->assertSame(0, IncomeConceptRecord::query()->count());
+    }
+
+    public function test_removing_an_unknown_income_concept_record_answers_404(): void
+    {
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records/999")
+            ->assertStatus(404);
+    }
+
+    #[DataProvider('lockedStates')]
+    public function test_income_concept_records_are_frozen_outside_submitted(string $status): void
+    {
+        $this->case->status = CaseStatus::from($status);
+        $this->case->save();
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])
+            ->assertStatus(409)
+            ->assertJsonPath('status', $status);
+
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records/1")
+            ->assertStatus(409)
+            ->assertJsonPath('status', $status);
+    }
+
+    public function test_an_unknown_case_answers_404_for_income_concepts(): void
+    {
+        $this->postJson('/api/v1/pension-cases/999/income-concept-records', [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])->assertStatus(404);
+    }
+
     public function test_requires_authentication(): void
     {
         auth()->logout();
 
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
             'year' => 2023, 'earned_salary' => '4800.00',
+        ])->assertUnauthorized();
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
         ])->assertUnauthorized();
     }
 }

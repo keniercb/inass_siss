@@ -20,6 +20,7 @@ use App\Modules\Security\Application\Services\RoleService;
 use App\Modules\Security\Application\Services\UserService;
 use App\Modules\Security\Infrastructure\Audit\EloquentAuditLogQuery;
 use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserIdProvider;
+use App\Modules\Security\Infrastructure\Authentication\AuthenticatedUserOfficeProvider;
 use App\Modules\Security\Infrastructure\Persistence\EloquentPermissionUsageQuery;
 use App\Modules\Security\Infrastructure\Persistence\EloquentRoleRepository;
 use App\Modules\Security\Infrastructure\Persistence\EloquentUserRepository;
@@ -27,6 +28,7 @@ use App\Modules\Security\Infrastructure\Persistence\Models\Role;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
 use App\Modules\Security\Infrastructure\Persistence\OfficeAssignmentQuery;
 use App\Modules\Shared\Contracts\ClockInterface;
+use App\Modules\Shared\Contracts\CurrentUserOfficeProviderInterface;
 use App\Modules\Shared\Contracts\CurrentUserProviderInterface;
 use App\Modules\Shared\Support\AuditableObserver;
 use App\Modules\Shared\Support\AuditTrailObserver;
@@ -115,6 +117,15 @@ final class SecurityServiceProvider extends ServiceProvider
         $this->app->bind(
             CurrentUserProviderInterface::class,
             AuthenticatedUserIdProvider::class,
+        );
+
+        // Registering office port (ADR-33): registration flows need to
+        // know WHICH OFFICE performs the capture — a pension case assumes
+        // the registering user's office instead of receiving it over the
+        // wire. Same Shared-port topology as the audit actor above.
+        $this->app->bind(
+            CurrentUserOfficeProviderInterface::class,
+            AuthenticatedUserOfficeProvider::class,
         );
 
         // Audit trail read port (RF-AUD-003, ADR-19): the bitácora is

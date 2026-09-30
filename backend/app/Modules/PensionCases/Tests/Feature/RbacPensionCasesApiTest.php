@@ -10,6 +10,8 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OfficeType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Organization;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\ScientificCategory;
@@ -89,7 +91,7 @@ final class RbacPensionCasesApiTest extends TestCase
             // role tests create through the API and the sequence
             // starts at 1, so a colliding fixture would break the
             // physical UNIQUE.
-            'number' => '900000',
+            'number' => '11-2026-90001',
             'requested_at' => now()->toDateString(),
             'status' => CaseStatus::Submitted->value,
             'applicant_person_id' => $applicant->id,
@@ -99,6 +101,13 @@ final class RbacPensionCasesApiTest extends TestCase
             'occupational_category_id' => OccupationalCategory::query()->create(['code' => 'TC', 'name' => 'Técnico'])->id,
             'educational_level_id' => EducationalLevel::query()->create(['name' => 'Medio superior', 'description' => 'Bachiller'])->id,
             'scientific_category_id' => ScientificCategory::query()->create(['code' => 'NIN', 'name' => 'Ninguna'])->id,
+            'pension_type_id' => PensionType::query()->create(['code' => 'VEJ', 'name' => 'Vejez'])->id,
+            'pension_regime_id' => PensionRegime::query()->create([
+                'name' => 'Seguro social',
+                'description' => 'Régimen general',
+                'months_per_year' => 12,
+            ])->id,
+            'rebel_army_member' => false,
             'last_salary' => '5000.00',
         ]);
     }
@@ -111,14 +120,19 @@ final class RbacPensionCasesApiTest extends TestCase
         $person = Person::factory()->create();
         $case = $this->case;
 
+        // Rule 0 (ADR-33): the payload carries NO office_id — the
+        // case assumes the office of the authenticated user. The
+        // writer roles get the fixture office assigned in the test.
         return [
             'applicant_person_id' => $person->id,
-            'office_id' => $case->office_id,
             'employer_entity_id' => $case->employer_entity_id,
             'position_id' => $case->position_id,
             'occupational_category_id' => $case->occupational_category_id,
             'educational_level_id' => $case->educational_level_id,
             'scientific_category_id' => $case->scientific_category_id,
+            'pension_type_id' => $case->pension_type_id,
+            'pension_regime_id' => $case->pension_regime_id,
+            'rebel_army_member' => false,
             'last_salary' => '5000.00',
         ];
     }
@@ -148,7 +162,7 @@ final class RbacPensionCasesApiTest extends TestCase
 
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")
             ->assertOk()
-            ->assertJsonPath('data.number', '900000');
+            ->assertJsonPath('data.number', '11-2026-90001');
     }
 
     /**
@@ -165,11 +179,15 @@ final class RbacPensionCasesApiTest extends TestCase
     #[DataProvider('writerRoles')]
     public function test_the_capture_roles_create_and_edit(string $role): void
     {
-        $this->actingAsRole($role);
+        // Rule 0: the registering user needs an office for the case
+        // to assume (ADR-33).
+        $user = $this->actingAsRole($role);
+        $user->forceFill(['office_id' => $this->case->office_id])->save();
 
         $this->postJson('/api/v1/pension-cases', $this->storePayload())
             ->assertStatus(201)
-            ->assertJsonPath('data.status', 'submitted');
+            ->assertJsonPath('data.status', 'submitted')
+            ->assertJsonPath('data.office_id', $this->case->office_id);
 
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/salary-records", [
             'year' => 2023, 'earned_salary' => '4800.00',

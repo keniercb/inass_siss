@@ -10,6 +10,8 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OfficeType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Organization;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\ScientificCategory;
@@ -100,6 +102,12 @@ final class OfficeCaseCountsApiTest extends TestCase
             'occupational_category_id' => OccupationalCategory::query()->create(['code' => 'TC', 'name' => 'Técnico'])->id,
             'educational_level_id' => EducationalLevel::query()->create(['name' => 'Medio superior', 'description' => 'Bachiller'])->id,
             'scientific_category_id' => ScientificCategory::query()->create(['code' => 'NIN', 'name' => 'Ninguna'])->id,
+            'pension_type_id' => PensionType::query()->create(['code' => 'VEJ', 'name' => 'Vejez'])->id,
+            'pension_regime_id' => PensionRegime::query()->create([
+                'name' => 'Seguro social',
+                'description' => 'Régimen general',
+                'months_per_year' => 12,
+            ])->id,
         ];
     }
 
@@ -125,6 +133,9 @@ final class OfficeCaseCountsApiTest extends TestCase
             'occupational_category_id' => $this->refs['occupational_category_id'],
             'educational_level_id' => $this->refs['educational_level_id'],
             'scientific_category_id' => $this->refs['scientific_category_id'],
+            'pension_type_id' => $this->refs['pension_type_id'],
+            'pension_regime_id' => $this->refs['pension_regime_id'],
+            'rebel_army_member' => false,
             'last_salary' => '5000.00',
         ]);
     }

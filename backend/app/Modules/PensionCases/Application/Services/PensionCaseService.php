@@ -7,7 +7,10 @@ namespace App\Modules\PensionCases\Application\Services;
 use App\Modules\Catalogs\Application\Contracts\CatalogRepositoryInterface;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\IncomeConcept;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\ScientificCategory;
 use App\Modules\Organizations\Application\Contracts\EntityRepositoryInterface;
@@ -15,13 +18,16 @@ use App\Modules\Organizations\Application\Contracts\OfficeRepositoryInterface;
 use App\Modules\PensionCases\Application\Contracts\PensionCaseRepositoryInterface;
 use App\Modules\PensionCases\Application\Contracts\PensionCaseServiceInterface;
 use App\Modules\PensionCases\Application\Exceptions\CaseNotEditableException;
+use App\Modules\PensionCases\Application\Exceptions\DuplicateIncomeConceptException;
 use App\Modules\PensionCases\Application\Exceptions\DuplicateSalaryYearException;
 use App\Modules\PensionCases\Application\Exceptions\OpenCaseExistsException;
 use App\Modules\PensionCases\Application\Exceptions\PersonNotEligibleException;
+use App\Modules\PensionCases\Domain\CaseNumber;
 use App\Modules\PensionCases\Domain\CaseStatus;
 use App\Modules\PensionCases\Domain\DeclaredService;
 use App\Modules\PensionCases\Domain\SalarySeries;
 use App\Modules\PensionCases\Domain\ServicePeriods;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -37,29 +43,38 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Use cases for the pension case aggregate, Sprint 5 (RF-EXP-001..004,
- * plan S5.2-S5.5).
+ * plan S5.2-S5.5) + user rules 0-5 (ADR-32/ADR-33).
  *
  * Creation (S5.2): the applicant must be alive and active — decided
  * by People's own state rule (`canStartNewProcess`, RF-SEG-003) so
- * the ownership of the rule stays in People; the office and the
- * employer entity must exist and stay active; every catalog
- * reference is probed before writing. The one-open-case-per-person
- * rule answers 409 with the open case, backed physically by the
- * open_case_key generated column. The number comes from the
- * centralized `pension_case` sequence (RN-009/ADR-17) — emitted
- * before the business transaction, so a failed insert may burn it:
- * holes are accepted by design, reuse never.
+ * the ownership of the rule stays in People; the office — the one
+ * the REGISTERING USER belongs to, resolved by the Presentation
+ * layer through the Shared office port (user rule 0/ADR-33) — and
+ * the employer entity must exist and stay active; every catalog
+ * reference (including the pension type/regime of user rule 4) is
+ * probed before writing. The one-open-case-per-person rule answers
+ * 409 with the open case, backed physically by the open_case_key
+ * generated column.
  *
- * Atomicity (S5.5): the case row plus every declared subrecord
- * insert inside one TransactionManager boundary — everything or
- * nothing. Subrecord rules (S5.3): the (case, year) pair is probed
- * semantically (422), the year range is decided against the clock
- * (1950…current+1, RF-EXP-002), money flows through the Money value
- * object (RN-005) and service date order is validated against the
- * resulting pair before the CHECK gets a chance to speak. Writes are
- * gated by the editable state: only `submitted` accepts subrecord
- * changes (plan S5.4) — CaseNotEditableException answers 409 with
- * the current status.
+ * The NUMBER (user rule 2/ADR-32) is composed of the registering
+ * office's province code (2), the current year (4) and the ANNUAL
+ * consecutive of the shared sequence (5, zero padded) — PP-YYYY-CCCCC
+ * — emitted before the business transaction, so a failed insert may
+ * burn it: holes are accepted by design, reuse never (RN-009).
+ * Each year keeps its own consecutive.
+ *
+ * Atomicity (S5.5): the case row plus every declared subrecord —
+ * salaries (at most FIFTEEN, user rule 1), services, cycles and
+ * income concept records (user rule 5) — inserts inside one
+ * TransactionManager boundary: everything or nothing. Subrecord
+ * rules (S5.3): the (case, year) and (case, concept) pairs are
+ * probed semantically (422), the year range is decided against the
+ * clock (1950…current+1, RF-EXP-002), money flows through the Money
+ * value object (RN-005) and service date order is validated against
+ * the resulting pair before the CHECK gets a chance to speak.
+ * Writes are gated by the editable state: only `submitted` accepts
+ * subrecord changes (plan S5.4) — CaseNotEditableException answers
+ * 409 with the current status.
  *
  * The advisory analysis (warnings) is delegated to the pure Domain
  * values (SalarySeries, ServicePeriods): missing interior salary
@@ -82,6 +97,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'occupational_category_id',
         'educational_level_id',
         'scientific_category_id',
+        'pension_type_id',
+        'pension_regime_id',
+        'rebel_army_member',
+        'rebel_army_join_date',
         'last_salary',
     ];
 
@@ -106,11 +125,13 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         $this->assertMandatoryKeys($payload, [
             'applicant_person_id', 'office_id', 'employer_entity_id', 'position_id',
-            'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'last_salary',
+            'occupational_category_id', 'educational_level_id', 'scientific_category_id',
+            'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary',
         ]);
 
         $this->assertApplicantIsEligible((int) $payload['applicant_person_id']);
         $this->assertReferencesAreActive($payload);
+        $this->assertRebelArmyPairIsCoherent($payload);
         $this->assertNoOpenCase((int) $payload['applicant_person_id']);
         $this->assertRequestedAtIsNotFuture($payload);
 
@@ -119,15 +140,28 @@ final class PensionCaseService implements PensionCaseServiceInterface
         $salaryRows = $this->salaryRows($attributes['salary_records'] ?? []);
         $serviceRows = $this->serviceRows($attributes['service_records'] ?? []);
         $cycleRows = $this->cycleRows($attributes['work_cycles'] ?? []);
+        $incomeRows = $this->incomeConceptRows($attributes['income_concept_records'] ?? []);
+
+        // User rule 2: the province section of the number comes from
+        // the REGISTERING office (which the Presentation layer took
+        // from the acting user, user rule 0).
+        $provinceCode = $this->provinceCodeOfRegisteringOffice((int) $payload['office_id']);
+
+        $rebelArmyMember = (bool) $payload['rebel_army_member'];
+        $rebelArmyJoinDate = $rebelArmyMember && isset($payload['rebel_army_join_date']) && $payload['rebel_army_join_date'] !== ''
+            ? (string) $payload['rebel_army_join_date']
+            : null;
 
         // The number is emitted BEFORE the business transaction: a
         // failed insert burns it (hole accepted by RN-009), but two
-        // concurrent creations can never share it (ADR-17).
-        $number = (string) $this->sequences->next(self::CASE_SEQUENCE);
+        // concurrent creations can never share it (ADR-17/ADR-32).
+        $year = (int) $this->clock->now()->format('Y');
+        $consecutive = $this->sequences->nextForYear(self::CASE_SEQUENCE, $year);
+        $number = CaseNumber::fromParts($provinceCode, $year, $consecutive)->__toString();
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
-            function () use ($payload, $lastSalary, $number, $salaryRows, $serviceRows, $cycleRows): PensionCase {
+            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
                 $case = $this->cases->create([
                     'number' => $number,
                     'requested_at' => $payload['requested_at'] ?? $this->clock->now()->format('Y-m-d'),
@@ -139,7 +173,11 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     'occupational_category_id' => (int) $payload['occupational_category_id'],
                     'educational_level_id' => (int) $payload['educational_level_id'],
                     'scientific_category_id' => (int) $payload['scientific_category_id'],
+                    'pension_type_id' => (int) $payload['pension_type_id'],
+                    'pension_regime_id' => (int) $payload['pension_regime_id'],
                     'last_salary' => $lastSalary->__toString(),
+                    'rebel_army_member' => $rebelArmyMember,
+                    'rebel_army_join_date' => $rebelArmyJoinDate,
                 ]);
 
                 if ($salaryRows !== []) {
@@ -152,6 +190,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
                 if ($cycleRows !== []) {
                     $this->cases->createWorkCycles($case, $cycleRows);
+                }
+
+                if ($incomeRows !== []) {
+                    $this->cases->createIncomeConceptRecords($case, $incomeRows);
                 }
 
                 return $case;
@@ -223,6 +265,14 @@ final class PensionCaseService implements PensionCaseServiceInterface
         }
 
         $this->assertCaseIsEditable($case);
+
+        // User rule 1: the ceiling counts LIVE rows — removing one
+        // frees its slot for a new year.
+        if ($this->cases->countSalaryRecords($caseId) >= SalarySeries::MAX_RECORDS) {
+            throw ValidationException::withMessages([
+                'salary_records' => 'A case can hold at most '.SalarySeries::MAX_RECORDS.' salary records.',
+            ]);
+        }
 
         if ($this->cases->salaryYearExists($caseId, $year)) {
             throw new DuplicateSalaryYearException($year, $caseId);
@@ -340,6 +390,49 @@ final class PensionCaseService implements PensionCaseServiceInterface
         return $this->cases->removeWorkCycle($case, $recordId);
     }
 
+    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount): ?IncomeConceptRecord
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        if ($this->catalogs->find(IncomeConcept::class, $incomeConceptId) === null) {
+            throw ValidationException::withMessages([
+                'income_concept_id' => "Income concept {$incomeConceptId} does not exist or is deactivated.",
+            ]);
+        }
+
+        if ($this->cases->incomeConceptExists($caseId, $incomeConceptId)) {
+            // User rule 5: one declared value per (case, concept) —
+            // the semantic probe of the UNIQUE, 422 not a driver
+            // error (RN-008 convention).
+            throw new DuplicateIncomeConceptException($incomeConceptId, $caseId);
+        }
+
+        $money = Money::fromString($amount);
+
+        return $this->transactions->execute(
+            fn (): IncomeConceptRecord => $this->cases->addIncomeConceptRecord($case, $incomeConceptId, $money->__toString()),
+        );
+    }
+
+    public function removeIncomeConceptRecord(int $caseId, int $recordId): ?bool
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        return $this->cases->removeIncomeConceptRecord($case, $recordId);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      * @return array<string, mixed>
@@ -424,6 +517,8 @@ final class PensionCaseService implements PensionCaseServiceInterface
             'occupational_category_id' => OccupationalCategory::class,
             'educational_level_id' => EducationalLevel::class,
             'scientific_category_id' => ScientificCategory::class,
+            'pension_type_id' => PensionType::class,
+            'pension_regime_id' => PensionRegime::class,
         ];
 
         foreach ($catalogProbes as $key => $modelClass) {
@@ -433,6 +528,59 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 ]);
             }
         }
+    }
+
+    /**
+     * User rule 4: the rebel army pair is coherent in exactly one
+     * shape — a member always carries the join date, a non-member
+     * never does. The FormRequest guards the wire; this is the
+     * domain-side probe so no caller can drift the pair.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertRebelArmyPairIsCoherent(array $payload): void
+    {
+        $member = (bool) ($payload['rebel_army_member'] ?? false);
+        $joinDate = $payload['rebel_army_join_date'] ?? null;
+        $joinDate = $joinDate === '' ? null : $joinDate;
+
+        if ($member && $joinDate === null) {
+            throw ValidationException::withMessages([
+                'rebel_army_join_date' => 'The rebel army join date is required when the applicant belongs to the rebel army.',
+            ]);
+        }
+
+        if (! $member && $joinDate !== null) {
+            throw ValidationException::withMessages([
+                'rebel_army_join_date' => 'The rebel army join date can only be declared when the applicant belongs to the rebel army.',
+            ]);
+        }
+    }
+
+    /**
+     * User rule 2: the province section of the case number is the
+     * registering office's province code — resolved through the
+     * Organizations directory the service already probes.
+     */
+    private function provinceCodeOfRegisteringOffice(int $officeId): string
+    {
+        $office = $this->offices->find($officeId);
+
+        if ($office === null) {
+            throw ValidationException::withMessages([
+                'office_id' => 'The office does not exist or is deactivated.',
+            ]);
+        }
+
+        $provinceCode = $office->province?->code;
+
+        if (is_string($provinceCode) && preg_match('/^\d{2}$/', $provinceCode) === 1) {
+            return $provinceCode;
+        }
+
+        throw ValidationException::withMessages([
+            'office_id' => 'The registering office must sit on a province with a two-digit code to derive the case number.',
+        ]);
     }
 
     private function assertNoOpenCase(int $personId): void
@@ -464,13 +612,20 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
     /**
      * Normalizes the declared salary rows (creation payload): money
-     * through the value object, year range against the clock.
+     * through the value object, year range against the clock and the
+     * FIFTEEN row ceiling of user rule 1.
      *
      * @param  list<array<string, mixed>>  $rows
      * @return list<array{year: int, earned_salary: string}>
      */
     private function salaryRows(array $rows): array
     {
+        if (count($rows) > SalarySeries::MAX_RECORDS) {
+            throw ValidationException::withMessages([
+                'salary_records' => 'A case can hold at most '.SalarySeries::MAX_RECORDS.' salary records.',
+            ]);
+        }
+
         $normalized = [];
         $seen = [];
 
@@ -567,6 +722,48 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 'planned_days' => $plannedDays,
                 'actual_days' => $actualDays,
                 'cycles_count' => $cyclesCount,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Normalizes the declared income concept rows (creation payload,
+     * user rule 5): catalog probe, one value per concept inside the
+     * payload and money through the value object.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{income_concept_id: int, amount: string}>
+     */
+    private function incomeConceptRows(array $rows): array
+    {
+        $normalized = [];
+        $seen = [];
+
+        foreach ($rows as $index => $row) {
+            $conceptId = (int) ($row['income_concept_id'] ?? 0);
+
+            if ($this->catalogs->find(IncomeConcept::class, $conceptId) === null) {
+                throw ValidationException::withMessages([
+                    "income_concept_records.{$index}.income_concept_id" => "Income concept {$conceptId} does not exist or is deactivated.",
+                ]);
+            }
+
+            if (isset($seen[$conceptId])) {
+                // User rule 5 inside one payload: the (case, concept)
+                // pair is unique, so declaring the concept twice is a
+                // 422 before anything is written.
+                throw ValidationException::withMessages([
+                    "income_concept_records.{$index}.income_concept_id" => "Income concept {$conceptId} is already declared in this payload.",
+                ]);
+            }
+
+            $seen[$conceptId] = true;
+
+            $normalized[] = [
+                'income_concept_id' => $conceptId,
+                'amount' => Money::fromString((string) ($row['amount'] ?? ''))->__toString(),
             ];
         }
 

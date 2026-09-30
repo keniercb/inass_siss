@@ -13,9 +13,12 @@ use Tests\TestCase;
 /**
  * SettingsSeeder (architecture section 8): declares the centralized
  * sequences consumed by later phases — bank control numbers (phase 5)
- * and pension case numbers (phase 3). Idempotent on the natural scope
+ * and the ANNUAL pension case consecutive (phase 3, ADR-32: one
+ * scope row per year, PP-YYYY-CCCCC). Idempotent on the natural scope
  * key: re-running never duplicates rows and never rewinds a consumed
- * sequence (RN-009: emitted numbers stay burned).
+ * sequence (RN-009: emitted numbers stay burned). The seeder declares
+ * the current year's row; the generator births future years on their
+ * first emission, so the rollover needs no operator.
  */
 final class SettingsSeederTest extends TestCase
 {
@@ -23,12 +26,14 @@ final class SettingsSeederTest extends TestCase
 
     public function test_seeds_the_declared_sequences_without_resetting_consumed_values(): void
     {
+        $year = (int) now()->format('Y');
+
         $this->artisan('db:seed', ['--class' => SettingsSeeder::class]);
 
         $this->assertSame(
-            ['bank_control', 'pension_case'],
+            ['bank_control', 'pension_case:'.$year],
             NumberingSequence::query()
-                ->whereIn('scope', ['bank_control', 'pension_case'])
+                ->whereIn('scope', ['bank_control', 'pension_case:'.$year])
                 ->orderBy('scope')
                 ->pluck('scope')
                 ->all(),
@@ -39,7 +44,7 @@ final class SettingsSeederTest extends TestCase
         );
         $this->assertSame(
             1,
-            (int) NumberingSequence::query()->where('scope', 'pension_case')->value('next_value'),
+            (int) NumberingSequence::query()->where('scope', 'pension_case:'.$year)->value('next_value'),
         );
 
         $generator = $this->app->make(SequenceGeneratorInterface::class);
@@ -55,5 +60,9 @@ final class SettingsSeederTest extends TestCase
             (int) NumberingSequence::query()->where('scope', 'bank_control')->value('next_value'),
         );
         $this->assertSame(2, $generator->next('bank_control'));
+
+        // The annual case consecutive answers to the same port: the
+        // seeded year hands out its first number.
+        $this->assertSame(1, $generator->nextForYear('pension_case', $year));
     }
 }

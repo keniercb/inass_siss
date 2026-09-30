@@ -86,6 +86,7 @@ Correcciones semánticas de nomenclatura: `proponente` (era "propovente"), `firm
 | Expediente | `pension_cases` | `PensionCase` |
 | Ciclo (de trabajo) | `work_cycles` | `WorkCycle` |
 | Registro de salario | `salary_records` | `SalaryRecord` |
+| Registro de concepto de ingreso | `income_concept_records` | `IncomeConceptRecord` |
 | Registro de servicio | `service_records` | `ServiceRecord` |
 | Historial del expediente | `pension_case_histories` | `PensionCaseHistory` |
 | Pensionado | `pensioners` | `Pensioner` |
@@ -669,17 +670,21 @@ Semántica de negocio (implementada, ADR-23; migración `2026_09_28_130000_creat
 
 | Columna | Tipo | Nulo | Clave | Descripción |
 |---|---|---|---|---|
-| number | VARCHAR(20) | NO | UNIQUE | Número de expediente (secuencia `pension_case`) |
+| number | VARCHAR(20) | NO | UNIQUE | Número compuesto PP-YYYY-CCCCC (ADR-32, regla de usuario 2): código de provincia de la oficina registrante (2 dígitos), año en curso (4) y consecutivo ANUAL rellenado con ceros a 5, secciones separadas por guion medio — scope `pension_case:{año}` de la secuencia centralizada |
 | requested_at | DATE | NO | — | Fecha de solicitud |
 | status | VARCHAR(20) | NO | CHECK | `submitted` / `under_review` / `approved` / `rejected` (enum PHP `CaseStatus`) |
 | applicant_person_id | BIGINT UNSIGNED | NO | FK → people | Proponente |
-| office_id | BIGINT UNSIGNED | NO | FK → offices | Oficina tramitadora |
+| office_id | BIGINT UNSIGNED | NO | FK → offices | Oficina del usuario que REGISTRA el expediente (regla de usuario 0/ADR-33: asumida del actor, jamás viaja en el POST) |
 | employer_entity_id | BIGINT UNSIGNED | NO | FK → entities | Centro de trabajo |
 | position_id | BIGINT UNSIGNED | NO | FK → positions | Cargo declarado |
 | occupational_category_id | BIGINT UNSIGNED | NO | FK → occupational_categories | Categoría ocupacional |
 | educational_level_id | BIGINT UNSIGNED | NO | FK → educational_levels | Nivel educacional |
 | scientific_category_id | BIGINT UNSIGNED | NO | FK → scientific_categories | Categoría científica |
+| pension_type_id | BIGINT UNSIGNED | NO | FK → pension_types | Tipo de pensión (regla de usuario 4, obligatorio) |
+| pension_regime_id | BIGINT UNSIGNED | NO | FK → pension_regimes | Régimen de pensión (regla de usuario 4, obligatorio) |
 | last_salary | DECIMAL(12,2) | NO | CHECK ≥ 0 | Último salario |
+| rebel_army_member | TINYINT(1) | NO | DEFAULT 0 | Pertenece al Ejército Rebelde (regla de usuario 4) |
+| rebel_army_join_date | DATE | SÍ | CHECK (par) | Fecha de alta en el Ejército Rebelde: obligatoria si `rebel_army_member=1`, rechazada si `=0` (CHECKs directo e inverso) |
 | approval_legal_basis_id | BIGINT UNSIGNED | SÍ | FK → legal_bases | Resolución aprobatoria (H-05); obligatoria al aprobar |
 | decision_notes | TEXT | SÍ | — | Nota de resolución o motivo de denegación |
 | decided_at | DATETIME | SÍ | — | Momento de la decisión |
@@ -691,7 +696,7 @@ Semántica de negocio (implementada, ADR-23; migración `2026_09_28_130000_creat
 
 Índice de gestión: `idx_cases_office_status (office_id, status, requested_at)`.
 
-**`salary_records`** — Serie salarial anual.
+**`salary_records`** — Serie salarial anual (MÁXIMO 15 filas vivas por expediente, regla de usuario 1: la columna generada no puede contar filas — la guarda vive en `SalarySeries::MAX_RECORDS` del dominio, sondeada en el payload y en cada alta individual; borrar una fila libera el cupo).
 
 | Columna | Tipo | Nulo | Clave | Descripción |
 |---|---|---|---|---|
@@ -721,6 +726,17 @@ Solapamientos y huecos se validan en la capa de dominio (RF-EXP-003); MySQL no l
 | actual_days | INT UNSIGNED | NO | — | Días reales |
 | cycles_count | INT UNSIGNED | NO | — | Cantidad de ciclos |
 
+**`income_concept_records`** — Conceptos de ingreso declarados del expediente (regla de usuario 5, ADR-32).
+
+| Columna | Tipo | Nulo | Clave | Descripción |
+|---|---|---|---|---|
+| pension_case_id | BIGINT UNSIGNED | NO | FK → pension_cases | Expediente |
+| income_concept_id | BIGINT UNSIGNED | NO | FK → income_concepts | Concepto del catálogo (salario en divisas, antigüedad…) |
+| amount | DECIMAL(12,2) | NO | CHECK ≥ 0 | Valor declarado del concepto (RN-005) |
+| — | — | — | UNIQUE | (`pension_case_id`, `income_concept_id`) — un valor por concepto |
+
+Sin timestamps ni autoría propias (las convenciones del agregado): las bajas son físicas y auditadas con los valores previos (ADR-19). El par (caso, concepto) se sondea semánticamente antes del insert (422 sobre `income_concept_id`, RN-008) y el catálogo se exige ACTIVO en alta y edición.
+
 **`pension_case_histories`** — Bitácora de transiciones (append-only, RN-010).
 
 | Columna | Tipo | Nulo | Clave | Descripción |
@@ -732,7 +748,7 @@ Solapamientos y huecos se validan en la capa de dominio (RF-EXP-003); MySQL no l
 | changed_at | DATETIME | NO | — | Momento (índice) |
 | note | TEXT | SÍ | — | Nota de la transición |
 
-Semántica de negocio (implementada, ADR-25; migraciones `2026_09_28_150000_create_pension_cases_table` a `150003_create_work_cycles_table`): el número del expediente proviene de la secuencia centralizada `pension_case` (RN-009/ADR-17) — emitido tras completar toda la validación semántica y antes de la transacción de negocio, de modo que un 422 no quema números y un fallo de insert sí (hueco aceptado por diseño, jamás reutilizado); el estado inicial es `submitted` con el catálogo normativo de la sección 2.4 respaldado por CHECK (la MATRIZ de transiciones llega en S6 como dataset). La unicidad de «un expediente abierto por persona» es FÍSICA: la columna generada almacenada `open_case_key` vale `IF(status IN ('approved','rejected'), NULL, applicant_person_id)` y su UNIQUE admite tantos casos resueltos como haga falta pero a lo sumo UNO vivo por proponente (el 409 del servicio con el expediente abierto la anticipa). Los importes `last_salary`/`earned_salary` son DECIMAL(12,2) con CHECK ≥ 0 (RN-005, `Money` en aplicación); el piso del año salarial 1950 está en CHECK y el techo «año actual+1» se decide contra `ClockInterface` porque NOW() no cabe en un CHECK determinista. El par (caso, año) es UNIQUE sondeado semánticamente antes del insert (RN-008). Los subregistros no llevan timestamps ni autoría propias — el expediente es el agregado — y sus bajas son FÍSICAS auditadas con los valores previos (ADR-19; borrado por instancia: el mass delete no dispara eventos Eloquent). El orden de fechas de servicios está respaldado por CHECK `chk_service_records_dates` (RN-006) y los solapamientos y vínculos abiertos — no expresables como constraint — se detectan y ADVIERTEN con el dominio puro `ServicePeriods` (objeto `warnings` hermano de `data`, nunca bloque), igual que `SalarySeries` advierte los años interiores ausentes de la serie declarada. Autoría del expediente estampada por `AuditableObserver` (ADR-14) y toda escritura — expediente y subregistros — aterriza en la bitácora append-only (ADR-19); las columnas de decisión (`approval_legal_basis_id`, `decided_by/decided_at`, `computed_amount`, `calculation_setting_id`) existen con sus FK desde ya para que la aprobación de S6 no toque el esquema. `pension_case_histories` aún no está migrada: llega con las transiciones de S6 (RF-EXP-009, RF-AUD-002).
+Semántica de negocio (implementada, ADR-25 + reglas de usuario 0-5/ADR-32/33; migraciones `2026_09_28_150000_create_pension_cases_table` a `150003_create_work_cycles_table`, `2026_09_30_120000_add_pension_classification_to_pension_cases_table` y `2026_09_30_120100_create_income_concept_records_table`): el número del expediente es COMPUESTO — PP-YYYY-CCCCC, provincia de la oficina registrante + año en curso + consecutivo ANUAL — emitido por el puerto `SequenceGeneratorInterface::nextForYear` sobre el scope `pension_case:{año}` de la secuencia centralizada (RN-009/ADR-17/ADR-32), tras completar toda la validación semántica y antes de la transacción de negocio, de modo que un 422 no quema números y un fallo de insert sí (hueco aceptado por diseño, jamás reutilizado); la OFICINA del expediente es la del usuario que REGISTRA (regla 0/ADR-33: resuelta por el puerto Shared `CurrentUserOfficeProviderInterface` e inyectada por el controller — `office_id` prohibido en el payload con 422, actor sin oficina 422) y el estado inicial es `submitted` con el catálogo normativo de la sección 2.4 respaldado por CHECK (la MATRIZ de transiciones llega en S6 como dataset). La clasificación de pensión (tipo y régimen, regla 4) es obligatoria con FK a sus catálogos y el par de Ejército Rebelde es COHERENTE por construcción: el wire exige `rebel_army_join_date` cuando el booleano es true y la rechaza cuando es false, con el guard del servicio y los CHECKs directo e inverso de BD como última línea. La serie salarial admite MÁXIMO 15 filas vivas (regla 1, `SalarySeries::MAX_RECORDS`: payload e individuales, borrar libera cupo). Los CONCEPTOS DE INGRESO (regla 5) son un subregistro más del agregado — anidado en la creación atómica y con endpoints propios de alta/baja — con UNIQUE (caso, concepto) sondeado semánticamente (422) y DECIMAL(12,2) no negativo por `Money` (RN-005). La unicidad de «un expediente abierto por persona» es FÍSICA: la columna generada almacenada `open_case_key` vale `IF(status IN ('approved','rejected'), NULL, applicant_person_id)` y su UNIQUE admite tantos casos resueltos como haga falta pero a lo sumo UNO vivo por proponente (el 409 del servicio con el expediente abierto la anticipa). El piso del año salarial 1950 está en CHECK y el techo «año actual+1» se decide contra `ClockInterface` porque NOW() no cabe en un CHECK determinista; el par (caso, año) es UNIQUE sondeado semánticamente antes del insert (RN-008). Los subregistros no llevan timestamps ni autoría propias — el expediente es el agregado — y sus bajas son FÍSICAS auditadas con los valores previos (ADR-19; borrado por instancia: el mass delete no dispara eventos Eloquent). El orden de fechas de servicios está respaldado por CHECK `chk_service_records_dates` (RN-006) y los solapamientos y vínculos abiertos — no expresables como constraint — se detectan y ADVIERTEN con el dominio puro `ServicePeriods` (objeto `warnings` hermano de `data`, nunca bloque), igual que `SalarySeries` advierte los años interiores ausentes de la serie declarada; el LISTADO carga el promovente completo (regla 3, `PersonResource` reutilizado con carga anticipada). Autoría del expediente estampada por `AuditableObserver` (ADR-14) y toda escritura — expediente y subregistros, incluidos los conceptos de ingreso — aterriza en la bitácora append-only (ADR-19); las columnas de decisión (`approval_legal_basis_id`, `decided_by/decided_at`, `computed_amount`, `calculation_setting_id`) existen con sus FK desde ya para que la aprobación de S6 no toque el esquema. `pension_case_histories` aún no está migrada: llega con las transiciones de S6 (RF-EXP-009, RF-AUD-002).
 
 ### 5.8 Pensionados y pagos
 
@@ -1005,6 +1021,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 | 1.12 | 2026-09-30 | Entrada `users` ampliada (ADR-29): migración `add_office_id_to_users_table` con `office_id` BIGINT NULL FK RESTRICT → `offices` e índice — pertenencia territorial de la cuenta (una a lo sumo), validada contra el directorio activo y protegida por el guard de desactivación de oficinas | Arq. Backend |
 | 1.13 | 2026-09-30 | Entrada `people` actualizada (ADR-30): la validación del carné se corrige al formato real del documento — 11 dígitos, mes 01-12 (dígitos 3-4), día 01-31 (dígitos 5-6), año y consecutivo sin validar, y el sexo codificado en el dígito 10 (par masculino, impar femenino) contrastado contra el declarado en el alta y en el PATCH; eliminados del value object el prefijo siglo/sexo y la fecha real del calendario | Arq. Backend |
 | 1.14 | 2026-09-30 | Entrada 5.5 `offices` ampliada (ADR-31, estructura territorial): `parent_office_id` pasa a ser DERIVADO del tipo (provincial→nacional, municipal→provincial de su provincia, nacional raíz) con 422 ante contradicciones del cliente; unicidad semántica entre activas — una nacional, una provincial por provincia, una municipal por municipio — sin índice parcial (el soft delete libera el ámbito); prerrequisitos de existencia del superior y `NationalOfficeSeeder` (regla 7) añadido a la tabla de seeders | Arq. Backend |
+| 1.15 | 2026-09-30 | Reglas de usuario 0-5 sobre el expediente (ADR-32/33): `pension_cases.number` pasa a PP-YYYY-CCCCC (provincia de la oficina registrante + año + consecutivo anual por scope `pension_case:{año}`, puerto `nextForYear`); `office_id` asumido del usuario que registra (prohibido en el POST, puerto `CurrentUserOfficeProviderInterface`); nuevos campos `pension_type_id`/`pension_regime_id` (FK obligatorios) y par `rebel_army_member`/`rebel_army_join_date` con CHECKs de coherencia; serie salarial de máximo 15 filas vivas (`SalarySeries::MAX_RECORDS`); nueva tabla `income_concept_records` (UNIQUE caso-concepto, DECIMAL(12,2)); la entrada 5.7 y la de `numbering_sequences` reflejan el scope anual y `SettingsSeeder` siembra el año en curso | Arq. Backend |
 
 
 

@@ -19,16 +19,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Conventions (ADR-11): persistence lives in the module's
  * Infrastructure layer; the creation, eligibility and subrecord
  * rules live in the Application service fed by the pure Domain
- * analysis values (SalarySeries, ServicePeriods). The number comes
- * from the centralized `pension_case` sequence (RN-009/ADR-17), the
- * status is the normative CaseStatus enum (section 2.4) and the
- * one-open-case-per-person guarantee is physical: the stored
- * generated column `open_case_key` is NULL on terminal states so the
- * UNIQUE index admits many resolved cases but at most one live case
- * per applicant. Authorship is stamped by the Shared
- * AuditableObserver and every write lands in the append-only trail
- * through the Shared AuditTrailObserver, both registered in the
- * PensionCasesServiceProvider.
+ * analysis values (SalarySeries, ServicePeriods). The number is
+ * composed of the registering office's province code, the current
+ * year and the ANNUAL consecutive of the shared sequence
+ * (PP-YYYY-CCCCC, user rule 2/ADR-32), the status is the normative
+ * CaseStatus enum (section 2.4) and the one-open-case-per-person
+ * guarantee is physical: the stored generated column `open_case_key`
+ * is NULL on terminal states so the UNIQUE index admits many
+ * resolved cases but at most one live case per applicant. The
+ * pension classification (type, regime, rebel army pair) rides
+ * along since user rule 4 and the income concept records are a
+ * (case, concept) unique subrecord (user rule 5). Authorship is
+ * stamped by the Shared AuditableObserver and every write lands in
+ * the append-only trail through the Shared AuditTrailObserver, both
+ * registered in the PensionCasesServiceProvider.
  *
  * @property int $id
  * @property string $number
@@ -41,7 +45,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $occupational_category_id
  * @property int $educational_level_id
  * @property int $scientific_category_id
+ * @property int $pension_type_id
+ * @property int $pension_regime_id
  * @property string $last_salary
+ * @property bool $rebel_army_member
+ * @property CarbonImmutable|null $rebel_army_join_date
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -56,6 +64,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Collection<int, SalaryRecord> $salaryRecords
  * @property-read Collection<int, ServiceRecord> $serviceRecords
  * @property-read Collection<int, WorkCycle> $workCycles
+ * @property-read Collection<int, IncomeConceptRecord> $incomeConceptRecords
  * @property-read \App\Modules\People\Infrastructure\Persistence\Models\Person|null $applicant
  */
 class PensionCase extends Model
@@ -74,7 +83,11 @@ class PensionCase extends Model
         'occupational_category_id',
         'educational_level_id',
         'scientific_category_id',
+        'pension_type_id',
+        'pension_regime_id',
         'last_salary',
+        'rebel_army_member',
+        'rebel_army_join_date',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
@@ -106,6 +119,8 @@ class PensionCase extends Model
             'requested_at' => 'immutable_date',
             'status' => CaseStatus::class,
             'last_salary' => 'decimal:2',
+            'rebel_army_join_date' => 'immutable_date',
+            'rebel_army_member' => 'boolean',
             'decided_at' => 'immutable_datetime',
             'computed_amount' => 'decimal:2',
             'approval_legal_basis_id' => 'integer',
@@ -139,6 +154,14 @@ class PensionCase extends Model
     public function workCycles(): HasMany
     {
         return $this->hasMany(WorkCycle::class)->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<IncomeConceptRecord>
+     */
+    public function incomeConceptRecords(): HasMany
+    {
+        return $this->hasMany(IncomeConceptRecord::class)->orderBy('id');
     }
 
     /**

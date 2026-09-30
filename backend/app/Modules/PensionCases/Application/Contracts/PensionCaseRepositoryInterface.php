@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Application\Contracts;
 
 use App\Modules\PensionCases\Domain\CaseStatus;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -23,7 +24,9 @@ interface PensionCaseRepositoryInterface
 {
     /**
      * Basic listing (RF-EXP-011 shape: status, office, person, date
-     * range, number). Tuned search and volume arrive in S6.
+     * range, number). Tuned search and volume arrive in S6. The
+     * applicant travels EAGERLY with every row (user rule 3: the
+     * listing answers the FULL promovente projection).
      *
      * @param  array{status?: CaseStatus, office_id?: int, applicant_person_id?: int, number?: string, requested_from?: string, requested_to?: string}  $filters
      * @return LengthAwarePaginator<int, PensionCase>
@@ -70,6 +73,16 @@ interface PensionCaseRepositoryInterface
      */
     public function createWorkCycles(PensionCase $case, array $rows): void;
 
+    /**
+     * Atomic income concept creation for the all-or-nothing flow
+     * (user rule 5): the caller drives the TransactionManager, the
+     * repository just inserts the rows it is given (already
+     * validated).
+     *
+     * @param  list<array{income_concept_id: int, amount: string}>  $rows
+     */
+    public function createIncomeConceptRecords(PensionCase $case, array $rows): void;
+
     public function addSalaryRecord(PensionCase $case, int $year, string $earnedSalary): SalaryRecord;
 
     public function removeSalaryRecord(PensionCase $case, int $recordId): bool;
@@ -88,9 +101,25 @@ interface PensionCaseRepositoryInterface
 
     public function removeWorkCycle(PensionCase $case, int $recordId): bool;
 
+    public function addIncomeConceptRecord(PensionCase $case, int $incomeConceptId, string $amount): IncomeConceptRecord;
+
+    public function removeIncomeConceptRecord(PensionCase $case, int $recordId): bool;
+
     /**
      * Semantic probe of the (case, year) UNIQUE before the insert
      * (RN-008 convention): answers a 422 instead of a driver error.
      */
     public function salaryYearExists(int $caseId, int $year): bool;
+
+    /**
+     * Semantic probe of the (case, concept) UNIQUE (user rule 5):
+     * same RN-008 convention — a 422 instead of a driver error.
+     */
+    public function incomeConceptExists(int $caseId, int $incomeConceptId): bool;
+
+    /**
+     * Live salary rows of the case — the FIFTEEN row ceiling (user
+     * rule 1) counts what stands, not what was declared and removed.
+     */
+    public function countSalaryRecords(int $caseId): int;
 }

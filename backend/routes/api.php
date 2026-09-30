@@ -362,4 +362,10 @@ Route::middleware(['auth:sanctum', 'permission:cases.edit'])->group(function ():
     Route::delete('/pension-cases/{id}/work-cycles/{record}', [PensionCaseController::class, 'removeWorkCycle'])
         ->whereNumber(['id', 'record'])
         ->name('pension-cases.work-cycles.destroy');
+    Route::post('/pension-cases/{id}/income-concept-records', [PensionCaseController::class, 'addIncomeConceptRecord'])
+        ->whereNumber('id')
+        ->name('pension-cases.income-concept-records.store');
+    Route::delete('/pension-cases/{id}/income-concept-records/{record}', [PensionCaseController::class, 'removeIncomeConceptRecord'])
+        ->whereNumber(['id', 'record'])
+        ->name('pension-cases.income-concept-records.destroy');
 });

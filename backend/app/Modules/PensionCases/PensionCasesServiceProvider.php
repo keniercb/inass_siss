@@ -9,6 +9,7 @@ use App\Modules\PensionCases\Application\Contracts\PensionCaseRepositoryInterfac
 use App\Modules\PensionCases\Application\Contracts\PensionCaseServiceInterface;
 use App\Modules\PensionCases\Application\Services\PensionCaseService;
 use App\Modules\PensionCases\Infrastructure\Persistence\EloquentPensionCaseRepository;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
@@ -66,5 +67,6 @@ final class PensionCasesServiceProvider extends ServiceProvider
         SalaryRecord::observe(AuditTrailObserver::class);
         ServiceRecord::observe(AuditTrailObserver::class);
         WorkCycle::observe(AuditTrailObserver::class);
+        IncomeConceptRecord::observe(AuditTrailObserver::class);
     }
 }

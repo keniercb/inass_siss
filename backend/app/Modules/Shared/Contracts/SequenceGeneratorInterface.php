@@ -21,4 +21,20 @@ interface SequenceGeneratorInterface
      * @param  non-empty-string  $sequenceName
      */
     public function next(string $sequenceName): int;
+
+    /**
+     * Returns the next value of the ANNUAL variant of the named
+     * sequence (ADR-32: case numbers PP-YYYY-CCCCC consume one
+     * consecutive PER YEAR).
+     *
+     * The scope row is "{base}:{year}": unlike next() — where scopes
+     * must be declared up front and an undeclared one fails loudly —
+     * a year that has no row yet is BORN at 1 inside the same
+     * pessimistic-lock transaction, so the annual rollover needs no
+     * operator and never hands out a duplicate. Each year keeps its
+     * own consecutive; the base scope is never disturbed.
+     *
+     * @param  non-empty-string  $baseScope
+     */
+    public function nextForYear(string $baseScope, int $year): int;
 }
