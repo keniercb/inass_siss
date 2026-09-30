@@ -92,4 +92,34 @@ final class CatalogSeedingTest extends TestCase
         $this->assertSame(5, \DB::table('races')->count());
         $this->assertSame(1, \DB::table('pension_regimes')->count());
     }
+
+    /**
+     * Task 31: the reference entries of the formerly name-only
+     * catalogs are seeded WITH their codes, so their listings carry
+     * the field from the very first deployment.
+     */
+    public function test_seeded_reference_entries_carry_their_codes(): void
+    {
+        $this->seed(CatalogsSeeder::class);
+
+        $expected = [
+            'educational_levels' => ['PRIM', 'SECB', 'TMED', 'PRE', 'SUP'],
+            'beneficiary_types' => ['TIT', 'VIU', 'HRF', 'OTR'],
+            'races' => ['BLA', 'NEG', 'MUL', 'CHN', 'OTR'],
+            'positions' => ['JDEPT', 'JAREA', 'ESP', 'TEC', 'ASERV'],
+            'pension_regimes' => ['GEN'],
+            'payment_types' => ['ABN', 'CHQ', 'EFE'],
+            'income_concepts' => ['SALB', 'PGR'],
+        ];
+
+        foreach ($expected as $table => $codes) {
+            $rows = \DB::table($table)->orderBy('id')->get();
+
+            $this->assertSame(
+                $codes,
+                $rows->pluck('code')->all(),
+                "Seeded codes mismatch for [{$table}]."
+            );
+        }
+    }
 }

@@ -88,6 +88,7 @@ final class CatalogCrudTest extends TestCase
     public function test_store_supports_catalog_specific_columns(): void
     {
         $this->postJson('/api/v1/catalogs/pension-regimes', [
+            'code' => 'GEN',
             'name' => 'General',
             'months_per_year' => 12,
             'description' => 'Régimen general',
@@ -96,10 +97,67 @@ final class CatalogCrudTest extends TestCase
             ->assertJsonPath('data.description', 'Régimen general');
 
         $this->postJson('/api/v1/catalogs/income-concepts', [
+            'code' => 'SALB',
             'name' => 'Salario base',
             'applies_base_salary' => true,
         ])->assertCreated()
             ->assertJsonPath('data.applies_base_salary', true);
+    }
+
+    /**
+     * Task 31: every uniform catalog carries a code, so EVERY listing
+     * answers with the field — the seven tables that used to be
+     * name-only included.
+     */
+    public function test_every_catalog_listing_returns_the_code_field(): void
+    {
+        $payloads = [
+            'provinces' => ['code' => '99', 'name' => 'Especial'],
+            'agency-types' => ['code' => 'OTR', 'name' => 'Otro tipo'],
+            'organizations' => ['code' => 'OTRORG', 'name' => 'Otro organismo'],
+            'entity-types' => ['code' => 'OTRET', 'name' => 'Otro tipo de entidad'],
+            'office-types' => ['code' => 'OTROF', 'name' => 'Otro tipo de oficina'],
+            'legal-basis-types' => ['code' => 'OTRL', 'name' => 'Otro tipo legal'],
+            'scientific-categories' => ['code' => 'OTRC', 'name' => 'Otra categoría'],
+            'educational-levels' => ['code' => 'POSTGR', 'name' => 'Postgrado', 'description' => 'Estudios de postgrado'],
+            'occupational-categories' => ['code' => 'OTROC', 'name' => 'Otra categoría ocupacional'],
+            'pension-types' => ['code' => 'OTRPT', 'name' => 'Otro tipo de pensión'],
+            'beneficiary-types' => ['code' => 'PADRE', 'name' => 'Padre', 'description' => 'Beneficiario padre'],
+            'races' => ['code' => 'OTRAR', 'name' => 'Otra raza'],
+            'positions' => ['code' => 'VICE', 'name' => 'Vicedirector'],
+            'pension-regimes' => ['code' => 'ESPR', 'name' => 'Especial', 'months_per_year' => 12],
+            'payment-types' => ['code' => 'TARJ', 'name' => 'Tarjeta', 'description' => 'Pago con tarjeta'],
+            'income-concepts' => ['code' => 'OTRIC', 'name' => 'Otros ingresos', 'applies_base_salary' => false],
+        ];
+
+        $this->assertSame(CatalogRegistry::keys(), array_keys($payloads), 'Every uniform catalog must be covered.');
+
+        foreach ($payloads as $type => $payload) {
+            $this->postJson("/api/v1/catalogs/{$type}", $payload)
+                ->assertCreated()
+                ->assertJsonPath('data.code', $payload['code']);
+        }
+
+        foreach ($payloads as $type => $payload) {
+            $rows = $this->getJson("/api/v1/catalogs/{$type}")->assertOk()->json('data');
+
+            $this->assertNotEmpty($rows, "Catalog [{$type}] must list the created entry.");
+            $this->assertArrayHasKey('code', $rows[0], "Catalog [{$type}] listing must carry the code field.");
+            $this->assertSame($payload['code'], $rows[0]['code'], "Catalog [{$type}] listing code mismatch.");
+        }
+    }
+
+    /**
+     * The formerly name-only catalogs now answer 422 when the code is
+     * missing from the payload.
+     */
+    public function test_store_rejects_a_missing_code_on_the_formerly_name_only_catalogs(): void
+    {
+        foreach (['races', 'educational-levels', 'payment-types'] as $type) {
+            $this->postJson("/api/v1/catalogs/{$type}", ['name' => 'Sin código'])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('code');
+        }
     }
 
     public function test_store_rejects_duplicated_natural_keys_with_422(): void
@@ -119,6 +177,7 @@ final class CatalogCrudTest extends TestCase
     public function test_store_rejects_invalid_months_per_year(): void
     {
         $this->postJson('/api/v1/catalogs/pension-regimes', [
+            'code' => 'MAL',
             'name' => 'Régimen inválido',
             'months_per_year' => 0,
         ])->assertUnprocessable()
@@ -127,7 +186,7 @@ final class CatalogCrudTest extends TestCase
 
     public function test_update_renames_entries(): void
     {
-        $id = $this->postJson('/api/v1/catalogs/races', ['name' => 'Mestiza'])
+        $id = $this->postJson('/api/v1/catalogs/races', ['code' => 'MUL', 'name' => 'Mestiza'])
             ->assertCreated()
             ->json('data.id');
 
@@ -155,7 +214,7 @@ final class CatalogCrudTest extends TestCase
 
     public function test_destroy_deactivates_logically(): void
     {
-        $id = $this->postJson('/api/v1/catalogs/races', ['name' => 'China'])
+        $id = $this->postJson('/api/v1/catalogs/races', ['code' => 'CHN', 'name' => 'China'])
             ->assertCreated()
             ->json('data.id');
 

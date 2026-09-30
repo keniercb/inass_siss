@@ -74,6 +74,7 @@ it('gives every catalog model an audit-ready fillable set', function (string $mo
     $fillable = $reflection->getDefaultProperties()['fillable'] ?? null;
 
     expect($fillable)->toBeArray()
+        ->and($fillable)->toContain('code')
         ->and($fillable)->toContain('name')
         ->and($fillable)->toContain('created_by')
         ->and($fillable)->toContain('updated_by');
@@ -85,9 +86,13 @@ it('marks the catalogs with code as such', function (string $key, bool $hasCode)
     ['provinces', true],
     ['agency-types', true],
     ['pension-types', true],
-    ['races', false],
-    ['pension-regimes', false],
-    ['income-concepts', false],
+    ['races', true],
+    ['pension-regimes', true],
+    ['income-concepts', true],
+    ['educational-levels', true],
+    ['beneficiary-types', true],
+    ['positions', true],
+    ['payment-types', true],
 ]);
 
 it('declares the reference guards of the geographic catalogs', function () {
