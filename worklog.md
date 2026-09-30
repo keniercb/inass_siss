@@ -1094,3 +1094,17 @@ Stage Summary:
 - FORMA DE DECLARACIÓN DEL TIEMPO DE SERVICIO (Task 32): service_records.forma_declaracion VARCHAR(20) NOT NULL DEFAULT 'Documental' con CHECK de los dos valores legales; POST /pension-cases/{id}/service-records acepta forma_declaracion opcional (Documental|Testifical; cualquier otro valor 422) y la omisión cae en Documental; el campo viaja en el 201, en el detalle del expediente y en el schema OA
 - LA SUITE NO SE EJECUTÓ EN ESTA SESIÓN (toolchain caído; precedente Task 29): la validación queda en el CI del PR
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 32-cierre
+Agent: Super Z (agente principal)
+Task: Corrección del rojo de CI del merge del SGP-26 (PHPStan nivel 8) y verificación de la pipeline completa
+
+Work Log:
+- QA post-merge detectó el Quality gate (PHP 8.3) en rojo sobre 8df87a6 (PR #27): PHPStan nivel 8 — «Offset 'forma_declaracion' on array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool} on left side of ?? does not exist» — el docblock del @param de PensionCaseService::addServiceRecord no incluía la clave nueva (Pint ya en PASS con 400 archivos; Pest y deptrac abortados antes de correr en ese pipeline)
+- Fix: shape del @param extendido con forma_declaracion (service + espejo en los contratos que declaran el shape) sobre rama fix/SGP-26-phpstan-docblock
+- Entrega: push con PAT, PR, merge a main; verificación del CI del nuevo merge con la pipeline completa (pint + phpstan + pest + deptrac)
+
+Stage Summary:
+- El shape del @param de addServiceRecord ahora declara forma_declaracion y el Quality gate del SGP-26 corre completo; el resultado del CI queda registrado en el journal de la siguiente tarea si aplicara algún ajuste
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
