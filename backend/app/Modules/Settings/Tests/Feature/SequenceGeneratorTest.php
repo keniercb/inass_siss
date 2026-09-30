@@ -108,6 +108,76 @@ final class SequenceGeneratorTest extends TestCase
         $this->assertSame('sequences', $model->getConnectionName());
     }
 
+    public function test_next_for_year_emits_consecutive_values_and_persists_the_increment(): void
+    {
+        $emitted = [
+            $this->generator->nextForYear('annual_probe', 2026),
+            $this->generator->nextForYear('annual_probe', 2026),
+            $this->generator->nextForYear('annual_probe', 2026),
+        ];
+
+        $this->assertSame([1, 2, 3], $emitted);
+        $this->assertSame(
+            4,
+            (int) NumberingSequence::query()->where('scope', 'annual_probe:2026')->value('next_value'),
+        );
+    }
+
+    public function test_next_for_year_births_the_new_year_at_one(): void
+    {
+        // No seeded row: the first emission of a new year creates the
+        // scope row at 1 — the annual rollover needs no operator.
+        $this->assertSame(1, $this->generator->nextForYear('fresh_year_probe', 2031));
+
+        $this->assertSame(
+            2,
+            (int) NumberingSequence::query()->where('scope', 'fresh_year_probe:2031')->value('next_value'),
+        );
+    }
+
+    public function test_next_for_year_keeps_one_consecutive_per_year(): void
+    {
+        $this->assertSame(1, $this->generator->nextForYear('multi_year_probe', 2026));
+        $this->assertSame(2, $this->generator->nextForYear('multi_year_probe', 2026));
+
+        // The new year restarts its own consecutive at 1.
+        $this->assertSame(1, $this->generator->nextForYear('multi_year_probe', 2027));
+        $this->assertSame(2, $this->generator->nextForYear('multi_year_probe', 2027));
+
+        // ...and the previous year is untouched by the rollover.
+        $this->assertSame(3, $this->generator->nextForYear('multi_year_probe', 2026));
+    }
+
+    public function test_next_for_year_does_not_disturb_the_declared_base_scope(): void
+    {
+        $this->declareSequence('base_probe', 1);
+
+        $this->assertSame(1, $this->generator->next('base_probe'));
+        $this->assertSame(1, $this->generator->nextForYear('base_probe', 2026));
+
+        // The plain scope keeps its own consecutive: the annual scope
+        // is a different row (base_probe:2026), never the same one.
+        $this->assertSame(2, $this->generator->next('base_probe'));
+    }
+
+    public function test_annual_emissions_survive_a_business_rollback(): void
+    {
+        $burned = null;
+
+        try {
+            DB::transaction(function () use (&$burned): void {
+                $burned = $this->generator->nextForYear('annual_rollback_probe', 2026);
+
+                throw new RuntimeException('business data rejected');
+            });
+        } catch (RuntimeException) {
+            // Expected: the business transaction rolls back.
+        }
+
+        $this->assertSame(1, $burned);
+        $this->assertSame(2, $this->generator->nextForYear('annual_rollback_probe', 2026));
+    }
+
     public function test_emit_command_prints_numbers_and_exits_successfully(): void
     {
         $this->declareSequence('command_probe', 100);
