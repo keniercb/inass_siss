@@ -990,3 +990,19 @@ Stage Summary:
 - Suite completa: 1023 tests / 3279 assertions contra MySQL real; scripts/smoke_case_registration.php (20 comprobaciones) como fumiga repetible de las 6 reglas
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
 - Higiene: PAT de desarrollo NO disponible tras el reinicio del sandbox — los commits quedan locales hasta que el usuario aporte el token para PR/CI/merge
+---
+Task ID: 29
+Agent: Super Z (agente principal)
+Task: En el GET que lista los service-records del expediente, devolver los datos completos de la entidad (push autorizado por el usuario SIN ejecutar la suite local)
+
+Work Log:
+- Sesion de plataforma inestable (403 intermitente en tools/call, ventanas de un solo comando): trabajo ejecutado en mega-comandos encadenados; el sandbox se re-provisiono a mitad de sesion y perdio el toolchain (PHP estatico ausente), con lo que el usuario autorizo subir sin probar localmente
+- Implementacion aditiva (sin cambio de esquema, proyeccion de lectura): ServiceRecord::entity() BelongsTo a Entity del modulo Organizations (dependencia ya permitida por deptrac; null ante entidad desactivada); EloquentPensionCaseRepository con ENTITY_RELATIONS = entity.{organization,province,municipality,entityType,parent} (espejo del WITH canonico de Organizations) cargadas en findDetailed() via serviceRecords.entity.* y en addServiceRecord() para que el 201 de la fila alta tambien devuelva la entidad; ServiceRecordResource con entity (whenLoaded + EntityResource completa) y propiedad OA entity en el schema ServiceRecord
+- La respuesta 201 del POST /pension-cases tambien refleja la entidad por su refetch via findDetailed; el listado index NO carga subregistros (diseno establecido)
+- Commits feat + docs(worklog); push de feat/SGP-23-case-registration-rules (Task 28 + 29) y PR por API con el PAT
+
+Stage Summary:
+- La fila de service_records del GET /pension-cases/{id} (y las altas de servicio/expediente) viaja con la proyeccion COMPLETA de la entidad empleadora: codigo, NIT, direccion, contacto, objeto social, organismo, geografia, tipo y entidad superior — ya no un entity_id desnudo
+- LA SUITE NO SE EJECUTO EN ESTA SESION (autorizacion explicita del usuario; toolchain caido): la validacion queda en el CI del PR; el cambio es aditivo y Task 28 estaba en verde (1023/3279) al momento de su commit
+- Pendiente para la proxima ventana estable: QA local completo (Pint/PHPStan/deptrac/Pest), tests TDD de la proyeccion de entidad, fumiga HTTP y actualizacion de docs de arquitectura/modelo de datos
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
