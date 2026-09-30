@@ -123,9 +123,10 @@ Del análisis anterior se derivan requisitos nuevos que el modelo original no co
 ### 4.1 Módulo CAT — Catálogos y datos maestros
 
 **RF-CAT-001 (M) — Gestión de catálogos simples (MO)**
-El sistema permite crear, consultar, modificar y desactivar los catálogos simples con código y nombre: provincias, tipos de agencia, organismos, categorías científicas, categorías ocupacionales, tipos de pensión, tipos de entidad, tipos de oficina y tipos de base legal.
+El sistema permite crear, consultar, modificar y desactivar los catálogos simples con código y nombre: provincias, tipos de agencia, organismos, categorías científicas, categorías ocupacionales, tipos de pensión, tipos de entidad, tipos de oficina, tipos de base legal, niveles educacionales, tipos de beneficiario, razas, cargos, regímenes de pensión, tipos de pago y conceptos de ingreso.
 - [ ] Alta, edición, listado paginado y detalle por catálogo con los campos del modelo original.
 - [ ] El código es único por catálogo y no modificable tras la creación (identificador estable de integración).
+- [x] Todos los listados de catálogo devuelven el campo código (corrección de usuario, Task 31): los siete catálogos antes solo-nombre — niveles educacionales, tipos de beneficiario, razas, cargos, regímenes de pensión, tipos de pago y conceptos de ingreso — ganaron columna `code` VARCHAR(10) UNIQUE (obligatoria en el alta, inmutable tras la creación, sembrada con códigos de referencia; migración `2026_10_01_110000`), de modo que las dieciséis superficies uniformes responden con la clave natural de integración.
 - [ ] La eliminación es lógica (desactivación) y queda bloqueada cuando existan referencias activas.
 
 **RF-CAT-002 (M) — Gestión de municipios (MO)**
@@ -181,7 +182,8 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 ### 4.3 Módulo ENT — Entidades, oficinas y firmas
 
 **RF-ENT-001 (M) — Gestión de entidades (MO)**
-- [ ] Entidad con código y NIT únicos, organismo, tipo de entidad, ubicación geográfica, dirección y datos de contacto.
+- [ ] Entidad con nombre denominativo, código y NIT únicos, organismo, tipo de entidad, ubicación geográfica, dirección y datos de contacto.
+- [x] Nombre denominativo de la entidad (corrección de usuario, Task 31): campo `name` VARCHAR(120) obligatorio en el alta (422 sin él), NOT NULL en el esquema, devuelto en listado/detalle/árbol y abarcado por la búsqueda `q` del listado (migración `2026_10_01_100000`).
 - [ ] Directores (general y económico) referencian personas registradas; son modificables con auditoría.
 - [ ] Jerarquía opcional `entidad superior` autorreferenciada.
 
