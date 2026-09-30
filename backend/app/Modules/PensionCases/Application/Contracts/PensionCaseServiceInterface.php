@@ -89,7 +89,7 @@ interface PensionCaseServiceInterface
     public function removeSalaryRecord(int $caseId, int $recordId): ?bool;
 
     /**
-     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool}  $attributes
+     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion?: string}  $attributes
      * @return null when the case does not exist (controller: 404)
      *
      * @throws CaseNotEditableException
