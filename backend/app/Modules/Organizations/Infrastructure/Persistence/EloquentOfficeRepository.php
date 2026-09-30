@@ -7,6 +7,7 @@ namespace App\Modules\Organizations\Infrastructure\Persistence;
 use App\Modules\Organizations\Application\Contracts\OfficeRepositoryInterface;
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 
 /**
  * Eloquent persistence for offices (ADR-11): search across the
@@ -64,6 +65,21 @@ final class EloquentOfficeRepository implements OfficeRepositoryInterface
         return Office::query()
             ->where('parent_office_id', $officeId)
             ->exists();
+    }
+
+    public function findActiveOfType(string $typeCode, ?int $provinceId = null, ?int $municipalityId = null, ?int $exceptId = null): ?Office
+    {
+        $query = Office::query()
+            ->whereHas('officeType', fn (EloquentBuilder $type): EloquentBuilder => $type->where('code', $typeCode))
+            ->when($provinceId !== null, fn (EloquentBuilder $query): EloquentBuilder => $query->where('province_id', $provinceId))
+            ->when($municipalityId !== null, fn (EloquentBuilder $query): EloquentBuilder => $query->where('municipality_id', $municipalityId))
+            ->when($exceptId !== null, fn (EloquentBuilder $query): EloquentBuilder => $query->whereKeyNot($exceptId))
+            ->orderBy('id');
+
+        /** @var Office|null $office */
+        $office = $query->first();
+
+        return $office;
     }
 
     public function create(array $attributes): Office

@@ -188,6 +188,13 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 **RF-ENT-002 (M) — Gestión de oficinas (MO)**
 - [ ] Oficina con tipo, provincia, municipio, dirección y `oficina superior` opcional.
 - [ ] Las jerarquías (entidades y oficinas) no pueden contener ciclos (RN-003).
+- [x] Estructura territorial (ADR-31, corrección de usuario): solo se puede adicionar UNA oficina de tipo nacional.
+- [x] Solo se puede adicionar una oficina de tipo provincial por provincia.
+- [x] Solo se puede adicionar una oficina de tipo municipal por provincia y municipio.
+- [x] Las oficinas de tipo municipal llevan `parent_office_id` igual al de la oficina provincial de la misma provincia (derivado; una contradicción responde 422).
+- [x] Las oficinas de tipo provincial llevan `parent_office_id` igual al de la oficina de tipo nacional (derivado; una contradicción responde 422).
+- [x] Para insertar una oficina provincial debe existir la nacional; para insertar una municipal debe existir la provincial de la provincia correspondiente (422 si falta).
+- [x] Seeder que inserta la oficina de tipo nacional al inicio de la aplicación (`NationalOfficeSeeder`, idempotente).
 
 **RF-ENT-003 (M) — Firmas autorizadas (MO)**
 - [ ] Firma autorizada vincula entidad, persona y cargo; la terna es única.

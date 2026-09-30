@@ -15,6 +15,7 @@ use App\Modules\Organizations\Application\Contracts\OfficeRepositoryInterface;
 use App\Modules\Organizations\Application\Contracts\OfficeServiceInterface;
 use App\Modules\Organizations\Domain\HierarchyPolicy;
 use App\Modules\Organizations\Domain\HierarchyTotals;
+use App\Modules\Organizations\Domain\OfficeStructurePolicy;
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +27,17 @@ use Illuminate\Validation\ValidationException;
  * via the Domain HierarchyPolicy over the active parent map, and
  * geographic coherence (RN-004) validated upfront with the composite
  * database key as the last line. Offices carry no natural key, so
- * there is no uniqueness or immutability guard.
+ * there is no uniqueness or immutability guard beyond the
+ * territorial one.
+ *
+ * The territorial structure (ADR-31) rules the NAC/PRO/MUN triad:
+ * a single national office, a single provincial per province, a
+ * single municipal per province and municipality, the parent chain
+ * fixed by the type (provincial -> national, municipal ->
+ * provincial of the same province) and the existence prerequisites
+ * of the superior offices — all answered as 422 per field before
+ * persisting. Types outside the triad keep the generic optional
+ * parent of RN-003.
  *
  * The case counts of RF-ENT-005 (second part, ADR-28) cross the
  * module boundary through the OfficeCaseCountQueryInterface port:
@@ -58,7 +69,14 @@ final class OfficeService implements OfficeServiceInterface
 
         $this->assertMandatoryKeys($payload, ['office_type_id', 'province_id', 'municipality_id', 'address']);
         $this->assertReferencesAreValid($payload);
-        $this->assertParentIsAcceptable(null, $payload['parent_office_id'] ?? null);
+
+        $typeCode = $this->typeCodeOf((int) $payload['office_type_id']);
+
+        if (OfficeStructurePolicy::isTerritorialType($typeCode)) {
+            $payload = $this->applyStructureRules($typeCode, $payload, $payload, null);
+        } else {
+            $this->assertParentIsAcceptable(null, $payload['parent_office_id'] ?? null);
+        }
 
         return $this->offices->create($payload);
     }
@@ -85,7 +103,17 @@ final class OfficeService implements OfficeServiceInterface
 
         $this->assertReferencesAreValid($resulting);
 
-        if (array_key_exists('parent_office_id', $payload)) {
+        $typeCode = $this->typeCodeOf((int) $resulting['office_type_id']);
+
+        // Children stay coherent for every type: an office with
+        // active children cannot move its type or territory out from
+        // under them — no retype may demote a parent its children
+        // depend on, territorial or not.
+        $this->assertChildrenTolerateIdentityChange($office, $resulting);
+
+        if (OfficeStructurePolicy::isTerritorialType($typeCode)) {
+            $payload = $this->applyStructureRules($typeCode, $payload, $resulting, $office);
+        } elseif (array_key_exists('parent_office_id', $payload)) {
             $this->assertParentIsAcceptable($office, $payload['parent_office_id']);
         }
 
@@ -284,6 +312,146 @@ final class OfficeService implements OfficeServiceInterface
             throw ValidationException::withMessages([
                 'parent_office_id' => 'The selected parent would create a cycle in the office hierarchy (RN-003).',
             ]);
+        }
+    }
+
+    /**
+     * Resolves the catalog code of an office type already proven to
+     * exist by assertReferencesAreValid: the territorial rules speak
+     * in codes, so the catalog stays the single source of truth.
+     */
+    private function typeCodeOf(int $officeTypeId): string
+    {
+        $type = $this->catalogs->find(OfficeType::class, $officeTypeId);
+
+        return $type instanceof OfficeType ? (string) $type->code : '';
+    }
+
+    /**
+     * Territorial structure rules (ADR-31) over the resulting state:
+     * per-scope uniqueness among active offices, existence of the
+     * required superior and the forced parent. Returns the payload
+     * with parent_office_id resolved — omitted or matching values
+     * are accepted, contradictions answer 422 on parent_office_id.
+     *
+     * @param  array<string, mixed>  $payload  the accepted write payload
+     * @param  array<string, mixed>  $resulting  the resulting office state (type, province and municipality)
+     * @param  Office|null  $current  null on create; the stored office on update
+     * @return array<string, mixed>
+     */
+    private function applyStructureRules(string $typeCode, array $payload, array $resulting, ?Office $current): array
+    {
+        $exceptId = $current?->id;
+
+        // 1. Per-scope uniqueness (rules 1-3): the lookup excludes the
+        //    office being edited, so re-saving itself never conflicts.
+        $scope = OfficeStructurePolicy::uniquenessScope(
+            $typeCode,
+            (int) $resulting['province_id'],
+            (int) $resulting['municipality_id'],
+        );
+
+        $conflict = $this->offices->findActiveOfType(
+            $scope['type_code'],
+            $scope['province_id'],
+            $scope['municipality_id'],
+            $exceptId,
+        );
+
+        if ($conflict !== null) {
+            throw ValidationException::withMessages([
+                'office_type_id' => match ($typeCode) {
+                    OfficeStructurePolicy::TYPE_NATIONAL => 'A national office already exists; the country keeps a single national office.',
+                    OfficeStructurePolicy::TYPE_PROVINCIAL => 'A provincial office already exists for the selected province; each province keeps a single provincial office.',
+                    default => 'A municipal office already exists for the selected municipality; each municipality keeps a single municipal office.',
+                },
+            ]);
+        }
+
+        // 2. Required superior (rules 4-6): provincial offices need
+        //    the national one and municipal offices the provincial of
+        //    their province; the national office is the root.
+        $parentCode = OfficeStructurePolicy::parentTypeCode($typeCode);
+
+        $expectedParentId = null;
+
+        if ($parentCode !== null) {
+            $parent = $this->offices->findActiveOfType(
+                $parentCode,
+                // The municipal parent must be the provincial office
+                // of the SAME province (rule 4): narrow the lookup.
+                $parentCode === OfficeStructurePolicy::TYPE_PROVINCIAL ? (int) $resulting['province_id'] : null,
+                null,
+                $exceptId,
+            );
+
+            if ($parent === null) {
+                throw ValidationException::withMessages([
+                    'office_type_id' => $parentCode === OfficeStructurePolicy::TYPE_NATIONAL
+                        ? 'The national office must exist before registering provincial offices.'
+                        : 'The provincial office of the selected province must exist before registering municipal offices.',
+                ]);
+            }
+
+            $expectedParentId = $parent->id;
+        }
+
+        // 3. The client cannot contradict the derived parent: a
+        //    concrete value must match it (rule 4/5) and the national
+        //    office cannot carry any parent at all.
+        $provided = $payload['parent_office_id'] ?? null;
+
+        if ($provided !== null && $provided !== '' && (int) $provided !== $expectedParentId) {
+            throw ValidationException::withMessages([
+                'parent_office_id' => match ($typeCode) {
+                    OfficeStructurePolicy::TYPE_NATIONAL => 'The national office is the root of the hierarchy and cannot report to another office.',
+                    OfficeStructurePolicy::TYPE_PROVINCIAL => 'Provincial offices must report to the national office; omit parent_office_id or send the national office id.',
+                    default => 'Municipal offices must report to the provincial office of their province; omit parent_office_id or send that office id.',
+                },
+            ]);
+        }
+
+        // An explicit null on update means unrooting the office: a
+        // contradiction for every type but the national root.
+        if ($current !== null
+            && array_key_exists('parent_office_id', $payload)
+            && ($payload['parent_office_id'] === null || $payload['parent_office_id'] === '')
+            && $expectedParentId !== null) {
+            throw ValidationException::withMessages([
+                'parent_office_id' => $parentCode === OfficeStructurePolicy::TYPE_NATIONAL
+                    ? 'Provincial offices must report to the national office; omit parent_office_id or send the national office id.'
+                    : 'Municipal offices must report to the provincial office of their province; omit parent_office_id or send that office id.',
+            ]);
+        }
+
+        // 4. The derived parent is the truth written to the database.
+        $payload['parent_office_id'] = $expectedParentId;
+
+        return $payload;
+    }
+
+    /**
+     * Active children stay coherent (ADR-31): an office with active
+     * children cannot change its type or territory, because its
+     * children depend on what it is — the guard mirrors the
+     * deactivation one ("deactivate them first").
+     *
+     * @param  array{office_type_id: int, province_id: int, municipality_id: int}  $resulting
+     */
+    private function assertChildrenTolerateIdentityChange(Office $office, array $resulting): void
+    {
+        foreach (['office_type_id', 'province_id', 'municipality_id'] as $field) {
+            if ((int) $resulting[$field] === (int) $office->{$field}) {
+                continue;
+            }
+
+            if ($this->offices->hasActiveChildren($office->id)) {
+                throw ValidationException::withMessages([
+                    $field => 'The office still has active child offices; deactivate or relocate them before changing its type or territory.',
+                ]);
+            }
+
+            return;
         }
     }
 

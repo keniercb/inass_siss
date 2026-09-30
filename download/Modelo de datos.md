@@ -602,8 +602,10 @@ Semántica de negocio (implementada, ADR-20): el carnet `identity_number` se val
 | province_id | BIGINT UNSIGNED | NO | FK → provinces | Provincia |
 | municipality_id | BIGINT UNSIGNED | NO | FK → municipalities | Municipio (RN-004) |
 | address | VARCHAR(255) | NO | — | Dirección |
-| parent_office_id | BIGINT UNSIGNED | SÍ | FK → offices | Oficina superior (jerarquía acíclica, RN-003) |
-| deleted_at | TIMESTAMP | SÍ | — | Soft delete |
+| parent_office_id | BIGINT UNSIGNED | SÍ | FK → offices | Oficina superior (ADR-31: DERIVADO del tipo — provincial→nacional, municipal→provincial de su provincia, nacional raíz; el CRUD lo rellena y una contradicción responde 422) |
+| deleted_at | TIMESTAMP | SÍ | — | Soft delete (libera el ámbito de unicidad territorial) |
+
+Reglas de estructura territorial (ADR-31, corrección de usuario sobre RF-ENT-002): una sola oficina NACIONAL, una PROVINCIAL por provincia y una MUNICIPAL por provincia y municipio — contadas entre ACTIVAS, sin índice parcial en MySQL: la unicidad es semántica (servicio + política de dominio `OfficeStructurePolicy`), igual que la reserva de email de ADR-24; los prerrequisitos de inserción (provincial exige nacional, municipal exige la provincial de su provincia) responden 422 antes de persistir; la nacional se siembra al arranque (`NationalOfficeSeeder`).
 
 **`entities`** — Entidades empleadoras / centros de trabajo.
 
@@ -914,6 +916,7 @@ Schema::create('pension_cases', function (Blueprint $table) {
 | Seeder | Contenido | Clave natural de upsert |
 |---|---|---|
 | `CubaGeographySeeder` | 15 provincias y 168 municipios (Isla de la Juventud con `province_id = NULL`) | `provinces.code`, (`municipalities.province_id`, `code`) |
+| `NationalOfficeSeeder` | La oficina NACIONAL que arranca la estructura territorial (ADR-31, regla 7): La Habana / Plaza de la Revolución, dirección placeholder (P-06), sin parent; solo crea si no existe una nacional ACTIVA | `office_types.code` = NAC (existencia, no upsert) |
 | `OrganizationsSeeder` | Organismos de la Administración Central del Estado | `code` |
 | `CatalogsSeeder` | Razas, niveles educacionales, categorías ocupacionales y científicas, tipos de pensión, tipos de beneficiario, tipos de agencia, tipos de entidad/oficina, tipos de pago, conceptos de ingreso, cargos base | `name` / `code` |
 | `PensionRegimesSeeder` | Regímenes con `months_per_year` (general = 12; especiales según P-02) | `name` |
@@ -1001,6 +1004,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 | 1.11 | 2026-09-29 | Entrada `roles` ampliada (ADR-26): columnas `description` (VARCHAR 255 NULL) e `is_system` (BOOLEAN con backfill de los cinco institucionales) añadidas por la gestión de roles — institucionales inmutables vía API (la matriz los re-sincroniza) y personalizados como subconjuntos del catálogo (21 permisos); conteo de uso para la guarda de borrado = pivotes de `model_has_roles` (desactivadas incluidas) | Arq. Backend |
 | 1.12 | 2026-09-30 | Entrada `users` ampliada (ADR-29): migración `add_office_id_to_users_table` con `office_id` BIGINT NULL FK RESTRICT → `offices` e índice — pertenencia territorial de la cuenta (una a lo sumo), validada contra el directorio activo y protegida por el guard de desactivación de oficinas | Arq. Backend |
 | 1.13 | 2026-09-30 | Entrada `people` actualizada (ADR-30): la validación del carné se corrige al formato real del documento — 11 dígitos, mes 01-12 (dígitos 3-4), día 01-31 (dígitos 5-6), año y consecutivo sin validar, y el sexo codificado en el dígito 10 (par masculino, impar femenino) contrastado contra el declarado en el alta y en el PATCH; eliminados del value object el prefijo siglo/sexo y la fecha real del calendario | Arq. Backend |
+| 1.14 | 2026-09-30 | Entrada 5.5 `offices` ampliada (ADR-31, estructura territorial): `parent_office_id` pasa a ser DERIVADO del tipo (provincial→nacional, municipal→provincial de su provincia, nacional raíz) con 422 ante contradicciones del cliente; unicidad semántica entre activas — una nacional, una provincial por provincia, una municipal por municipio — sin índice parcial (el soft delete libera el ámbito); prerrequisitos de existencia del superior y `NationalOfficeSeeder` (regla 7) añadido a la tabla de seeders | Arq. Backend |
 
 
 
