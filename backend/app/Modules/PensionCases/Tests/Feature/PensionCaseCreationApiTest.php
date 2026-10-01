@@ -51,13 +51,19 @@ use Tests\TestCase;
  *  5. income concept records travel as nested subrecords of the
  *     atomic creation.
  *
- * Task 35 (user correction over Task 34): persona_por is NOT
+ * Task 35 (user correction over Task 34): the filer is NOT
  * free text anymore — it REFERENCES a registered person. The wire
- * carries persona_por_id (nullable integer), the service probes the
+ * carries filed_by_person_id (nullable integer), the service probes the
  * registry (unknown or deactivated person answers 422 with nothing
  * created) and every read surface returns the id plus the FULL
  * Person projection of the filer (same shape as the applicant,
  * user rule 3).
+ *
+ * Task 36 (user correction, SGP-30): the database columns added by
+ * the Task 32-35 corrections follow the English naming pattern of
+ * every previous column (ADR-03) — forma_declaracion became
+ * declaration_form and persona_por_id became filed_by_person_id —
+ * and that pattern is binding for all future development.
  *
  * The one-open-case rule, eligibility of the applicant and the
  * all-or-nothing subrecord creation stay as Sprint 5 left them.
@@ -216,9 +222,9 @@ final class PensionCaseCreationApiTest extends TestCase
         $this->assertSame($this->applicant->identity_number, $response->json('data.applicant.identity_number'));
     }
 
-    public function test_creates_a_case_with_the_persona_por_reference(): void
+    public function test_creates_a_case_with_the_filed_by_reference(): void
     {
-        // Task 35: the wire RECEIVES persona_por_id — a reference to
+        // Task 35: the wire RECEIVES filed_by_person_id — a reference to
         // a REGISTERED person — and every read surface RETURNS the id
         // plus the full Person projection of the filer: the 201 of
         // the creation, the detail and the listing.
@@ -231,69 +237,69 @@ final class PensionCaseCreationApiTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/v1/pension-cases', $this->payload([
-            'persona_por_id' => $filer->id,
+            'filed_by_person_id' => $filer->id,
         ]));
 
         $response->assertStatus(201)
-            ->assertJsonPath('data.persona_por_id', $filer->id)
-            ->assertJsonPath('data.persona_por.id', $filer->id)
-            ->assertJsonPath('data.persona_por.identity_number', $filer->identity_number)
-            ->assertJsonPath('data.persona_por.first_name', 'María');
+            ->assertJsonPath('data.filed_by_person_id', $filer->id)
+            ->assertJsonPath('data.filed_by.id', $filer->id)
+            ->assertJsonPath('data.filed_by.identity_number', $filer->identity_number)
+            ->assertJsonPath('data.filed_by.first_name', 'María');
 
         $this->assertDatabaseHas('pension_cases', [
             'id' => $response->json('data.id'),
-            'persona_por_id' => $filer->id,
+            'filed_by_person_id' => $filer->id,
         ]);
 
         $this->getJson('/api/v1/pension-cases/'.$response->json('data.id'))
             ->assertOk()
-            ->assertJsonPath('data.persona_por_id', $filer->id)
-            ->assertJsonPath('data.persona_por.id', $filer->id);
+            ->assertJsonPath('data.filed_by_person_id', $filer->id)
+            ->assertJsonPath('data.filed_by.id', $filer->id);
 
         $this->getJson('/api/v1/pension-cases')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.persona_por_id', $filer->id)
-            ->assertJsonPath('data.0.persona_por.id', $filer->id);
+            ->assertJsonPath('data.0.filed_by_person_id', $filer->id)
+            ->assertJsonPath('data.0.filed_by.id', $filer->id);
     }
 
-    public function test_persona_por_is_optional_and_defaults_to_null(): void
+    public function test_filed_by_is_optional_and_defaults_to_null(): void
     {
-        // The reference is optional: an omitted persona_por_id
+        // The reference is optional: an omitted filed_by_person_id
         // creates the case with NULL — never a 422 — and both the id
         // and the projection travel as null.
         $response = $this->postJson('/api/v1/pension-cases', $this->payload());
 
         $response->assertStatus(201)
-            ->assertJsonPath('data.persona_por_id', null)
-            ->assertJsonPath('data.persona_por', null);
+            ->assertJsonPath('data.filed_by_person_id', null)
+            ->assertJsonPath('data.filed_by', null);
 
         $this->assertDatabaseHas('pension_cases', [
             'id' => $response->json('data.id'),
-            'persona_por_id' => null,
+            'filed_by_person_id' => null,
         ]);
     }
 
-    public function test_rejects_a_persona_por_that_is_not_a_registered_person(): void
+    public function test_rejects_a_filed_by_that_is_not_a_registered_person(): void
     {
         // The reference must point at a REGISTERED person (Task 35
         // user correction): an unknown id answers 422 on
-        // persona_por_id and creates NOTHING — the all-or-nothing of
+        // filed_by_person_id and creates NOTHING — the all-or-nothing of
         // S5.5 starts at the payload probes.
         $this->postJson('/api/v1/pension-cases', $this->payload([
-            'persona_por_id' => 999999,
+            'filed_by_person_id' => 999999,
         ]))
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['persona_por_id']);
+            ->assertJsonValidationErrors(['filed_by_person_id']);
 
         $this->assertSame(0, PensionCase::query()->count());
     }
 
-    public function test_rejects_a_deactivated_persona_por(): void
+    public function test_rejects_a_deactivated_filed_by(): void
     {
         // A soft-deleted person is history, not a filer: the probe
         // uses the ACTIVE registry surface, so a deactivated
-        // persona_por answers 422 exactly like the office/entity/
+        // filed_by answers 422 exactly like the office/entity/
         // catalog references of assertReferencesAreActive.
         $filer = Person::factory()->create([
             'identity_number' => PersonFactory::identity('F', '1975-02-03'),
@@ -303,10 +309,10 @@ final class PensionCaseCreationApiTest extends TestCase
         $filer->delete();
 
         $this->postJson('/api/v1/pension-cases', $this->payload([
-            'persona_por_id' => $filer->id,
+            'filed_by_person_id' => $filer->id,
         ]))
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['persona_por_id']);
+            ->assertJsonValidationErrors(['filed_by_person_id']);
 
         $this->assertSame(0, PensionCase::query()->count());
     }
@@ -658,7 +664,7 @@ final class PensionCaseCreationApiTest extends TestCase
                     'entity_id' => $this->entity->id,
                     'start_date' => '1980-01-01',
                     'end_date' => '1990-12-31',
-                    'forma_declaracion' => 'Testifical',
+                    'declaration_form' => 'Testifical',
                 ],
                 [
                     'entity_id' => $this->entity->id,
@@ -668,20 +674,20 @@ final class PensionCaseCreationApiTest extends TestCase
         ]))
             ->assertStatus(201)
             ->assertJsonCount(2, 'data.service_records')
-            ->assertJsonPath('data.service_records.0.forma_declaracion', 'Testifical')
-            ->assertJsonPath('data.service_records.1.forma_declaracion', 'Documental');
+            ->assertJsonPath('data.service_records.0.declaration_form', 'Testifical')
+            ->assertJsonPath('data.service_records.1.declaration_form', 'Documental');
 
         $caseId = $response->json('data.id') ?? $this->fail('The response must carry the case id.');
 
         $this->assertDatabaseHas('service_records', [
             'pension_case_id' => $caseId,
             'start_date' => '1980-01-01',
-            'forma_declaracion' => 'Testifical',
+            'declaration_form' => 'Testifical',
         ]);
         $this->assertDatabaseHas('service_records', [
             'pension_case_id' => $caseId,
             'start_date' => '2000-01-01',
-            'forma_declaracion' => 'Documental',
+            'declaration_form' => 'Documental',
         ]);
     }
 
@@ -692,12 +698,12 @@ final class PensionCaseCreationApiTest extends TestCase
                 [
                     'entity_id' => $this->entity->id,
                     'start_date' => '1980-01-01',
-                    'forma_declaracion' => 'Mixta',
+                    'declaration_form' => 'Mixta',
                 ],
             ],
         ]))
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['service_records.0.forma_declaracion']);
+            ->assertJsonValidationErrors(['service_records.0.declaration_form']);
 
         // Everything or nothing (S5.5): no case, no row — and no
         // sequence number burned.
