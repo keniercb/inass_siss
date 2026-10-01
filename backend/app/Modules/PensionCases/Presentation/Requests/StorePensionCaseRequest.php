@@ -23,6 +23,12 @@ use Illuminate\Foundation\Http\FormRequest;
  * the controller through the Shared office port. A client that
  * still sends the field gets a 422 instead of silently believing
  * its value was honored.
+ *
+ * Task 34: persona_por — the free-text person who files or manages
+ * the case when it is not the applicant themselves — is an optional
+ * passthrough: nullable string capped at the VARCHAR(120) of the
+ * schema, with no semantic rule (the case can be filed by the
+ * applicant in person).
  */
 final class StorePensionCaseRequest extends FormRequest
 {
@@ -59,6 +65,8 @@ final class StorePensionCaseRequest extends FormRequest
                 // …and rejected when it is false.
                 'prohibited_unless:rebel_army_member,1,true',
             ],
+            // Task 34: free-text passthrough, VARCHAR(120).
+            'persona_por' => ['nullable', 'string', 'max:120'],
             // RN-005: money travels as an exact decimal string.
             'last_salary' => ['required', ...$money],
             'requested_at' => ['nullable', 'date_format:Y-m-d'],

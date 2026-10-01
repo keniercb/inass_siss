@@ -33,10 +33,10 @@ final class EntityController
         operationId: 'entitiesIndex',
         tags: ['Estructura'],
         summary: 'Listado paginado de entidades',
-        description: 'Entidades activas con referencias anidadas (RF-ENT-005): búsqueda por fragmentos de código, NIT u objeto social, y filtros por organismo, provincia, municipio y tipo. Código y NIT quedan reservados tras desactivar.',
+        description: 'Entidades activas con referencias anidadas (RF-ENT-005): búsqueda por fragmentos de código, nombre, NIT u objeto social (Task 31; documentado en Task 34), y filtros por organismo, provincia, municipio y tipo. Código y NIT quedan reservados tras desactivar.',
         security: [['sanctumAuth' => []]],
         parameters: [
-            new OA\QueryParameter(name: 'q', description: 'Fragmentos de código, NIT u objeto social', schema: new OA\Schema(type: 'string', maxLength: 120)),
+            new OA\QueryParameter(name: 'q', description: 'Fragmentos de código, nombre, NIT u objeto social', schema: new OA\Schema(type: 'string', maxLength: 120)),
             new OA\QueryParameter(name: 'organization_id', schema: new OA\Schema(type: 'integer', nullable: true)),
             new OA\QueryParameter(name: 'province_id', schema: new OA\Schema(type: 'integer', nullable: true)),
             new OA\QueryParameter(name: 'municipality_id', schema: new OA\Schema(type: 'integer', nullable: true)),

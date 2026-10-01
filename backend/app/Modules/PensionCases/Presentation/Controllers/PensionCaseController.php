@@ -189,6 +189,7 @@ final class PensionCaseController
                     new OA\Property(property: 'pension_regime_id', type: 'integer', example: 1, description: 'Régimen de pensión del catálogo (regla 4)'),
                     new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'Pertenece al Ejército Rebelde (regla 4)'),
                     new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'Fecha de alta en el Ejército Rebelde: obligatoria si rebel_army_member=true, rechazada si false'),
+                    new OA\Property(property: 'persona_por', type: 'string', nullable: true, maxLength: 120, example: 'María Fernández Ruiz', description: 'Persona que presenta o gestiona el expediente cuando no es el propio proponente (Task 34): texto libre opcional; la omisión persiste null'),
                     new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, decimal exacto no negativo (RN-005)'),
                     new OA\Property(property: 'requested_at', type: 'string', format: 'date', nullable: true, example: '2026-09-30', description: 'Opcional; por defecto hoy; nunca futura'),
                     new OA\Property(

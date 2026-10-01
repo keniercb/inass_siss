@@ -30,7 +30,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * resolved cases but at most one live case per applicant. The
  * pension classification (type, regime, rebel army pair) rides
  * along since user rule 4 and the income concept records are a
- * (case, concept) unique subrecord (user rule 5). Authorship is
+ * (case, concept) unique subrecord (user rule 5). Since Task 34
+ * the optional free-text persona_por — the person who files or
+ * manages the case when it is not the applicant themselves — is a
+ * pure passthrough column: no default, no semantic rule, NULL
+ * when omitted. Authorship is
  * stamped by the Shared AuditableObserver and every write lands in
  * the append-only trail through the Shared AuditTrailObserver, both
  * registered in the PensionCasesServiceProvider.
@@ -51,6 +55,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $last_salary
  * @property bool $rebel_army_member
  * @property CarbonImmutable|null $rebel_army_join_date
+ * @property string|null $persona_por
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -89,6 +94,7 @@ class PensionCase extends Model
         'last_salary',
         'rebel_army_member',
         'rebel_army_join_date',
+        'persona_por',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
