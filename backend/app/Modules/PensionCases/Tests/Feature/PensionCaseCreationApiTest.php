@@ -21,6 +21,7 @@ use App\Modules\Organizations\Infrastructure\Persistence\Models\Office;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\IncomeConceptRecord;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\SalaryRecord;
+use App\Modules\PensionCases\Infrastructure\Persistence\Models\ServiceRecord;
 use App\Modules\PensionCases\Tests\Concerns\ResetsCaseSequence;
 use App\Modules\People\Infrastructure\Persistence\Models\Person;
 use App\Modules\Security\Infrastructure\Persistence\Models\User;
@@ -541,6 +542,64 @@ final class PensionCaseCreationApiTest extends TestCase
         $this->assertSame(2, $case->serviceRecords()->count());
         $this->assertSame(1, $case->workCycles()->count());
         $this->assertSame(1, $case->incomeConceptRecords()->count());
+    }
+
+    public function test_creates_nested_service_records_with_their_declaration_forms(): void
+    {
+        // Forma de declaración (RF-EXP-003, Task 33): the nested
+        // creation payload declares it per row — a silently dropped
+        // Testifical would fake a documentary-backed history.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                [
+                    'entity_id' => $this->entity->id,
+                    'start_date' => '1980-01-01',
+                    'end_date' => '1990-12-31',
+                    'forma_declaracion' => 'Testifical',
+                ],
+                [
+                    'entity_id' => $this->entity->id,
+                    'start_date' => '2000-01-01',
+                ],
+            ],
+        ]))
+            ->assertStatus(201)
+            ->assertJsonCount(2, 'data.service_records')
+            ->assertJsonPath('data.service_records.0.forma_declaracion', 'Testifical')
+            ->assertJsonPath('data.service_records.1.forma_declaracion', 'Documental');
+
+        $caseId = $response->json('data.id') ?? $this->fail('The response must carry the case id.');
+
+        $this->assertDatabaseHas('service_records', [
+            'pension_case_id' => $caseId,
+            'start_date' => '1980-01-01',
+            'forma_declaracion' => 'Testifical',
+        ]);
+        $this->assertDatabaseHas('service_records', [
+            'pension_case_id' => $caseId,
+            'start_date' => '2000-01-01',
+            'forma_declaracion' => 'Documental',
+        ]);
+    }
+
+    public function test_rejects_an_unknown_declaration_form_in_the_nested_payload(): void
+    {
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                [
+                    'entity_id' => $this->entity->id,
+                    'start_date' => '1980-01-01',
+                    'forma_declaracion' => 'Mixta',
+                ],
+            ],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['service_records.0.forma_declaracion']);
+
+        // Everything or nothing (S5.5): no case, no row — and no
+        // sequence number burned.
+        $this->assertSame(0, ServiceRecord::query()->count());
+        $this->assertSame(0, PensionCase::query()->count());
     }
 
     public function test_an_invalid_subrecord_leaves_nothing_behind(): void
