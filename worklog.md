@@ -1129,3 +1129,21 @@ Stage Summary:
 - Las tres correcciones de usuario pedidas en la sesión quedaron verificadas en main: numeración territorial (Task 30/PR #25), nombre de entidad + código universal de catálogos (Task 31/PR #26) y forma de declaración con su hueco anidado ya cerrado (Task 32/PR #27+#28 + Task 33/esta entrega)
 - SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada; deuda documental de Task 29 pendiente (changelogs/entrada 5.7 de la proyección de entidad en service-records)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 33-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-27 — PR #29, CI y merge a main (forma de declaración en el alta anidada)
+
+Work Log:
+- PR #29 creada por API: https://github.com/keniercb/inass_siss/pull/29 (rama feat/SGP-27-nested-declaration-form, 4 commits: feat 1bb348a + test b332930 + docs df45bfd + worklog 757d23e)
+- Incidente del daemon recurrente pero contenido DOS veces: volteó HEAD a main ANTES del commit de feat (el commit aterrizó en main y se recolocó con branch -f + realineación de main a origin/main en un solo comando encadenado) y OTRA vez antes del commit de tests (atrapado por el guard de rama DENTRO del mismo comando — grep de la rama antes de add/commit: el commit no se ejecutó); cada cierre de PR de sesiones previas repite la misma lección y el protocolo volvió a funcionar
+- CI (run 36797868120) SUCCESS a la primera: Pint, PHPStan 8, deptrac, Pest contra MySQL del runner (1046/3467) y build Docker
+- PR #29 mergeeada a main como 1f3fa5b con merge commit; main local sincronizado y regresión final sobre main en verde: 1046 tests / 3467 aserciones, Pint PASS (400 archivos), PHPStan 8 sin errores, deptrac 0 violaciones/0 uncovered
+
+Stage Summary:
+- FORMA DE DECLARACIÓN EN EL ALTA ANIDADA EN MAIN (Task 33): POST /pension-cases acepta forma_declaracion POR FILA en service_records (in:Documental,Testifical; omisión = Documental, desconocido 422 todo-o-nada) — el descarte silencioso del SGP-26 queda cerrado
+- Las tres correcciones de usuario pedidas en la sesión están verificadas en main: numeración territorial (Task 30/PR #25), nombre de entidad + código universal de catálogos (Task 31/PR #26) y forma de declaración completa (Task 32/PR #27+#28 + Task 33/PR #29)
+- Suite 1046/3467 en verde contra MySQL real; fumiga de expedientes con 23 comprobaciones TODO OK
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada; deuda documental de Task 29 pendiente (changelogs/entrada 5.7 de la proyección de entidad en service-records)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
