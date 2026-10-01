@@ -252,6 +252,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 **RF-EXP-003 (M) — Subregistro de servicios (MO)**
 - [ ] Cada servicio declara entidad, fecha de inicio, fecha de fin opcional y marcador de coletilla.
 - [x] Forma de declaración del tiempo de servicio (corrección de usuario, Task 32): Documental (respaldo documental, valor por defecto) o Testifical (declaración testimonial) — campo `forma_declaracion` VARCHAR(20) NOT NULL DEFAULT 'Documental' con CHECK de los dos valores legales, opcional en el alta (422 con cualquier otro valor; la omisión cae en Documental) y devuelto en el 201 y el detalle del expediente (migración `2026_10_01_120000`).
+- [x] Forma de declaración en el alta anidada (Task 33): el payload de creación del expediente acepta `forma_declaracion` POR FILA en `service_records` (`in:Documental,Testifical`; la omisión cae en Documental y un valor desconocido responde 422 sobre `service_records.N.forma_declaracion` sin crear nada, todo-o-nada S5.5) — antes de Task 33 el valor declarado en la creación anidada se descartaba silenciosamente y la fila nacía siempre Documental.
 - [ ] La fecha de fin, si existe, es posterior o igual a la de inicio.
 - [ ] El sistema detecta solapamientos de períodos dentro del expediente y servicios sin cerrar con fecha de fin.
 

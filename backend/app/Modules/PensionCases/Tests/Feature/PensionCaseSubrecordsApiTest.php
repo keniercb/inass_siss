@@ -292,6 +292,30 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['forma_declaracion']);
     }
 
+    public function test_the_detail_carries_the_declaration_form_of_every_service(): void
+    {
+        // End-to-end projection (Task 33): the case detail answers
+        // the form of every row — a declared Testifical first, the
+        // Documental default second.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '1980-01-01',
+            'end_date' => '1990-12-31',
+            'forma_declaracion' => 'Testifical',
+        ])->assertStatus(201);
+
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2000-01-01',
+        ])->assertStatus(201);
+
+        $this->getJson("/api/v1/pension-cases/{$this->case->id}")
+            ->assertStatus(200)
+            ->assertJsonCount(2, 'data.service_records')
+            ->assertJsonPath('data.service_records.0.forma_declaracion', 'Testifical')
+            ->assertJsonPath('data.service_records.1.forma_declaracion', 'Documental');
+    }
+
     public function test_removes_a_service_record(): void
     {
         $id = $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [

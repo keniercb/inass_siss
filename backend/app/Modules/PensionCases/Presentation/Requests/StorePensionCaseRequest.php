@@ -75,6 +75,12 @@ final class StorePensionCaseRequest extends FormRequest
             'service_records.*.start_date' => ['required_with:service_records', 'date_format:Y-m-d'],
             'service_records.*.end_date' => ['nullable', 'date_format:Y-m-d'],
             'service_records.*.is_appendix' => ['nullable', 'boolean'],
+            // Forma de declaración per row (Task 33): the nested
+            // payload accepts the same Documental|Testifical enum as
+            // the individual endpoint — omitted rows keep the
+            // Documental default, unknown values answer 422 instead
+            // of being silently dropped.
+            'service_records.*.forma_declaracion' => ['nullable', 'in:Documental,Testifical'],
 
             'work_cycles' => ['nullable', 'array', 'max:100'],
             'work_cycles.*.planned_days' => ['required_with:work_cycles', 'integer', 'min:0'],

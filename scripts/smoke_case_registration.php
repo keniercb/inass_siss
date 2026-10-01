@@ -158,6 +158,11 @@ try {
         'birth_date' => '1957-03-13',
         'sex' => 'F',
     ]);
+    $thirdApplicant = Person::factory()->create([
+        'identity_number' => PersonFactory::identity('M', '1950-07-22'),
+        'birth_date' => '1950-07-22',
+        'sex' => 'M',
+    ]);
 
     $payload = [
         'applicant_person_id' => $applicant->id,
@@ -214,6 +219,37 @@ try {
         'regla 2: el consecutivo territorial avanza por creación',
         $second->status() === 201 && $secondNumber === substr($number, 0, 6).sprintf('%05d', $consecutive + 1),
         'primero='.$number.' segundo='.$secondNumber,
+    );
+
+    // ---- Forma de declaración del tiempo de servicio (Task 33) ----
+    // El payload anidado la declara por fila: una Testifical y una
+    // omitida (default Documental); un valor desconocido es 422 y no
+    // deja nada detrás.
+    $nestedPayload = array_merge($payload, [
+        'applicant_person_id' => $thirdApplicant->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31', 'forma_declaracion' => 'Testifical'],
+            ['entity_id' => $entity->id, 'start_date' => '2000-01-01'],
+        ],
+    ]);
+    $nested = $base('POST', '/pension-cases', $nestedPayload);
+    check(
+        'forma de declaración: filas anidadas con Testifical y default Documental',
+        $nested->status() === 201
+            && ($nested->json('data.service_records.0.forma_declaracion') ?? '') === 'Testifical'
+            && ($nested->json('data.service_records.1.forma_declaracion') ?? '') === 'Documental',
+        detail($nested),
+    );
+    $nestedInvalid = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $thirdApplicant->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'forma_declaracion' => 'Mixta'],
+        ],
+    ]));
+    check(
+        'forma de declaración: valor desconocido en el payload anidado responde 422',
+        $nestedInvalid->status() === 422 && isset($nestedInvalid->json('errors')['service_records.0.forma_declaracion']),
+        detail($nestedInvalid),
     );
 
     // ---- Regla 1: 15 salarios admitidos, el 16º rechazado, el cupo se libera ----

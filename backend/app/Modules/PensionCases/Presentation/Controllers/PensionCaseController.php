@@ -214,6 +214,7 @@ final class PensionCaseController
                                 new OA\Property(property: 'start_date', type: 'string', format: 'date', example: '2000-01-01'),
                                 new OA\Property(property: 'end_date', type: 'string', format: 'date', nullable: true, example: null),
                                 new OA\Property(property: 'is_appendix', type: 'boolean', example: false),
+                                new OA\Property(property: 'forma_declaracion', type: 'string', enum: ['Documental', 'Testifical'], example: 'Documental', description: 'Forma de declaración del vínculo; Documental por omisión'),
                             ],
                             type: 'object',
                         ),
