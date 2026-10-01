@@ -21,6 +21,10 @@ declare(strict_types=1);
  *     false);
  *  5. conceptos de ingreso como subregistro (alta/baja/duplicado).
  *
+ * Task 34: persona por del expediente — texto libre opcional que
+ * recibe el alta y devuelven el 201, el detalle y el listado
+ * (422 con 121 caracteres, tope del VARCHAR(120)).
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -250,6 +254,34 @@ try {
         'forma de declaración: valor desconocido en el payload anidado responde 422',
         $nestedInvalid->status() === 422 && isset($nestedInvalid->json('errors')['service_records.0.forma_declaracion']),
         detail($nestedInvalid),
+    );
+
+    // ---- Task 34: persona por del expediente (passthrough opcional) ----
+    $fourthApplicant = Person::factory()->create();
+    $personaPorCase = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $fourthApplicant->id,
+        'persona_por' => 'Gestora María Fernández',
+    ]));
+    $personaPorId = (int) ($personaPorCase->json('data.id') ?? 0);
+    check(
+        'persona por: recibida en el alta y devuelta en el 201 y el detalle',
+        $personaPorCase->status() === 201
+            && ($personaPorCase->json('data.persona_por') ?? '') === 'Gestora María Fernández'
+            && ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por') ?? '') === 'Gestora María Fernández',
+        detail($personaPorCase),
+    );
+    check(
+        'persona por: el listado filtrado por promovente la devuelve',
+        ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por') ?? '') === 'Gestora María Fernández',
+    );
+    $oversizedPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $fourthApplicant->id,
+        'persona_por' => str_repeat('a', 121),
+    ]));
+    check(
+        'persona por: el wire rechaza 121 caracteres con 422',
+        $oversizedPersonaPor->status() === 422 && isset($oversizedPersonaPor->json('errors')['persona_por']),
+        detail($oversizedPersonaPor),
     );
 
     // ---- Regla 1: 15 salarios admitidos, el 16º rechazado, el cupo se libera ----
