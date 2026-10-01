@@ -1167,3 +1167,20 @@ Stage Summary:
 - BÚSQUEDA DE ENTIDADES POR NOMBRE VERIFICADA Y DOCUMENTADA: q cubre código, nombre, NIT y objeto social (comportamiento vigente desde Task 31); el hueco era la descripción OA del endpoint/parámetro, ahora corregida; test reforzado con fragmento parcial en minúsculas
 - Suite 1049/3485 en verde contra MySQL real; fumiga de expedientes con 26 comprobaciones TODO OK sobre la BD sgp
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 34-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-28 — PR #31, CI y merge a main (persona por del expediente + revisión de la búsqueda de entidades por nombre)
+
+Work Log:
+- Entrega: rama feat/SGP-28-persona-por-entity-name-search (4 commits: feat 94f3f89 + test ccdc6ef + docs 9f02cdf + worklog 520b5a4), push con PAT y PR #31 creada por API (https://github.com/keniercb/inass_siss/pull/31)
+- Incidente del daemon recurrente y contenido TRES veces en el ciclo: volteó HEAD a main ANTES del commit de feat (atrapado por el guard de rama dentro del mismo comando encadenado: el commit no se ejecutó), otra vez entre el feat y el test (atrapado igual) y una vez más tras el commit de worklog (detectado al sondear el CI con rev-parse HEAD devolviendo 95f0062 — el sondeo se rehízo contra el tip de la rama); ningún commit aterrizó fuera de la rama y ningún reset --hard hizo falta
+- CI (Quality gate, PHP 8.3) SUCCESS a la primera sobre 520b5a4: pint + phpstan 8 + pest contra MySQL del runner + deptrac + build Docker
+- PR #31 mergeeada a main como 9a30653 con merge commit; main local sincronizado y regresión final sobre main en verde: 1049 tests / 3485 aserciones, Pint PASS, PHPStan 8 sin errores, deptrac 0 violaciones/0 uncovered
+
+Stage Summary:
+- PERSONA POR DEL EXPEDIENTE + BÚSQUEDA DE ENTIDADES POR NOMBRE EN MAIN (Task 34): POST /pension-cases recibe persona_por (VARCHAR(120) NULL; 422 con 121 caracteres, omisión = NULL) y el 201, el detalle y el listado lo devuelven; la búsqueda q de GET /entities verificada cubriendo código, nombre, NIT y objeto social, con la descripción OA del endpoint y del parámetro corregida
+- Suite 1049/3485 en verde sobre main; fumiga de expedientes con 26 comprobaciones TODO OK
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
