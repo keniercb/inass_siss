@@ -24,11 +24,12 @@ use Illuminate\Foundation\Http\FormRequest;
  * still sends the field gets a 422 instead of silently believing
  * its value was honored.
  *
- * Task 34: persona_por — the free-text person who files or manages
- * the case when it is not the applicant themselves — is an optional
- * passthrough: nullable string capped at the VARCHAR(120) of the
- * schema, with no semantic rule (the case can be filed by the
- * applicant in person).
+ * Task 35 (user correction over Task 34): persona_por_id — the
+ * REGISTERED person who files or manages the case when it is not
+ * the applicant themselves — travels as a nullable integer; the
+ * registry probe (unknown or DEACTIVATED person answers 422)
+ * lives in the service, exactly like the applicant and the rest
+ * of the references: the FormRequest guards shape only.
  */
 final class StorePensionCaseRequest extends FormRequest
 {
@@ -65,8 +66,10 @@ final class StorePensionCaseRequest extends FormRequest
                 // …and rejected when it is false.
                 'prohibited_unless:rebel_army_member,1,true',
             ],
-            // Task 34: free-text passthrough, VARCHAR(120).
-            'persona_por' => ['nullable', 'string', 'max:120'],
+            // Task 35: reference to a REGISTERED person — the
+            // existence/active probe is semantic (service), like
+            // applicant_person_id.
+            'persona_por_id' => ['nullable', 'integer', 'min:1'],
             // RN-005: money travels as an exact decimal string.
             'last_salary' => ['required', ...$money],
             'requested_at' => ['nullable', 'date_format:Y-m-d'],
