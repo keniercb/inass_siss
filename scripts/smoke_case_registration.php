@@ -21,9 +21,11 @@ declare(strict_types=1);
  *     false);
  *  5. conceptos de ingreso como subregistro (alta/baja/duplicado).
  *
- * Task 34: persona por del expediente — texto libre opcional que
- * recibe el alta y devuelven el 201, el detalle y el listado
- * (422 con 121 caracteres, tope del VARCHAR(120)).
+ * Task 35 (corrección de usuario sobre Task 34): persona por del
+ * expediente como REFERENCIA a una persona registrada — el alta
+ * recibe persona_por_id y el 201, el detalle y el listado devuelven
+ * el id más la proyección completa de la persona (422 si el id no
+ * existe o está desactivada; la omisión persiste NULL).
  *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
@@ -256,32 +258,59 @@ try {
         detail($nestedInvalid),
     );
 
-    // ---- Task 34: persona por del expediente (passthrough opcional) ----
+    // ---- Task 35: persona por del expediente (referencia a una
+    // persona REGISTRADA — corrección de usuario sobre Task 34) ----
     $fourthApplicant = Person::factory()->create();
+    $filer = Person::factory()->create([
+        'identity_number' => PersonFactory::identity('F', '1980-07-12'),
+        'birth_date' => '1980-07-12',
+        'sex' => 'F',
+        'first_name' => 'María',
+        'first_surname' => 'Fernández',
+    ]);
     $personaPorCase = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $fourthApplicant->id,
-        'persona_por' => 'Gestora María Fernández',
+        'persona_por_id' => $filer->id,
     ]));
     $personaPorId = (int) ($personaPorCase->json('data.id') ?? 0);
     check(
-        'persona por: recibida en el alta y devuelta en el 201 y el detalle',
+        'persona por: referencia recibida en el alta y devuelta (id + proyección) en el 201 y el detalle',
         $personaPorCase->status() === 201
-            && ($personaPorCase->json('data.persona_por') ?? '') === 'Gestora María Fernández'
-            && ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por') ?? '') === 'Gestora María Fernández',
+            && (int) ($personaPorCase->json('data.persona_por_id') ?? 0) === $filer->id
+            && (int) ($personaPorCase->json('data.persona_por.id') ?? 0) === $filer->id
+            && ($personaPorCase->json('data.persona_por.first_name') ?? '') === 'María'
+            && (int) ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por_id') ?? 0) === $filer->id
+            && ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por.identity_number') ?? '') === $filer->identity_number,
         detail($personaPorCase),
     );
     check(
-        'persona por: el listado filtrado por promovente la devuelve',
-        ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por') ?? '') === 'Gestora María Fernández',
+        'persona por: el listado filtrado por promovente devuelve el id y la proyección',
+        (int) ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por_id') ?? 0) === $filer->id
+            && ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por.first_name') ?? '') === 'María',
     );
-    $oversizedPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
+    $unknownPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $fourthApplicant->id,
-        'persona_por' => str_repeat('a', 121),
+        'persona_por_id' => 999999,
     ]));
     check(
-        'persona por: el wire rechaza 121 caracteres con 422',
-        $oversizedPersonaPor->status() === 422 && isset($oversizedPersonaPor->json('errors')['persona_por']),
-        detail($oversizedPersonaPor),
+        'persona por: un id de persona no registrada responde 422',
+        $unknownPersonaPor->status() === 422 && isset($unknownPersonaPor->json('errors')['persona_por_id']),
+        detail($unknownPersonaPor),
+    );
+    $deactivatedFiler = Person::factory()->create([
+        'identity_number' => PersonFactory::identity('F', '1975-02-03'),
+        'birth_date' => '1975-02-03',
+        'sex' => 'F',
+    ]);
+    $deactivatedFiler->delete();
+    $deactivatedPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $fourthApplicant->id,
+        'persona_por_id' => $deactivatedFiler->id,
+    ]));
+    check(
+        'persona por: una persona desactivada responde 422',
+        $deactivatedPersonaPor->status() === 422 && isset($deactivatedPersonaPor->json('errors')['persona_por_id']),
+        detail($deactivatedPersonaPor),
     );
 
     // ---- Regla 1: 15 salarios admitidos, el 16º rechazado, el cupo se libera ----

@@ -51,11 +51,13 @@ use Tests\TestCase;
  *  5. income concept records travel as nested subrecords of the
  *     atomic creation.
  *
- * Task 34 (user correction): persona_por — the free-text person who
- * files or manages the case when it is not the applicant themselves
- * (a relative, a representative) — rides the payload as an optional
- * passthrough: received by the store, returned by the 201, the
- * detail and the listing.
+ * Task 35 (user correction over Task 34): persona_por is NOT
+ * free text anymore — it REFERENCES a registered person. The wire
+ * carries persona_por_id (nullable integer), the service probes the
+ * registry (unknown or deactivated person answers 422 with nothing
+ * created) and every read surface returns the id plus the FULL
+ * Person projection of the filer (same shape as the applicant,
+ * user rule 3).
  *
  * The one-open-case rule, eligibility of the applicant and the
  * all-or-nothing subrecord creation stay as Sprint 5 left them.
@@ -214,56 +216,97 @@ final class PensionCaseCreationApiTest extends TestCase
         $this->assertSame($this->applicant->identity_number, $response->json('data.applicant.identity_number'));
     }
 
-    public function test_creates_a_case_with_the_persona_por(): void
+    public function test_creates_a_case_with_the_persona_por_reference(): void
     {
-        // Task 34: the wire RECEIVES persona_por and every read
-        // surface RETURNS it — the 201 of the creation, the detail
-        // and the listing all carry the stored value.
+        // Task 35: the wire RECEIVES persona_por_id — a reference to
+        // a REGISTERED person — and every read surface RETURNS the id
+        // plus the full Person projection of the filer: the 201 of
+        // the creation, the detail and the listing.
+        $filer = Person::factory()->create([
+            'identity_number' => PersonFactory::identity('F', '1980-07-12'),
+            'birth_date' => '1980-07-12',
+            'sex' => 'F',
+            'first_name' => 'María',
+            'first_surname' => 'Fernández',
+        ]);
+
         $response = $this->postJson('/api/v1/pension-cases', $this->payload([
-            'persona_por' => 'María Fernández Ruiz',
+            'persona_por_id' => $filer->id,
         ]));
 
         $response->assertStatus(201)
-            ->assertJsonPath('data.persona_por', 'María Fernández Ruiz');
+            ->assertJsonPath('data.persona_por_id', $filer->id)
+            ->assertJsonPath('data.persona_por.id', $filer->id)
+            ->assertJsonPath('data.persona_por.identity_number', $filer->identity_number)
+            ->assertJsonPath('data.persona_por.first_name', 'María');
 
         $this->assertDatabaseHas('pension_cases', [
             'id' => $response->json('data.id'),
-            'persona_por' => 'María Fernández Ruiz',
+            'persona_por_id' => $filer->id,
         ]);
 
         $this->getJson('/api/v1/pension-cases/'.$response->json('data.id'))
             ->assertOk()
-            ->assertJsonPath('data.persona_por', 'María Fernández Ruiz');
+            ->assertJsonPath('data.persona_por_id', $filer->id)
+            ->assertJsonPath('data.persona_por.id', $filer->id);
 
         $this->getJson('/api/v1/pension-cases')
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.persona_por', 'María Fernández Ruiz');
+            ->assertJsonPath('data.0.persona_por_id', $filer->id)
+            ->assertJsonPath('data.0.persona_por.id', $filer->id);
     }
 
     public function test_persona_por_is_optional_and_defaults_to_null(): void
     {
-        // The field is a passthrough with no default: an omitted
-        // persona_por creates the case with NULL — never a 422.
+        // The reference is optional: an omitted persona_por_id
+        // creates the case with NULL — never a 422 — and both the id
+        // and the projection travel as null.
         $response = $this->postJson('/api/v1/pension-cases', $this->payload());
 
         $response->assertStatus(201)
+            ->assertJsonPath('data.persona_por_id', null)
             ->assertJsonPath('data.persona_por', null);
 
         $this->assertDatabaseHas('pension_cases', [
             'id' => $response->json('data.id'),
-            'persona_por' => null,
+            'persona_por_id' => null,
         ]);
     }
 
-    public function test_rejects_an_oversized_persona_por(): void
+    public function test_rejects_a_persona_por_that_is_not_a_registered_person(): void
     {
-        // Structural guard of the wire: VARCHAR(120).
+        // The reference must point at a REGISTERED person (Task 35
+        // user correction): an unknown id answers 422 on
+        // persona_por_id and creates NOTHING — the all-or-nothing of
+        // S5.5 starts at the payload probes.
         $this->postJson('/api/v1/pension-cases', $this->payload([
-            'persona_por' => str_repeat('a', 121),
+            'persona_por_id' => 999999,
         ]))
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['persona_por']);
+            ->assertJsonValidationErrors(['persona_por_id']);
+
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_a_deactivated_persona_por(): void
+    {
+        // A soft-deleted person is history, not a filer: the probe
+        // uses the ACTIVE registry surface, so a deactivated
+        // persona_por answers 422 exactly like the office/entity/
+        // catalog references of assertReferencesAreActive.
+        $filer = Person::factory()->create([
+            'identity_number' => PersonFactory::identity('F', '1975-02-03'),
+            'birth_date' => '1975-02-03',
+            'sex' => 'F',
+        ]);
+        $filer->delete();
+
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'persona_por_id' => $filer->id,
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['persona_por_id']);
 
         $this->assertSame(0, PensionCase::query()->count());
     }
