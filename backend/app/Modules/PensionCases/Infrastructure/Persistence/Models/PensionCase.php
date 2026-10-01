@@ -30,11 +30,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * resolved cases but at most one live case per applicant. The
  * pension classification (type, regime, rebel army pair) rides
  * along since user rule 4 and the income concept records are a
- * (case, concept) unique subrecord (user rule 5). Since Task 34
- * the optional free-text persona_por — the person who files or
- * manages the case when it is not the applicant themselves — is a
- * pure passthrough column: no default, no semantic rule, NULL
- * when omitted. Authorship is
+ * (case, concept) unique subrecord (user rule 5). Since Task 35
+ * (user correction over Task 34) the optional persona_por_id —
+ * the REGISTERED person who files or manages the case when it is
+ * not the applicant themselves — is a nullable reference to
+ * people (restrictOnDelete, like every reference of the table)
+ * probed against the ACTIVE registry surface before writing; the
+ * full Person projection travels as the personaPor relation,
+ * eager-loaded by the detail and the listing exactly like the
+ * applicant. Authorship is
  * stamped by the Shared AuditableObserver and every write lands in
  * the append-only trail through the Shared AuditTrailObserver, both
  * registered in the PensionCasesServiceProvider.
@@ -55,7 +59,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $last_salary
  * @property bool $rebel_army_member
  * @property CarbonImmutable|null $rebel_army_join_date
- * @property string|null $persona_por
+ * @property int|null $persona_por_id
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -72,6 +76,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Collection<int, WorkCycle> $workCycles
  * @property-read Collection<int, IncomeConceptRecord> $incomeConceptRecords
  * @property-read \App\Modules\People\Infrastructure\Persistence\Models\Person|null $applicant
+ * @property-read \App\Modules\People\Infrastructure\Persistence\Models\Person|null $personaPor
  */
 class PensionCase extends Model
 {
@@ -94,7 +99,7 @@ class PensionCase extends Model
         'last_salary',
         'rebel_army_member',
         'rebel_army_join_date',
-        'persona_por',
+        'persona_por_id',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
@@ -128,6 +133,7 @@ class PensionCase extends Model
             'last_salary' => 'decimal:2',
             'rebel_army_join_date' => 'immutable_date',
             'rebel_army_member' => 'boolean',
+            'persona_por_id' => 'integer',
             'decided_at' => 'immutable_datetime',
             'computed_amount' => 'decimal:2',
             'approval_legal_basis_id' => 'integer',
@@ -177,5 +183,18 @@ class PensionCase extends Model
     public function applicant(): BelongsTo
     {
         return $this->belongsTo(\App\Modules\People\Infrastructure\Persistence\Models\Person::class, 'applicant_person_id');
+    }
+
+    /**
+     * The registered person who files or manages the case when it
+     * is not the applicant themselves (Task 35): nullable reference
+     * probed against the ACTIVE registry surface by the service —
+     * a deactivated person is history, not a filer.
+     *
+     * @return BelongsTo<Person, $this>
+     */
+    public function personaPor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\People\Infrastructure\Persistence\Models\Person::class, 'persona_por_id');
     }
 }

@@ -44,7 +44,7 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
         $query = PensionCase::query()
-            ->with('applicant')
+            ->with(['applicant', 'personaPor'])
             ->orderByDesc('requested_at')
             ->orderByDesc('id');
 
@@ -96,6 +96,7 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
                 'workCycles',
                 'incomeConceptRecords',
                 'applicant',
+                'personaPor',
             ])
             ->find($id);
     }

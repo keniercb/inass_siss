@@ -53,9 +53,13 @@ use Illuminate\Validation\ValidationException;
  * layer through the Shared office port (user rule 0/ADR-33) — and
  * the employer entity must exist and stay active; every catalog
  * reference (including the pension type/regime of user rule 4) is
- * probed before writing. The one-open-case-per-person rule answers
- * 409 with the open case, backed physically by the open_case_key
- * generated column.
+ * probed before writing. The persona por (Task 35, user correction
+ * over Task 34) is a REFERENCE to a registered person: the optional
+ * persona_por_id is probed against the ACTIVE registry surface of
+ * People (unknown or deactivated answers 422 on persona_por_id)
+ * before any number is burned or row written. The
+ * one-open-case-per-person rule answers 409 with the open case,
+ * backed physically by the open_case_key generated column.
  *
  * The NUMBER (user rule 2/ADR-34) is eleven contiguous digits: the
  * registering office's province (2) and municipality (2) codes, the
@@ -103,7 +107,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'pension_regime_id',
         'rebel_army_member',
         'rebel_army_join_date',
-        'persona_por',
+        'persona_por_id',
         'last_salary',
     ];
 
@@ -132,8 +136,14 @@ final class PensionCaseService implements PensionCaseServiceInterface
             'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary',
         ]);
 
+        // Task 35: the persona por reference normalized BEFORE the
+        // probes — an absent, null or empty wire value all mean
+        // "no filer" (NULL).
+        $personaPorId = $this->normalizePersonaPorId($payload);
+
         $this->assertApplicantIsEligible((int) $payload['applicant_person_id']);
         $this->assertReferencesAreActive($payload);
+        $this->assertPersonaPorIsRegistered($personaPorId);
         $this->assertRebelArmyPairIsCoherent($payload);
         $this->assertNoOpenCase((int) $payload['applicant_person_id']);
         $this->assertRequestedAtIsNotFuture($payload);
@@ -170,7 +180,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
-            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
+            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $personaPorId, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
                 $case = $this->cases->create([
                     'number' => $number,
                     'requested_at' => $payload['requested_at'] ?? $this->clock->now()->format('Y-m-d'),
@@ -187,10 +197,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     'last_salary' => $lastSalary->__toString(),
                     'rebel_army_member' => $rebelArmyMember,
                     'rebel_army_join_date' => $rebelArmyJoinDate,
-                    // Task 34: free-text passthrough — an omitted
-                    // persona_por persists NULL (never a silent
-                    // discard, the lesson of Task 33).
-                    'persona_por' => $payload['persona_por'] ?? null,
+                    // Task 35: reference to a registered person,
+                    // normalized before the probes (never a silent
+                    // discard — the lesson of Task 33).
+                    'persona_por_id' => $personaPorId,
                 ]);
 
                 if ($salaryRows !== []) {
@@ -541,6 +551,45 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     $key => 'The referenced catalog entry does not exist or is deactivated.',
                 ]);
             }
+        }
+    }
+
+    /**
+     * Task 35: normalize the optional persona por reference before
+     * the probes — an absent, null or empty wire value all mean
+     * "no filer" (NULL); anything else becomes the int the registry
+     * probe and the FK expect.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function normalizePersonaPorId(array $payload): ?int
+    {
+        $value = $payload['persona_por_id'] ?? null;
+
+        return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    /**
+     * Task 35 (user correction over Task 34): the persona por is a
+     * REFERENCE to a registered person, not free text. The probe uses
+     * the ACTIVE registry surface of People — a soft-deleted person
+     * is history, not a filer — so an unknown or deactivated id
+     * answers 422 on persona_por_id BEFORE any number is burned or
+     * row written, mirroring assertReferencesAreActive. The rule
+     * itself (who may file) stays intentionally open: any active
+     * registered person qualifies, no eligibility state is demanded
+     * from the filer.
+     */
+    private function assertPersonaPorIsRegistered(?int $personaPorId): void
+    {
+        if ($personaPorId === null) {
+            return;
+        }
+
+        if ($this->peopleRegistry->find($personaPorId) === null) {
+            throw ValidationException::withMessages([
+                'persona_por_id' => 'The referenced person does not exist or is deactivated.',
+            ]);
         }
     }
 
