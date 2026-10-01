@@ -136,6 +136,7 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
                 'start_date' => $row['start_date'],
                 'end_date' => $row['end_date'],
                 'is_appendix' => $row['is_appendix'],
+                'forma_declaracion' => $row['forma_declaracion'],
             ]);
         }
     }

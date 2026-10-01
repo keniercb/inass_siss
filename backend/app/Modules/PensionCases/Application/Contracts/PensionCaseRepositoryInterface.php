@@ -64,7 +64,7 @@ interface PensionCaseRepositoryInterface
     public function createSalaryRecords(PensionCase $case, array $rows): void;
 
     /**
-     * @param  list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool}>  $rows
+     * @param  list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion: string}>  $rows
      */
     public function createServiceRecords(PensionCase $case, array $rows): void;
 

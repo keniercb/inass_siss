@@ -677,7 +677,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
      * Normalizes the declared service rows (creation payload).
      *
      * @param  list<array<string, mixed>>  $rows
-     * @return list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool}>
+     * @return list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion: string}>
      */
     private function serviceRows(array $rows): array
     {
@@ -708,6 +708,11 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'is_appendix' => (bool) ($row['is_appendix'] ?? false),
+                // Forma de declaración (Task 33): the nested payload
+                // travels the same Documental|Testifical enum as the
+                // individual endpoint — omitted rows keep the
+                // declared default, never a silent drop.
+                'forma_declaracion' => (string) ($row['forma_declaracion'] ?? ServiceDeclarationForm::Documental->value),
             ];
         }
 
