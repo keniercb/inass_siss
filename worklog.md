@@ -1208,3 +1208,26 @@ Stage Summary:
 - Suite 1050/3495 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes TODO OK con la persona por en 4 comprobaciones
 - PENDIENTE: push de la rama y PR — el reset del sandbox se llevó ~/.git-credentials y el PAT de desarrollo NO está disponible (el reprovision lo advierte: pedirlo al usuario); los 4 commits viven en local listos para empujar apenas llegue
 - SIGUIENTE tras el push/merge: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+
+---
+Task ID: 35-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-29 — PR #33, CI y merge a main (persona por del expediente como referencia a persona registrada), desbloqueado por el PAT nuevo del usuario
+
+Work Log:
+- El usuario aportó el PAT de desarrollo recién rotado en el arranque de la sesión: desbloqueó la entrega que la sesión previa dejó completa en local (4 commits sobre feat/SGP-29-persona-por-person-reference) pero sin empujar — credenciales reconfiguradas (helper store, ~/.git-credentials 600, URL limpia del remoto) y verificadas contra la API antes de tocar nada
+- Higiene git previa: main local cargaba otro commit basura no empujado (3308d49, mensaje UUID: scripts/patch_docs_task35.py) sobre 2b911b3 (PR #32) — respaldado en scripts/tmp_mermaid/task35-pre-reset-backup/ y main realineado a origin/main con reset --hard (los 553 archivos "modified" eran solo ruido de permisos 100644→100755 del reinicio del sandbox)
+- Toolchain re-provisionado (reprovision-sandbox.sh: PHP 8.3.32 + composer + MySQL 8.4.6 en 13306); .env reconstituido desde .env.example (APP_KEY generada, DB_DATABASE=sgp con el usuario sgp de .env.example y grants a mano sobre sgp/sgp_test); línea base de main re-verificada en verde (1049/3485) tras detectar un volteo del daemon a mitad de la verificación (el guard de rama detectó HEAD en main con la 140000 ausente; re-ejecutado con switch + guard encadenados)
+- Rama re-verificada íntegra antes de empujar: Pest 1050 tests / 3495 aserciones contra MySQL real (62 s) y fumiga HTTP de expedientes sobre la BD sgp re-migrada TODO OK (con la persona por en sus 4 comprobaciones)
+- Incidente del daemon activo durante TODA la sesión (cuatro volteos de HEAD detectados): la totalidad de las operaciones sensibles (switch, suite, fumiga, push, commit del cierre) se ejecutaron como comandos encadenados con guard de rama — ningún commit aterrizó fuera de su rama; el push explícito por nombre de rama fue inmune al volteo
+- Push de feat/SGP-29-persona-por-person-reference (tip 2837aa7 confirmado idéntico en local y remoto) y PR #33 creada por API: https://github.com/keniercb/inass_siss/pull/33
+- CI (run 36878612002, "CI" #71) SUCCESS a la primera sobre 2837aa7: pint + phpstan 8 + pest contra MySQL del runner (1050/3495) + deptrac + build Docker
+- PR #33 mergeeada a main como 190ed57 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1050 tests / 3495 aserciones (63 s), Pint PASS (402 archivos), PHPStan nivel 8 sin errores (--memory-limit=1G), deptrac 0 violaciones / 0 uncovered
+- Cierre del ciclo documental con esta entrada (chore/worklog-task35-cierre → PR + merge, patrón de los cierres 33/34)
+
+Stage Summary:
+- PERSONA POR COMO REFERENCIA EN MAIN (Task 35/SGP-29, PR #33): pension_cases.persona_por_id BIGINT UNSIGNED NULL FK → people (restrictOnDelete, migración 2026_10_01_140000 que sustituye el VARCHAR(120) de Task 34) — el POST recibe persona_por_id con sonda sobre la superficie ACTIVA (desconocida/desactivada = 422 sobre persona_por_id, omisión = NULL) y el 201, el detalle y el listado devuelven el id más la proyección COMPLETA de la persona bajo persona_por (misma forma que applicant, regla de usuario 3)
+- Las CUATRO correcciones de usuario del ciclo viven verificadas en main: forma de declaración (Task 32+33), numeración territorial (Task 30), nombre de entidad + búsqueda por nombre verificada (Task 31/34) y persona por como referencia (Task 34→35)
+- Suite 1050/3495 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes TODO OK
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
