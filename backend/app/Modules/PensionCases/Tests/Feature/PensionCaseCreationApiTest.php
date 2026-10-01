@@ -51,6 +51,12 @@ use Tests\TestCase;
  *  5. income concept records travel as nested subrecords of the
  *     atomic creation.
  *
+ * Task 34 (user correction): persona_por — the free-text person who
+ * files or manages the case when it is not the applicant themselves
+ * (a relative, a representative) — rides the payload as an optional
+ * passthrough: received by the store, returned by the 201, the
+ * detail and the listing.
+ *
  * The one-open-case rule, eligibility of the applicant and the
  * all-or-nothing subrecord creation stay as Sprint 5 left them.
  */
@@ -206,6 +212,60 @@ final class PensionCaseCreationApiTest extends TestCase
 
         // The applicant projection travels for disambiguation.
         $this->assertSame($this->applicant->identity_number, $response->json('data.applicant.identity_number'));
+    }
+
+    public function test_creates_a_case_with_the_persona_por(): void
+    {
+        // Task 34: the wire RECEIVES persona_por and every read
+        // surface RETURNS it — the 201 of the creation, the detail
+        // and the listing all carry the stored value.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload([
+            'persona_por' => 'María Fernández Ruiz',
+        ]));
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.persona_por', 'María Fernández Ruiz');
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'persona_por' => 'María Fernández Ruiz',
+        ]);
+
+        $this->getJson('/api/v1/pension-cases/'.$response->json('data.id'))
+            ->assertOk()
+            ->assertJsonPath('data.persona_por', 'María Fernández Ruiz');
+
+        $this->getJson('/api/v1/pension-cases')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.persona_por', 'María Fernández Ruiz');
+    }
+
+    public function test_persona_por_is_optional_and_defaults_to_null(): void
+    {
+        // The field is a passthrough with no default: an omitted
+        // persona_por creates the case with NULL — never a 422.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload());
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.persona_por', null);
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'persona_por' => null,
+        ]);
+    }
+
+    public function test_rejects_an_oversized_persona_por(): void
+    {
+        // Structural guard of the wire: VARCHAR(120).
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'persona_por' => str_repeat('a', 121),
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['persona_por']);
+
+        $this->assertSame(0, PensionCase::query()->count());
     }
 
     public function test_the_case_takes_the_office_of_the_registering_user(): void

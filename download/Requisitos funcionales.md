@@ -184,6 +184,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 **RF-ENT-001 (M) — Gestión de entidades (MO)**
 - [ ] Entidad con nombre denominativo, código y NIT únicos, organismo, tipo de entidad, ubicación geográfica, dirección y datos de contacto.
 - [x] Nombre denominativo de la entidad (corrección de usuario, Task 31): campo `name` VARCHAR(120) obligatorio en el alta (422 sin él), NOT NULL en el esquema, devuelto en listado/detalle/árbol y abarcado por la búsqueda `q` del listado (migración `2026_10_01_100000`).
+- [x] Búsqueda del listado de entidades por nombre (revisión de usuario, Task 34): el parámetro `q` de `GET /entities` busca por fragmentos de código, nombre, NIT y objeto social, insensible a mayúsculas y con fragmentos parciales — comportamiento vigente desde Task 31, ahora verificado con test y fumiga y documentado en la descripción OA del endpoint y del parámetro (que omitía el nombre).
 - [ ] Directores (general y económico) referencian personas registradas; son modificables con auditoría.
 - [ ] Jerarquía opcional `entidad superior` autorreferenciada.
 
@@ -233,6 +234,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 - [ ] Expediente con número único COMPUESTO generado por el sistema: once dígitos CONTIGUOS en cuatro secciones — dos del código de provincia de la oficina que registra, dos del código de su municipio, dos de los últimos dígitos del año en curso y cinco del consecutivo del año, provincia y municipio, rellenado con ceros a la izquierda (PPMMAACCCCC) —, con el consecutivo persistido en una tabla propia por AÑO, PROVINCIA Y MUNICIPIO que se incrementa con cada número emitido.
 - [ ] El expediente ASUME la oficina del usuario que lo registra: `office_id` no se envía en el POST (rechazado con 422 si llega; 422 si el actor no tiene oficina o su oficina está desactivada).
 - [ ] Datos del proponente (persona), oficina tramitadora, centro de trabajo, cargo, categoría ocupacional, nivel educacional, categoría científica, TIPO de pensión, RÉGIMEN de pensión y último salario.
+- [x] Persona por (corrección de usuario, Task 34): campo `persona_por` VARCHAR(120) NULL — persona que presenta o gestiona el expediente cuando no es el propio proponente (un familiar, un apoderado, un gestor) — texto libre opcional de puro paso: el alta lo recibe (422 con más de 120 caracteres; la omisión persiste NULL) y el 201, el detalle y el listado lo devuelven (migración `2026_10_01_130000`).
 - [ ] Clasificación de Ejército Rebelde: booleano «pertenece» y fecha de alta, la cual es OBLIGATORIA cuando el booleano es true y se rechaza cuando es false.
 - [ ] El último salario es no negativo y se expresa con dos decimales.
 - [ ] El listado de expedientes devuelve la proyección COMPLETA de la persona promovente (todos sus campos), no un resumen.

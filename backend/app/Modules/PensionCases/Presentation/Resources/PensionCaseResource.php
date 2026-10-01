@@ -21,7 +21,9 @@ use OpenApi\Attributes as OA;
  * derived evidence for the specialist, not case state. The decision
  * fields (approval_legal_basis_id, decision_notes, decided_at,
  * decided_by, computed_amount) stay null until the S6 transitions
- * write them.
+ * write them. The free-text persona_por (Task 34) — the person who
+ * files or manages the case when it is not the applicant — rides
+ * along as a nullable passthrough.
  *
  * @mixin PensionCase
  */
@@ -46,6 +48,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, DECIMAL(12,2) no negativo (RN-005)'),
         new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'Pertenece al Ejército Rebelde (regla 4)'),
         new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'Fecha de alta en el Ejército Rebelde: obligatoria si rebel_army_member es true'),
+        new OA\Property(property: 'persona_por', type: 'string', nullable: true, example: 'María Fernández Ruiz', description: 'Persona que presenta o gestiona el expediente cuando no es el propio proponente (Task 34): texto libre opcional'),
         new OA\Property(property: 'approval_legal_basis_id', type: 'integer', format: 'int64', nullable: true, example: null, description: 'Resolución aprobatoria (H-05); la fija la aprobación de S6'),
         new OA\Property(property: 'decision_notes', type: 'string', nullable: true, example: null, description: 'Nota de resolución o motivo de denegación (S6)'),
         new OA\Property(property: 'decided_at', type: 'string', format: 'date-time', nullable: true, example: null),
@@ -83,6 +86,7 @@ final class PensionCaseResource extends JsonResource
             'last_salary' => (string) $this->last_salary,
             'rebel_army_member' => $this->rebel_army_member,
             'rebel_army_join_date' => $this->rebel_army_join_date?->format('Y-m-d'),
+            'persona_por' => $this->persona_por,
             'approval_legal_basis_id' => $this->approval_legal_basis_id,
             'decision_notes' => $this->decision_notes,
             'decided_at' => $this->decided_at?->format('Y-m-d H:i:s'),

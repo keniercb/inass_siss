@@ -103,6 +103,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'pension_regime_id',
         'rebel_army_member',
         'rebel_army_join_date',
+        'persona_por',
         'last_salary',
     ];
 
@@ -186,6 +187,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     'last_salary' => $lastSalary->__toString(),
                     'rebel_army_member' => $rebelArmyMember,
                     'rebel_army_join_date' => $rebelArmyJoinDate,
+                    // Task 34: free-text passthrough — an omitted
+                    // persona_por persists NULL (never a silent
+                    // discard, the lesson of Task 33).
+                    'persona_por' => $payload['persona_por'] ?? null,
                 ]);
 
                 if ($salaryRows !== []) {

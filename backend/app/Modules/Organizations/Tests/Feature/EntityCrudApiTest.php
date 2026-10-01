@@ -373,6 +373,14 @@ final class EntityCrudApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data');
 
+        // Task 34 review: a PARTIAL, lowercase fragment of the name
+        // matches — the q parameter searches the name column like it
+        // searches code, NIT and social purpose.
+        $this->getJson('/api/v1/entities?q=transportista')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Transportista del Este');
+
         // Filter by province.
         $this->getJson("/api/v1/entities?province_id={$this->santiago->id}")
             ->assertOk()
