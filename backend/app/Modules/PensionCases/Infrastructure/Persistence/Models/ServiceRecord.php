@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $start_date
  * @property CarbonImmutable|null $end_date
  * @property bool $is_appendix
- * @property ServiceDeclarationForm $forma_declaracion
+ * @property ServiceDeclarationForm $declaration_form
  * @property Entity|null $entity
  */
 class ServiceRecord extends Model
@@ -38,7 +38,7 @@ class ServiceRecord extends Model
         'start_date',
         'end_date',
         'is_appendix',
-        'forma_declaracion',
+        'declaration_form',
     ];
 
     /**
@@ -50,7 +50,7 @@ class ServiceRecord extends Model
             'start_date' => 'immutable_date',
             'end_date' => 'immutable_date',
             'is_appendix' => 'boolean',
-            'forma_declaracion' => ServiceDeclarationForm::class,
+            'declaration_form' => ServiceDeclarationForm::class,
         ];
     }
 

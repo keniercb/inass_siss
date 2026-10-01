@@ -24,7 +24,8 @@ use Illuminate\Foundation\Http\FormRequest;
  * still sends the field gets a 422 instead of silently believing
  * its value was honored.
  *
- * Task 35 (user correction over Task 34): persona_por_id — the
+ * Task 35 (user correction over Task 34, English column name
+ * since Task 36): filed_by_person_id — the
  * REGISTERED person who files or manages the case when it is not
  * the applicant themselves — travels as a nullable integer; the
  * registry probe (unknown or DEACTIVATED person answers 422)
@@ -69,7 +70,7 @@ final class StorePensionCaseRequest extends FormRequest
             // Task 35: reference to a REGISTERED person — the
             // existence/active probe is semantic (service), like
             // applicant_person_id.
-            'persona_por_id' => ['nullable', 'integer', 'min:1'],
+            'filed_by_person_id' => ['nullable', 'integer', 'min:1'],
             // RN-005: money travels as an exact decimal string.
             'last_salary' => ['required', ...$money],
             'requested_at' => ['nullable', 'date_format:Y-m-d'],
@@ -86,12 +87,13 @@ final class StorePensionCaseRequest extends FormRequest
             'service_records.*.start_date' => ['required_with:service_records', 'date_format:Y-m-d'],
             'service_records.*.end_date' => ['nullable', 'date_format:Y-m-d'],
             'service_records.*.is_appendix' => ['nullable', 'boolean'],
-            // Forma de declaración per row (Task 33): the nested
+            // Declaration form per row (Task 33; English name since
+            // Task 36): the nested
             // payload accepts the same Documental|Testifical enum as
             // the individual endpoint — omitted rows keep the
             // Documental default, unknown values answer 422 instead
             // of being silently dropped.
-            'service_records.*.forma_declaracion' => ['nullable', 'in:Documental,Testifical'],
+            'service_records.*.declaration_form' => ['nullable', 'in:Documental,Testifical'],
 
             'work_cycles' => ['nullable', 'array', 'max:100'],
             'work_cycles.*.planned_days' => ['required_with:work_cycles', 'integer', 'min:0'],
