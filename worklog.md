@@ -1430,3 +1430,20 @@ Stage Summary:
 - Suite 1108/3788 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga del ciclo de vida 28/28 TODO OK sobre la BD sgp
 - Entrega: 4 commits de código (wip-recuperación + feat + smoke + docs) sobre feat/SGP-34-case-delete-update; push/PR/CI/merge a continuación
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 40-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-34 — PR #43, CI y merge a main (DELETE soft del expediente solo en solicitud + PUT con el promovente inmutable)
+
+Work Log:
+- Entrega: rama feat/SGP-34-case-delete-update (6 commits: wip-recuperación 227c450 + feat 8666da5 + smoke ec78248 + docs 764ed4c + worklog 61f2d7e + pint-fix a9bf848), push explícito por nombre de rama y PR #43 creada por API: https://github.com/keniercb/inass_siss/pull/43
+- Primer CI en ROJO por estilo: el pint --dirty local solo había procesado los archivos del parche propio, pero el contrato del service traído por el wip huérfano cargaba un phpdoc_separation que nunca pasó Pint (su sesión original murió antes del QA) — detectado con pint --test completo, arreglado (1 línea) y re-push como a9bf848; lección: tras recuperar trabajo huérfano, el QA debe correr sobre TODO el árbol, nunca --dirty
+- CI (Quality gate PHP 8.3) SUCCESS sobre a9bf848; PR #43 mergeeada a main como bccb378 con merge commit
+- Regresión final sobre main en verde: Pest 1108 tests / 3788 aserciones contra MySQL real (72 s), Pint PASS (412 archivos), PHPStan nivel 8 sin errores, deptrac 0 violaciones / 0 uncovered
+
+Stage Summary:
+- EL CICLO DE VIDA DEL EXPEDIENTE EN MAIN (Task 40/SGP-34, PR #43): DELETE /pension-cases/{id} soft-delete SOLO en submitted (409 fuera con el estado actual; la fila sobrevive con deleted_at y la bitácora con los valores previos, los subregistros quedan físicos, el detalle/listado dejan de verlo con 404) con la reservación de un-abierto-por-persona LIBERADA (open_case_key NULL en filas borradas, migración 2026_10_02_130000) — y PUT /pension-cases/{id} edita los campos propios con semántica PATCH y probes espejo del alta mientras el PROMOVENTE de la pensión queda INMUTABLE (los 8 campos de la esfera de la persona y los 3 de ciclo de vida responden 422 prohibido), todo anclado por el contrato de ApiDocsTest (spec 1.2.0)
+- Las ONCE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37), el lote del SGP-32 (38), el Schema de Entrada del catálogo (39) y el ciclo de vida del expediente (40)
+- Suite 1108/3788 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga del ciclo de vida 28/28 TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
