@@ -62,6 +62,13 @@ use Illuminate\Validation\ValidationException;
  * one-open-case-per-person rule answers 409 with the open case,
  * backed physically by the open_case_key generated column.
  *
+ * Task 37 (user correction, SGP-31): the case carries the promovente
+ * contact pair — phone and popular_council, nullable free text
+ * normalized like the filer reference (absent, null or empty wire
+ * value all mean NULL) — and the internationalist flag, REQUIRED at
+ * the wire exactly like rebel_army_member (assertMandatoryKeys) with
+ * the boolean cast resolving the persistence.
+ *
  * The NUMBER (user rule 2/ADR-34) is eleven contiguous digits: the
  * registering office's province (2) and municipality (2) codes, the
  * last two digits of the current year (2) and the TERRITORIAL
@@ -77,16 +84,20 @@ use Illuminate\Validation\ValidationException;
  * rules (S5.3): the (case, year) and (case, concept) pairs are
  * probed semantically (422), the year range is decided against the
  * clock (1950…current+1, RF-EXP-002), money flows through the Money
- * value object (RN-005) and service date order is validated against
- * the resulting pair before the CHECK gets a chance to speak.
- * Writes are gated by the editable state: only `submitted` accepts
- * subrecord changes (plan S5.4) — CaseNotEditableException answers
- * 409 with the current status.
+ * value object (RN-005) and — since the Task 37 user correction —
+ * every service period is CLOSED (mandatory end_date strictly after
+ * the start, 422) and DISJOINT from its siblings: overlapping rows
+ * inside the payload answer 422 on service_records before anything
+ * is written. Writes are gated by the editable state: only
+ * `submitted` accepts subrecord changes (plan S5.4) —
+ * CaseNotEditableException answers 409 with the current status.
  *
  * The advisory analysis (warnings) is delegated to the pure Domain
- * values (SalarySeries, ServicePeriods): missing interior salary
- * years, overlapping service periods and links still open are
- * ADVERTISEMENTS for the specialist, never blocks.
+ * values: only the missing interior salary years of SalarySeries
+ * remain an ADVERTISEMENT for the specialist — the overlapping and
+ * open-link analysis of ServicePeriods became a REJECTION with Task
+ * 37 (closed disjoint periods), so the warnings envelope carries
+ * the salary analysis alone.
  *
  * Missing cases are the caller's null (controller answers 404):
  * services never raise HTTP semantics.
@@ -108,7 +119,10 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'pension_regime_id',
         'rebel_army_member',
         'rebel_army_join_date',
+        'internationalist',
         'filed_by_person_id',
+        'phone',
+        'popular_council',
         'last_salary',
     ];
 
@@ -134,7 +148,8 @@ final class PensionCaseService implements PensionCaseServiceInterface
         $this->assertMandatoryKeys($payload, [
             'applicant_person_id', 'office_id', 'employer_entity_id', 'position_id',
             'occupational_category_id', 'educational_level_id', 'scientific_category_id',
-            'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary',
+            'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'internationalist',
+            'last_salary',
         ]);
 
         // Task 35: the filer reference normalized BEFORE the
@@ -166,6 +181,13 @@ final class PensionCaseService implements PensionCaseServiceInterface
             ? (string) $payload['rebel_army_join_date']
             : null;
 
+        // Task 37: promovente classification flag (required at the
+        // wire — assertMandatoryKeys above) and contact pair
+        // (normalized like the filer: absent/null/'' all mean NULL).
+        $internationalist = (bool) $payload['internationalist'];
+        $phone = $this->normalizePromoventeText($payload, 'phone');
+        $popularCouncil = $this->normalizePromoventeText($payload, 'popular_council');
+
         // The number is emitted BEFORE the business transaction: a
         // failed insert burns it (hole accepted by RN-009), but two
         // concurrent creations can never share it (ADR-17/ADR-34).
@@ -181,7 +203,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
-            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $filedByPersonId, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
+            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $filedByPersonId, $internationalist, $phone, $popularCouncil, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
                 $case = $this->cases->create([
                     'number' => $number,
                     'requested_at' => $payload['requested_at'] ?? $this->clock->now()->format('Y-m-d'),
@@ -198,6 +220,12 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     'last_salary' => $lastSalary->__toString(),
                     'rebel_army_member' => $rebelArmyMember,
                     'rebel_army_join_date' => $rebelArmyJoinDate,
+                    // Task 37: internationalist flag plus promovente
+                    // contact pair — never a silent drop (the lesson
+                    // of Task 33).
+                    'internationalist' => $internationalist,
+                    'phone' => $phone,
+                    'popular_council' => $popularCouncil,
                     // Task 35: reference to a registered person,
                     // normalized before the probes (never a silent
                     // discard — the lesson of Task 33).
@@ -258,25 +286,17 @@ final class PensionCaseService implements PensionCaseServiceInterface
     public function warnings(PensionCase $case): array
     {
         $years = [];
-        $services = [];
 
         foreach ($case->salaryRecords as $record) {
             $years[] = (int) $record->year;
         }
 
-        foreach ($case->serviceRecords as $record) {
-            $services[] = new DeclaredService(
-                (int) $record->id,
-                $record->start_date->format('Y-m-d'),
-                $record->end_date?->format('Y-m-d'),
-                (bool) $record->is_appendix,
-            );
-        }
-
+        // Task 37: the service periods are closed and disjoint by
+        // construction now — every write path rejects an open or
+        // overlapping period — so the overlap/open analysis left the
+        // envelope: only the salary series advice remains.
         return [
             'missing_salary_years' => SalarySeries::missingConsecutiveYears($years),
-            'overlapping_services' => ServicePeriods::overlappingPairs($services),
-            'open_services' => ServicePeriods::openServiceIds($services),
         ];
     }
 
@@ -325,7 +345,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, declaration_form?: string}  $attributes
+     * @param  array{entity_id: int, start_date: string, end_date: string, is_appendix: bool, declaration_form?: string}  $attributes
      */
     public function addServiceRecord(int $caseId, array $attributes): ?ServiceRecord
     {
@@ -346,15 +366,17 @@ final class PensionCaseService implements PensionCaseServiceInterface
         }
 
         $startDate = (string) $attributes['start_date'];
-        $endDate = $attributes['end_date'] !== null ? (string) $attributes['end_date'] : null;
+        $endDate = (string) $attributes['end_date'];
 
-        if ($endDate !== null && $endDate < $startDate) {
-            // RN-006 semantic probe: the database CHECK is the last
-            // line, not the answer.
+        if ($endDate <= $startDate) {
+            // Task 37: the end is MANDATORY and STRICTLY posterior —
+            // the database CHECK is the last line, not the answer.
             throw ValidationException::withMessages([
-                'end_date' => 'The service end date cannot precede its start date.',
+                'end_date' => 'The service end date must be after its start date.',
             ]);
         }
+
+        $this->assertPeriodDoesNotOverlap($case, $startDate, $endDate);
 
         return $this->transactions->execute(
             fn (): ServiceRecord => $this->cases->addServiceRecord($case, [
@@ -571,6 +593,52 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
+     * Task 37: normalize one promovente contact string (phone,
+     * popular_council) before the persistence — an absent, null or
+     * empty wire value all mean NULL, exactly like the filer
+     * reference.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function normalizePromoventeText(array $payload, string $key): ?string
+    {
+        $value = $payload[$key] ?? null;
+
+        return $value === null || $value === '' ? null : (string) $value;
+    }
+
+    /**
+     * Task 37 (user correction, SGP-31): no two service periods of a
+     * case may share a single day. The probe runs BEFORE any write —
+     * the candidate is compared against every stored row through the
+     * pure Domain analysis (ServicePeriods::idsOverlappingWith) and a
+     * crossing period answers 422 on end_date naming the stored
+     * records it collides with.
+     */
+    private function assertPeriodDoesNotOverlap(PensionCase $case, string $startDate, string $endDate): void
+    {
+        $existing = [];
+
+        foreach ($case->serviceRecords as $record) {
+            $existing[] = new DeclaredService(
+                (int) $record->id,
+                $record->start_date->format('Y-m-d'),
+                $record->end_date->format('Y-m-d'),
+                (bool) $record->is_appendix,
+            );
+        }
+
+        $candidate = new DeclaredService(0, $startDate, $endDate);
+        $overlapping = ServicePeriods::idsOverlappingWith($candidate, $existing);
+
+        if ($overlapping !== []) {
+            throw ValidationException::withMessages([
+                'end_date' => 'The service period overlaps the existing service record'.(count($overlapping) > 1 ? 's' : '').' #'.implode(', #', $overlapping).' of this case.',
+            ]);
+        }
+    }
+
+    /**
      * Task 35 (user correction over Task 34): the filer is a
      * REFERENCE to a registered person, not free text. The probe uses
      * the ACTIVE registry surface of People — a soft-deleted person
@@ -731,12 +799,17 @@ final class PensionCaseService implements PensionCaseServiceInterface
     /**
      * Normalizes the declared service rows (creation payload).
      *
+     * Task 37: every period is CLOSED and DISJOINT — the end date is
+     * mandatory, strictly posterior to the start and may not share a
+     * single day with a sibling row of the same payload.
+     *
      * @param  list<array<string, mixed>>  $rows
-     * @return list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, declaration_form: string}>
+     * @return list<array{entity_id: int, start_date: string, end_date: string, is_appendix: bool, declaration_form: string}>
      */
     private function serviceRows(array $rows): array
     {
         $normalized = [];
+        $periods = [];
 
         foreach ($rows as $index => $row) {
             $entityId = (int) ($row['entity_id'] ?? 0);
@@ -750,11 +823,19 @@ final class PensionCaseService implements PensionCaseServiceInterface
             $startDate = (string) ($row['start_date'] ?? '');
             $endDate = isset($row['end_date']) && $row['end_date'] !== ''
                 ? (string) $row['end_date']
-                : null;
+                : '';
 
-            if ($endDate !== null && $endDate < $startDate) {
+            if ($endDate === '') {
+                // Task 37: the end date is MANDATORY — the open link
+                // (vínculo vigente) of Sprint 5 no longer exists.
                 throw ValidationException::withMessages([
-                    "service_records.{$index}.end_date" => 'The service end date cannot precede its start date.',
+                    "service_records.{$index}.end_date" => 'The service end date is required.',
+                ]);
+            }
+
+            if ($endDate <= $startDate) {
+                throw ValidationException::withMessages([
+                    "service_records.{$index}.end_date" => 'The service end date must be after its start date.',
                 ]);
             }
 
@@ -769,6 +850,26 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 // declared default, never a silent drop.
                 'declaration_form' => (string) ($row['declaration_form'] ?? ServiceDeclarationForm::Documental->value),
             ];
+
+            // Synthetic id: the row's position in the payload, so
+            // the overlap probe can name the offending rows.
+            $periods[] = new DeclaredService($index, $startDate, $endDate);
+        }
+
+        $pairs = ServicePeriods::overlappingPairs($periods);
+
+        if ($pairs !== []) {
+            // Task 37: the rows of one payload are simultaneous — no
+            // single row owns the fault, so the rejection lands on
+            // the array field naming every overlapping pair.
+            $described = array_map(
+                static fn (array $pair): string => "rows {$pair[0]} and {$pair[1]}",
+                $pairs,
+            );
+
+            throw ValidationException::withMessages([
+                'service_records' => 'The declared service periods overlap: '.implode('; ', $described).'.',
+            ]);
         }
 
         return $normalized;

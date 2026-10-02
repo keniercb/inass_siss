@@ -39,10 +39,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * probed against the ACTIVE registry surface before writing; the
  * full Person projection travels as the filedBy relation,
  * eager-loaded by the detail and the listing exactly like the
- * applicant. Authorship is
- * stamped by the Shared AuditableObserver and every write lands in
- * the append-only trail through the Shared AuditTrailObserver, both
- * registered in the PensionCasesServiceProvider.
+ * applicant. Since Task 37 (user correction, SGP-31) the case also
+ * carries the internationalist flag of the promovente (parallel of
+ * the rebel army pair, required at the wire with the database
+ * DEFAULT covering off-wire writes) plus the promovente contact
+ * pair — phone and popular_council, nullable free text. Authorship
+ * is stamped by the Shared AuditableObserver and every write lands
+ * in the append-only trail through the Shared AuditTrailObserver,
+ * both registered in the PensionCasesServiceProvider.
  *
  * @property int $id
  * @property string $number
@@ -60,7 +64,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $last_salary
  * @property bool $rebel_army_member
  * @property CarbonImmutable|null $rebel_army_join_date
+ * @property bool $internationalist
  * @property int|null $filed_by_person_id
+ * @property string|null $phone
+ * @property string|null $popular_council
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -100,7 +107,10 @@ class PensionCase extends Model
         'last_salary',
         'rebel_army_member',
         'rebel_army_join_date',
+        'internationalist',
         'filed_by_person_id',
+        'phone',
+        'popular_council',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
@@ -134,6 +144,7 @@ class PensionCase extends Model
             'last_salary' => 'decimal:2',
             'rebel_army_join_date' => 'immutable_date',
             'rebel_army_member' => 'boolean',
+            'internationalist' => 'boolean',
             'filed_by_person_id' => 'integer',
             'decided_at' => 'immutable_datetime',
             'computed_amount' => 'decimal:2',
