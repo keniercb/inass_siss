@@ -105,6 +105,124 @@ final class CatalogCrudTest extends TestCase
     }
 
     /**
+     * Task 38 (user correction, SGP-32): the régimen de jubilación
+     * carries an OPTIONAL sector (integer) — EVERY endpoint of the
+     * catalog answers with it: store 201, show, listing and PATCH.
+     */
+    public function test_pension_regimes_carry_the_sector_across_every_endpoint(): void
+    {
+        $id = $this->postJson('/api/v1/catalogs/pension-regimes', [
+            'code' => 'SECT',
+            'name' => 'Sectorial',
+            'months_per_year' => 12,
+            'sector' => 2,
+        ])->assertCreated()
+            ->assertJsonPath('data.sector', 2)
+            ->json('data.id');
+
+        $this->assertDatabaseHas('pension_regimes', ['id' => $id, 'sector' => 2]);
+
+        // Show answers with the sector.
+        $this->getJson("/api/v1/catalogs/pension-regimes/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.sector', 2);
+
+        // The listing answers with the sector.
+        $this->getJson('/api/v1/catalogs/pension-regimes')
+            ->assertOk()
+            ->assertJsonPath('data.0.sector', 2);
+
+        // PATCH updates the sector and answers with it.
+        $this->patchJson("/api/v1/catalogs/pension-regimes/{$id}", ['sector' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.sector', 1);
+
+        // PATCH without the sector leaves it untouched.
+        $this->patchJson("/api/v1/catalogs/pension-regimes/{$id}", ['description' => 'Ajuste'])
+            ->assertOk()
+            ->assertJsonPath('data.sector', 1);
+    }
+
+    public function test_pension_regime_sector_is_optional_and_rejects_non_integers(): void
+    {
+        $this->postJson('/api/v1/catalogs/pension-regimes', [
+            'code' => 'SINSEC',
+            'name' => 'Sin sector',
+            'months_per_year' => 12,
+        ])->assertCreated()
+            ->assertJsonPath('data.sector', null);
+
+        $this->assertDatabaseHas('pension_regimes', ['code' => 'SINSEC', 'sector' => null]);
+
+        $this->postJson('/api/v1/catalogs/pension-regimes', [
+            'code' => 'MALSEC',
+            'name' => 'Sector inválido',
+            'months_per_year' => 12,
+            'sector' => 'dos',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('sector');
+    }
+
+    /**
+     * Task 38 (user correction, SGP-32): the tipo de pensión carries
+     * the persona fallecida flag — deceased_person, boolean with
+     * database DEFAULT false — on EVERY endpoint: an omitted store
+     * persists false, an explicit true travels back in the 201, the
+     * show, the listing and the PATCH.
+     */
+    public function test_pension_types_carry_the_deceased_person_flag_across_every_endpoint(): void
+    {
+        // Omitted flag: the database DEFAULT false answers — never a
+        // 422, never a silent drop.
+        $plain = $this->postJson('/api/v1/catalogs/pension-types', [
+            'code' => 'EDAD',
+            'name' => 'Por edad',
+        ])->assertCreated()
+            ->assertJsonPath('data.deceased_person', false)
+            ->json('data.id');
+
+        $this->assertDatabaseHas('pension_types', ['id' => $plain, 'deceased_person' => false]);
+
+        // Explicit flag: a survivor-style type answers true everywhere.
+        $id = $this->postJson('/api/v1/catalogs/pension-types', [
+            'code' => 'SOB',
+            'name' => 'Por sobrevivencia',
+            'deceased_person' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.deceased_person', true)
+            ->json('data.id');
+
+        $this->assertDatabaseHas('pension_types', ['id' => $id, 'deceased_person' => true]);
+
+        $this->getJson("/api/v1/catalogs/pension-types/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.deceased_person', true);
+
+        $this->getJson('/api/v1/catalogs/pension-types?search=SOB')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.deceased_person', true);
+
+        // PATCH flips the flag and answers with it.
+        $this->patchJson("/api/v1/catalogs/pension-types/{$id}", ['deceased_person' => false])
+            ->assertOk()
+            ->assertJsonPath('data.deceased_person', false);
+
+        // PATCH without the flag leaves it untouched.
+        $this->patchJson("/api/v1/catalogs/pension-types/{$id}", ['name' => 'Por sobrevivencia total'])
+            ->assertOk()
+            ->assertJsonPath('data.deceased_person', false);
+
+        // Non-boolean values answer 422 on the field.
+        $this->postJson('/api/v1/catalogs/pension-types', [
+            'code' => 'MALFAL',
+            'name' => 'Fallecido inválido',
+            'deceased_person' => 'yes',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('deceased_person');
+    }
+
+    /**
      * Task 31: every uniform catalog carries a code, so EVERY listing
      * answers with the field — the seven tables that used to be
      * name-only included.

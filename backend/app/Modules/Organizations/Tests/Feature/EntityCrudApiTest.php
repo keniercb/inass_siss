@@ -126,6 +126,62 @@ final class EntityCrudApiTest extends TestCase
             ->assertJsonPath('data.economic_director_person_id', $economic->id);
     }
 
+    /**
+     * Task 38 FIX (user correction, SGP-32): the GET listado de
+     * entidades answers with the DATA of the director general and the
+     * económico — the FULL Person projections under director and
+     * economic_director, not the bare ids. Entities without directors
+     * answer null on both keys — never a broken projection.
+     */
+    public function test_the_listing_carries_the_full_director_projections(): void
+    {
+        $director = Person::factory()->create();
+        $economic = Person::factory()->create();
+
+        $this->postJson('/api/v1/entities', $this->payload([
+            'director_person_id' => $director->id,
+            'economic_director_person_id' => $economic->id,
+        ]))->assertCreated();
+
+        $this->postJson('/api/v1/entities', $this->payload([
+            'code' => 'ENT-0002',
+            'name' => 'Sin directores',
+            'tax_id_number' => '11000099999',
+        ]))->assertCreated();
+
+        // The listado (GET /entities) carries the full projections.
+        $this->getJson('/api/v1/entities?q=0001')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.director_person_id', $director->id)
+            ->assertJsonPath('data.0.director.id', $director->id)
+            ->assertJsonPath('data.0.director.identity_number', $director->identity_number)
+            ->assertJsonPath('data.0.director.first_name', $director->first_name)
+            ->assertJsonPath('data.0.director.first_surname', $director->first_surname)
+            ->assertJsonPath('data.0.director.deceased', false)
+            ->assertJsonPath('data.0.economic_director_person_id', $economic->id)
+            ->assertJsonPath('data.0.economic_director.id', $economic->id)
+            ->assertJsonPath('data.0.economic_director.identity_number', $economic->identity_number)
+            ->assertJsonPath('data.0.economic_director.first_name', $economic->first_name);
+
+        // Entities without directors: null, never a broken resource.
+        $this->getJson('/api/v1/entities?q=0002')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.director', null)
+            ->assertJsonPath('data.0.economic_director', null);
+
+        // The detail shares the same projection (single WITH source).
+        $entityId = Entity::query()->where('code', 'ENT-0001')->value('id');
+
+        $this->getJson("/api/v1/entities/{$entityId}")
+            ->assertOk()
+            ->assertJsonPath('data.director.id', $director->id)
+            ->assertJsonPath('data.director.identity_number', $director->identity_number)
+            ->assertJsonPath('data.economic_director.id', $economic->id)
+            ->assertJsonPath('data.economic_director.identity_number', $economic->identity_number);
+    }
+
     public function test_registration_lands_in_the_audit_trail(): void
     {
         $this->postJson('/api/v1/entities', $this->payload())->assertCreated();

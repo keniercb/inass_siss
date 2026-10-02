@@ -20,7 +20,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 final class EloquentEntityRepository implements EntityRepositoryInterface
 {
     /** Relations every read projection needs (single source). */
-    private const WITH = ['organization', 'province', 'municipality', 'entityType', 'parent'];
+    private const WITH = ['organization', 'province', 'municipality', 'entityType', 'parent', 'director', 'economicDirector'];
 
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {

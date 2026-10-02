@@ -39,6 +39,11 @@ use Illuminate\Foundation\Http\FormRequest;
  * MANDATORY end_date; the strictly-posterior and no-overlap rules
  * are semantic probes of the service (the database CHECK is the
  * last line), exactly like the rest of the date rules.
+ *
+ * Task 38 (user correction, SGP-32): the fecha de desvinculación —
+ * termination_date, an OPTIONAL date with the Y-m-d shape rule only
+ * (no semantic probe: the user correction declares it plain
+ * optional), exactly like requested_at's shape treatment.
  */
 final class StorePensionCaseRequest extends FormRequest
 {
@@ -81,6 +86,9 @@ final class StorePensionCaseRequest extends FormRequest
             // Task 37: promovente contact pair — nullable free text.
             'phone' => ['nullable', 'string', 'max:30'],
             'popular_council' => ['nullable', 'string', 'max:120'],
+            // Task 38: fecha de desvinculación — optional wire date,
+            // shape rule only (no semantic probe).
+            'termination_date' => ['nullable', 'date_format:Y-m-d'],
             // Task 35: reference to a REGISTERED person — the
             // existence/active probe is semantic (service), like
             // applicant_person_id.

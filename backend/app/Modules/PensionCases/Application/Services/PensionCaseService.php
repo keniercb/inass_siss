@@ -69,6 +69,13 @@ use Illuminate\Validation\ValidationException;
  * the wire exactly like rebel_army_member (assertMandatoryKeys) with
  * the boolean cast resolving the persistence.
  *
+ * Task 38 (user correction, SGP-32): the case carries the promovente's
+ * fecha de desvinculación — termination_date, an OPTIONAL wire date
+ * normalized with the SAME rule as the contact pair (absent, null or
+ * empty all mean NULL). No semantic probe: the user correction
+ * declares the field plain optional, so only the Y-m-d shape rule of
+ * the FormRequest guards it.
+ *
  * The NUMBER (user rule 2/ADR-34) is eleven contiguous digits: the
  * registering office's province (2) and municipality (2) codes, the
  * last two digits of the current year (2) and the TERRITORIAL
@@ -123,6 +130,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'filed_by_person_id',
         'phone',
         'popular_council',
+        'termination_date',
         'last_salary',
     ];
 
@@ -188,6 +196,11 @@ final class PensionCaseService implements PensionCaseServiceInterface
         $phone = $this->normalizePromoventeText($payload, 'phone');
         $popularCouncil = $this->normalizePromoventeText($payload, 'popular_council');
 
+        // Task 38: fecha de desvinculación — optional wire date with
+        // the same normalization as the contact pair (absent/null/''
+        // all mean NULL), never a silent drop (the lesson of Task 33).
+        $terminationDate = $this->normalizePromoventeText($payload, 'termination_date');
+
         // The number is emitted BEFORE the business transaction: a
         // failed insert burns it (hole accepted by RN-009), but two
         // concurrent creations can never share it (ADR-17/ADR-34).
@@ -203,7 +216,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
-            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $filedByPersonId, $internationalist, $phone, $popularCouncil, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
+            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $filedByPersonId, $internationalist, $phone, $popularCouncil, $terminationDate, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
                 $case = $this->cases->create([
                     'number' => $number,
                     'requested_at' => $payload['requested_at'] ?? $this->clock->now()->format('Y-m-d'),
@@ -226,6 +239,9 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     'internationalist' => $internationalist,
                     'phone' => $phone,
                     'popular_council' => $popularCouncil,
+                    // Task 38: fecha de desvinculación — never a
+                    // silent drop (the lesson of Task 33).
+                    'termination_date' => $terminationDate,
                     // Task 35: reference to a registered person,
                     // normalized before the probes (never a silent
                     // discard — the lesson of Task 33).

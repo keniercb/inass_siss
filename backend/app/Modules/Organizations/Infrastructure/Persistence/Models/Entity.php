@@ -8,6 +8,7 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Organization;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
+use App\Modules\People\Infrastructure\Persistence\Models\Person;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +29,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * activity trail through the Shared AuditTrailObserver, both
  * registered in the OrganizationsServiceProvider — this class
  * imports no Security types (deptrac: Organizations depends on
- * Shared, Catalogs and People only).
+ * Shared, Catalogs and People only). Since Task 38 (user correction,
+ * SGP-32) the director general and the económico resolve as People
+ * relations — director and economicDirector — eager-loaded by the
+ * repository WITH so EVERY read projection (listing included)
+ * carries their full Person projections.
  *
  * @property int $id
  * @property string $code
@@ -56,6 +61,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property Municipality|null $municipality
  * @property EntityType|null $entityType
  * @property Entity|null $parent
+ * @property Person|null $director
+ * @property Person|null $economicDirector
  */
 class Entity extends Model
 {
@@ -129,5 +136,30 @@ class Entity extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_entity_id');
+    }
+
+    /**
+     * Director general (Task 38, user correction FIX): the full Person
+     * projection of the registered person holding the general
+     * directorship — eager-loaded by the repository WITH so the
+     * LISTING answers with the data, not the bare id.
+     *
+     * @return BelongsTo<Person, $this>
+     */
+    public function director(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'director_person_id');
+    }
+
+    /**
+     * Director económico (Task 38, user correction FIX): the full
+     * Person projection of the registered economic director — same
+     * eager-loading treatment as the general director.
+     *
+     * @return BelongsTo<Person, $this>
+     */
+    public function economicDirector(): BelongsTo
+    {
+        return $this->belongsTo(Person::class, 'economic_director_person_id');
     }
 }

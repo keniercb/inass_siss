@@ -21,6 +21,7 @@ use Carbon\CarbonImmutable;
  * @property string $name
  * @property string|null $description
  * @property int $months_per_year
+ * @property int|null $sector
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property CarbonImmutable|null $deleted_at
@@ -33,6 +34,8 @@ class PensionRegime extends CatalogModel
         'name',
         'description',
         'months_per_year',
+        // Task 38 (user correction, SGP-32): optional sector.
+        'sector',
         'created_by',
         'updated_by',
     ];
@@ -44,6 +47,7 @@ class PensionRegime extends CatalogModel
     {
         return array_merge(parent::casts(), [
             'months_per_year' => 'integer',
+            'sector' => 'integer',
         ]);
     }
 }

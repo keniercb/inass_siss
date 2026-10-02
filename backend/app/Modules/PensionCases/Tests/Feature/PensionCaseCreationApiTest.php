@@ -425,6 +425,63 @@ final class PensionCaseCreationApiTest extends TestCase
         $this->assertSame(0, PensionCase::query()->count());
     }
 
+    public function test_creates_a_case_with_the_termination_date(): void
+    {
+        // Task 38 (user correction, SGP-32): the expediente carries
+        // the promovente's fecha de desvinculación — termination_date,
+        // an OPTIONAL wire date — the 201, the detail and the listing
+        // RETURN it.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload([
+            'termination_date' => '2025-07-31',
+        ]));
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.termination_date', '2025-07-31');
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'termination_date' => '2025-07-31',
+        ]);
+
+        $this->getJson('/api/v1/pension-cases/'.$response->json('data.id'))
+            ->assertOk()
+            ->assertJsonPath('data.termination_date', '2025-07-31');
+
+        $this->getJson('/api/v1/pension-cases')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.termination_date', '2025-07-31');
+    }
+
+    public function test_termination_date_is_optional_and_defaults_to_null(): void
+    {
+        // The fecha de desvinculación is OPTIONAL: an omitted
+        // termination_date creates the case with NULL — never a 422.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload());
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.termination_date', null);
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'termination_date' => null,
+        ]);
+    }
+
+    public function test_rejects_a_malformed_termination_date(): void
+    {
+        // Shape rule: the wire accepts Y-m-d only — a day-first or
+        // nonsense date answers 422 on termination_date and creates
+        // nothing.
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'termination_date' => '31-07-2025',
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['termination_date']);
+
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
     public function test_the_case_takes_the_office_of_the_registering_user(): void
     {
         // Rule 0: the payload carries NO office_id — the case assumes

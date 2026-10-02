@@ -83,6 +83,13 @@ final class CatalogDefinition
      * Same as storeRules() but every field is optional (PATCH
      * semantics); the code stays immutable either way.
      *
+     * Since Task 38 the PATCH semantics hold for the type-specific
+     * extra columns too: a store rule led by `required` relaxes to
+     * `sometimes` — an absent column simply stays untouched instead
+     * of demanding the whole natural-key set on every PATCH (the
+     * pre-Task-38 merge made every pension-regimes PATCH demand
+     * months_per_year even when only the new sector travelled).
+     *
      * @return array<string, string|array<string>>
      */
     public function updateRules(): array
@@ -99,6 +106,12 @@ final class CatalogDefinition
             $rules['description'] = 'sometimes|nullable|string|max:255';
         }
 
-        return [...$rules, ...$this->extraRules];
+        foreach ($this->extraRules as $column => $rule) {
+            $rules[$column] = str_starts_with($rule, 'required')
+                ? 'sometimes'.substr($rule, strlen('required'))
+                : $rule;
+        }
+
+        return $rules;
     }
 }

@@ -43,10 +43,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * carries the internationalist flag of the promovente (parallel of
  * the rebel army pair, required at the wire with the database
  * DEFAULT covering off-wire writes) plus the promovente contact
- * pair — phone and popular_council, nullable free text. Authorship
- * is stamped by the Shared AuditableObserver and every write lands
- * in the append-only trail through the Shared AuditTrailObserver,
- * both registered in the PensionCasesServiceProvider.
+ * pair — phone and popular_council, nullable free text. Since Task
+ * 38 (user correction, SGP-32) the case also carries the promovente's
+ * fecha de desvinculación — termination_date, a plain nullable date
+ * with no semantic probe (the user correction declares it optional).
+ * Authorship is stamped by the Shared AuditableObserver and every
+ * write lands in the append-only trail through the Shared
+ * AuditTrailObserver, both registered in the
+ * PensionCasesServiceProvider.
  *
  * @property int $id
  * @property string $number
@@ -68,6 +72,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $filed_by_person_id
  * @property string|null $phone
  * @property string|null $popular_council
+ * @property CarbonImmutable|null $termination_date
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -111,6 +116,7 @@ class PensionCase extends Model
         'filed_by_person_id',
         'phone',
         'popular_council',
+        'termination_date',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
@@ -145,6 +151,7 @@ class PensionCase extends Model
             'rebel_army_join_date' => 'immutable_date',
             'rebel_army_member' => 'boolean',
             'internationalist' => 'boolean',
+            'termination_date' => 'immutable_date',
             'filed_by_person_id' => 'integer',
             'decided_at' => 'immutable_datetime',
             'computed_amount' => 'decimal:2',
