@@ -32,7 +32,7 @@ return new class extends Migration
         DB::statement('ALTER TABLE pension_cases DROP COLUMN open_case_key');
         DB::statement(
             'ALTER TABLE pension_cases'
-            ." ADD COLUMN open_case_key BIGINT UNSIGNED NULL"
+            .' ADD COLUMN open_case_key BIGINT UNSIGNED'
             ." GENERATED ALWAYS AS (IF(status IN ('approved', 'rejected') OR deleted_at IS NOT NULL, NULL, applicant_person_id)) STORED"
         );
         DB::statement(
@@ -49,7 +49,7 @@ return new class extends Migration
         DB::statement('ALTER TABLE pension_cases DROP COLUMN open_case_key');
         DB::statement(
             'ALTER TABLE pension_cases'
-            ." ADD COLUMN open_case_key BIGINT UNSIGNED NULL"
+            .' ADD COLUMN open_case_key BIGINT UNSIGNED'
             ." GENERATED ALWAYS AS (IF(status IN ('approved', 'rejected'), NULL, applicant_person_id)) STORED"
         );
         DB::statement(

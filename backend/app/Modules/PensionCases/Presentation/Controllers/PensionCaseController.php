@@ -21,6 +21,7 @@ use App\Modules\PensionCases\Presentation\Requests\StorePensionCaseRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreSalaryRecordRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreServiceRecordRequest;
 use App\Modules\PensionCases\Presentation\Requests\StoreWorkCycleRequest;
+use App\Modules\PensionCases\Presentation\Requests\UpdatePensionCaseRequest;
 use App\Modules\PensionCases\Presentation\Resources\IncomeConceptRecordResource;
 use App\Modules\PensionCases\Presentation\Resources\PensionCaseResource;
 use App\Modules\PensionCases\Presentation\Resources\SalaryRecordResource;
@@ -319,6 +320,123 @@ final class PensionCaseController
             ->additional(['warnings' => $this->cases->warnings($case)])
             ->response()
             ->setStatusCode(201);
+    }
+
+    #[OA\Put(
+        path: '/api/v1/pension-cases/{id}',
+        operationId: 'pensionCasesUpdate',
+        tags: ['Expedientes'],
+        summary: 'Edición del expediente (promovente inmutable)',
+        description: 'PUT de edición del expediente (SGP-34, corrección de usuario, RF-EXP-001): edita los campos del expediente propio — el vínculo laboral y la clasificación de la pensión (entidad, cargo, ambos pares de categorías, tipo y régimen), el último salario y la fecha de solicitud — mientras el PROMOVENTE de la pensión queda INMUTABLE: todo campo de la esfera de la persona (applicant_person_id, filed_by_person_id, el par de Ejército Rebelde, el internacionalista, el par de contacto y la fecha de desvinculación) responde 422 prohibido en vez de derivar silenciosamente al promovente que el registro ya conoce. Los campos de ciclo de vida siguen la misma suerte: office_id respeta la regla 0 del alta (el expediente asume la oficina del usuario que registra) y number/status solo se mueven por sus propios canales (la secuencia del alta, la máquina de transiciones de S6). Semántica PATCH: cada campo es opcional, solo las claves declaradas cambian y la omisión de un campo nunca arranca su valor almacenado. Los probes semánticos espejan el alta (entidad y catálogos activos: 422; fecha de solicitud no futura: 422). La edición solo corre mientras el expediente está en submitted (409 fuera, con el estado actual). Las advertencias de la serie salarial viajan junto a data.',
+        security: [['sanctumAuth' => []]],
+        parameters: [
+            new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'employer_entity_id', type: 'integer', example: 3, description: 'Entidad empleadora del expediente (editable, activa)'),
+                    new OA\Property(property: 'position_id', type: 'integer', example: 2, description: 'Cargo (editable)'),
+                    new OA\Property(property: 'occupational_category_id', type: 'integer', example: 1, description: 'Categoría ocupacional (editable)'),
+                    new OA\Property(property: 'educational_level_id', type: 'integer', example: 4, description: 'Nivel de escolaridad (editable)'),
+                    new OA\Property(property: 'scientific_category_id', type: 'integer', example: 2, description: 'Categoría científica (editable)'),
+                    new OA\Property(property: 'pension_type_id', type: 'integer', example: 1, description: 'Tipo de pensión del catálogo (editable)'),
+                    new OA\Property(property: 'pension_regime_id', type: 'integer', example: 1, description: 'Régimen de pensión del catálogo (editable)'),
+                    new OA\Property(property: 'last_salary', type: 'string', example: '6200.00', description: 'Último salario, decimal exacto no negativo (RN-005, editable)'),
+                    new OA\Property(property: 'requested_at', type: 'string', format: 'date', example: '2026-09-30', description: 'Fecha de solicitud (editable, nunca futura)'),
+                    new OA\Property(property: 'applicant_person_id', type: 'integer', example: 7, description: 'PROHIBIDO (SGP-34): el promovente de la pensión es no modificable — 422 si se envía'),
+                    new OA\Property(property: 'filed_by_person_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable por este endpoint — 422 si se envía'),
+                    new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'internationalist', type: 'boolean', example: true, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'phone', type: 'string', nullable: true, maxLength: 30, example: '+53 5 555 1234', description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'popular_council', type: 'string', nullable: true, maxLength: 120, example: 'Consejo Popular Playa', description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'termination_date', type: 'string', format: 'date', nullable: true, example: '2025-07-31', description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
+                    new OA\Property(property: 'office_id', type: 'integer', nullable: true, example: null, description: 'PROHIBIDO (regla 0): el expediente asume la oficina del usuario autenticado — 422 si se envía'),
+                    new OA\Property(property: 'number', type: 'string', example: '11032600099', description: 'PROHIBIDO: el número se asigna en el alta y no se modifica — 422 si se envía'),
+                    new OA\Property(property: 'status', type: 'string', example: 'submitted', description: 'PROHIBIDO: el estado solo se mueve por su propio canal de transiciones — 422 si se envía'),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Expediente editado con las advertencias de la serie salarial',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', ref: '#/components/schemas/PensionCase'),
+                        new OA\Property(property: 'warnings', type: 'object'),
+                    ],
+                ),
+            ),
+            new OA\Response(ref: '#/components/responses/Unauthorized', response: 401),
+            new OA\Response(ref: '#/components/responses/Forbidden', response: 403),
+            new OA\Response(ref: '#/components/responses/ValidationError', response: 422),
+            new OA\Response(response: 404, description: 'Expediente inexistente (o ya eliminado)'),
+            new OA\Response(response: 409, description: 'Expediente ya no editable (devuelve estado actual)'),
+        ],
+    )]
+    public function update(UpdatePensionCaseRequest $request, int $id): JsonResponse
+    {
+        // SGP-34 (user correction): case edition with an IMMUTABLE
+        // promovente — the FormRequest already rejected every
+        // person-sphere key (422), so only case proper fields ride
+        // the payload. The 409 of the editable state rides the same
+        // caseNotEditable shape of the subrecord writes.
+        try {
+            $case = $this->cases->update($id, $request->validated());
+        } catch (CaseNotEditableException $exception) {
+            return $this->caseNotEditable($exception);
+        }
+
+        abort_if($case === null, 404, 'Case not found.');
+
+        return (new PensionCaseResource($case))
+            ->additional(['warnings' => $this->cases->warnings($case)])
+            ->response();
+    }
+
+    #[OA\Delete(
+        path: '/api/v1/pension-cases/{id}',
+        operationId: 'pensionCasesDestroy',
+        tags: ['Expedientes'],
+        summary: 'Eliminación lógica del expediente',
+        description: 'DELETE del expediente (SGP-34, corrección de usuario, RF-EXP-001): eliminación LÓGICA (soft delete) disponible SOLO mientras el expediente está en submitted (estado de solicitud) — fuera de submitted responde 409 con el estado actual. La fila sobrevive con su deleted_at: la evidencia y la pista de auditoría siguen respondiendo (RN-001) con los valores previos (ADR-19), mientras el detalle y el listado públicos dejan de verlo (404). Los subregistros no se tocan: la historia queda física. La reservación de expediente-abierto-por-persona se LIBERA (la columna generada open_case_key pasa a NULL en las filas eliminadas) para que el operador pueda re-capturar al mismo solicitante tras eliminar un registro equivocado.',
+        security: [['sanctumAuth' => []]],
+        parameters: [
+            new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Expediente eliminado lógicamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Case deleted.'),
+                    ],
+                ),
+            ),
+            new OA\Response(ref: '#/components/responses/Unauthorized', response: 401),
+            new OA\Response(ref: '#/components/responses/Forbidden', response: 403),
+            new OA\Response(response: 404, description: 'Expediente inexistente (o ya eliminado)'),
+            new OA\Response(response: 409, description: 'Expediente fuera de submitted (devuelve estado actual)'),
+        ],
+    )]
+    public function destroy(int $id): JsonResponse
+    {
+        // SGP-34 (user correction): the soft delete of a submitted
+        // case — only the case row dies (logically); the subrecords
+        // and the audit trail survive by construction.
+        try {
+            $deleted = $this->cases->delete($id);
+        } catch (CaseNotEditableException $exception) {
+            return $this->caseNotEditable($exception);
+        }
+
+        abort_if($deleted === null, 404, 'Case not found.');
+
+        return response()->json(['message' => 'Case deleted.']);
     }
 
     #[OA\Post(

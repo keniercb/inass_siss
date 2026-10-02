@@ -26,8 +26,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * 2/ADR-34), the status is the normative
  * CaseStatus enum (section 2.4) and the one-open-case-per-person
  * guarantee is physical: the stored generated column `open_case_key`
- * is NULL on terminal states so the UNIQUE index admits many
- * resolved cases but at most one live case per applicant. The
+ * is NULL on terminal states AND on soft-deleted rows (SGP-34: the
+ * soft delete releases the one-open-case reservation) so the
+ * UNIQUE index admits many resolved cases but at most one live
+ * case per applicant. The
  * pension classification (type, regime, rebel army pair) rides
  * along since user rule 4 and the income concept records are a
  * (case, concept) unique subrecord (user rule 5). Since Task 35

@@ -134,6 +134,18 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'last_salary',
     ];
 
+    private const array UPDATE_COLUMNS = [
+        'employer_entity_id',
+        'position_id',
+        'occupational_category_id',
+        'educational_level_id',
+        'scientific_category_id',
+        'pension_type_id',
+        'pension_regime_id',
+        'last_salary',
+        'requested_at',
+    ];
+
     /**
      * @param  CatalogRepositoryInterface<CatalogModel>  $catalogs
      */
@@ -314,6 +326,69 @@ final class PensionCaseService implements PensionCaseServiceInterface
         return [
             'missing_salary_years' => SalarySeries::missingConsecutiveYears($years),
         ];
+    }
+
+    /**
+     * SGP-34 (user correction): case edition with an IMMUTABLE
+     * promovente. The FormRequest already rejected every
+     * person-sphere key (422), so only case proper fields reach this
+     * port — PATCH semantics: the declared keys change, the omitted
+     * ones keep their stored value. The semantic probes mirror the
+     * store (active entity/catalog references, non-future request
+     * date) so both write paths answer the same shape, and the money
+     * flows through the Money value object exactly like the create.
+     *
+     * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at)
+     */
+    public function update(int $caseId, array $attributes): ?PensionCase
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        $payload = $this->updatePayload($attributes);
+
+        $this->assertUpdateReferencesAreActive($payload);
+        $this->assertRequestedAtIsNotFuture($payload);
+
+        if (isset($payload['last_salary'])) {
+            $payload['last_salary'] = Money::fromString((string) $payload['last_salary'])->__toString();
+        }
+
+        // An empty update is a no-op that answers the untouched case
+        // — never an empty UPDATE statement nor an audit entry.
+        if ($payload !== []) {
+            $this->cases->update($case, $payload);
+        }
+
+        return $this->cases->findDetailed($caseId);
+    }
+
+    /**
+     * SGP-34 (user correction): SOFT delete of a SUBMITTED case —
+     * the row survives with its deleted_at (RN-001: the evidence and
+     * the audit trail stay answerable, with the previous values per
+     * ADR-19) and the subrecords are never touched: the history
+     * stays physically. The one-open-case reservation is RELEASED by
+     * the widened open_case_key generated column (NULL on deleted
+     * rows) so the operator can re-capture the applicant after
+     * eliminating a mistaken registration.
+     */
+    public function delete(int $caseId): ?bool
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        return $this->cases->delete($case);
     }
 
     public function addSalaryRecord(int $caseId, int $year, string $earnedSalary): ?SalaryRecord
@@ -975,6 +1050,57 @@ final class PensionCaseService implements PensionCaseServiceInterface
             throw ValidationException::withMessages([
                 'year' => "The year must be between {$floor} and {$ceiling}.",
             ]);
+        }
+    }
+
+    /**
+     * SGP-34: the editable surface of the update — only the case
+     * proper columns, only the keys the wire declared. The
+     * promovente and lifecycle fields never reach this method: the
+     * FormRequest already rejected them as prohibited.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function updatePayload(array $attributes): array
+    {
+        return collect($attributes)
+            ->only(self::UPDATE_COLUMNS)
+            ->all();
+    }
+
+    /**
+     * SGP-34: the update's semantic probes mirror the store's
+     * assertReferencesAreActive but only over the PRESENT keys — a
+     * PATCH never drags references it did not declare.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertUpdateReferencesAreActive(array $payload): void
+    {
+        if (isset($payload['employer_entity_id'])
+            && $this->entities->find((int) $payload['employer_entity_id']) === null) {
+            throw ValidationException::withMessages([
+                'employer_entity_id' => 'The employer entity does not exist or is deactivated.',
+            ]);
+        }
+
+        $catalogProbes = [
+            'position_id' => Position::class,
+            'occupational_category_id' => OccupationalCategory::class,
+            'educational_level_id' => EducationalLevel::class,
+            'scientific_category_id' => ScientificCategory::class,
+            'pension_type_id' => PensionType::class,
+            'pension_regime_id' => PensionRegime::class,
+        ];
+
+        foreach ($catalogProbes as $key => $modelClass) {
+            if (isset($payload[$key])
+                && $this->catalogs->find($modelClass, (int) $payload[$key]) === null) {
+                throw ValidationException::withMessages([
+                    $key => 'The referenced catalog entry does not exist or is deactivated.',
+                ]);
+            }
         }
     }
 
