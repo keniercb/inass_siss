@@ -158,11 +158,17 @@ final class RbacPensionCasesApiTest extends TestCase
     #[DataProvider('consultationRoles')]
     public function test_every_role_reads_the_case(string $role): void
     {
-        $this->actingAsRole($role);
+        // SGP-35: the listing is scoped to the actor's office — the
+        // readers get the fixture office assigned so the consultation
+        // answers with the case (an officeless actor would keep an
+        // empty, fail-closed page).
+        $user = $this->actingAsRole($role);
+        $user->forceFill(['office_id' => $this->case->office_id])->save();
 
         $this->getJson('/api/v1/pension-cases')
             ->assertOk()
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.office_id', $this->case->office_id);
 
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")
             ->assertOk()

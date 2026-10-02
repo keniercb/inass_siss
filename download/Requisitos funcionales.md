@@ -294,8 +294,9 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 - [ ] La reapertura exige motivo y bloquea pagos nuevos del pensionado afectado hasta re-resolución.
 
 **RF-EXP-011 (M) — Búsqueda y filtros (MO)**
-- [ ] Listado filtrable por estado, oficina, persona, rango de fechas de solicitud y número.
+- [ ] Listado filtrable por estado, persona, rango de fechas de solicitud y número.
 - [ ] Exportación CSV del resultado filtrado (ver RF-REP-004).
+- [x] ALCANCE TERRITORIAL del listado (corrección de usuario, Task 41/SGP-35): solo cargan los expedientes cuya oficina coincide con la oficina del USUARIO AUTENTICADO — la oficina NO viaja en la petición (422 prohibido si llega: el filtro dejó el wire) porque el servidor la deriva de la asignación del actor (ADR-33/ADR-29, el mismo patrón del alta que asume la oficina del usuario que registra); un actor sin oficina — estado de cuenta legítimo — recibe una página VACÍA (fail-closed, nunca el directorio sin scope), y el alcance compone con los filtros restantes, que angulan DENTRO de la oficina del actor, jamás a través de ella.
 
 ### 4.6 Módulo CAL — Cálculo de pensión
 

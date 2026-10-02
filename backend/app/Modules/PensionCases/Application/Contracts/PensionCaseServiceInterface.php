@@ -64,7 +64,13 @@ interface PensionCaseServiceInterface
     public function create(array $attributes): PensionCase;
 
     /**
-     * @param  array{status?: string, office_id?: int, applicant_person_id?: int, number?: string, requested_from?: string, requested_to?: string}  $filters
+     * TERRITORIALLY scoped search (SGP-35, user correction): only
+     * the cases of the acting user's office load — the office is
+     * resolved by the Presentation layer through the Shared office
+     * port, never the wire. An absent/null office_id answers an
+     * EMPTY page (fail-closed), never the unscoped directory.
+     *
+     * @param  array{status?: string, office_id?: int|null, applicant_person_id?: int, number?: string, requested_from?: string, requested_to?: string}  $filters
      * @return LengthAwarePaginator<int, PensionCase>
      */
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator;

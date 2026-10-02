@@ -284,11 +284,27 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * @param  array{status?: string, office_id?: int, applicant_person_id?: int, number?: string, requested_from?: string, requested_to?: string}  $filters
+     * TERRITORIALLY scoped search (SGP-35, user correction): only
+     * the cases of the acting user's office load. The controller
+     * resolves the office through the Shared port and injects it
+     * here; the guard below keeps the scope FAIL-CLOSED — an actor
+     * without an office (a legitimate account state, ADR-29) or a
+     * caller that forgets the criterion matches no office, so the
+     * answer is an empty page, never the unscoped directory.
+     *
+     * @param  array{status?: string, office_id?: int|null, applicant_person_id?: int, number?: string, requested_from?: string, requested_to?: string}  $filters
      * @return LengthAwarePaginator<int, PensionCase>
      */
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
+        $officeId = $filters['office_id'] ?? null;
+
+        unset($filters['office_id']);
+
+        if ($officeId === null) {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage, $page);
+        }
+
         $status = $filters['status'] ?? null;
 
         unset($filters['status']);
@@ -298,6 +314,8 @@ final class PensionCaseService implements PensionCaseServiceInterface
             $filters,
             static fn (string|int|null $value): bool => $value !== null && $value !== '',
         );
+
+        $criteria['office_id'] = $officeId;
 
         if (is_string($status) && $status !== '') {
             $criteria['status'] = CaseStatus::from($status);

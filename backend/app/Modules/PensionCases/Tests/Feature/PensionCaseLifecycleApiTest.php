@@ -65,6 +65,12 @@ final class PensionCaseLifecycleApiTest extends TestCase
         $this->operator = $this->actingAsRole('operator');
 
         [$this->applicant, $this->entity, $this->case] = $this->seedCase();
+
+        // SGP-35: the listing is scoped to the actor's office — the
+        // operator joins the fixture office so the listing assertions
+        // of the lifecycle stay honest (the re-capture forceFill below
+        // becomes a no-op, never a divergence).
+        $this->operator->forceFill(['office_id' => $this->case->office_id])->save();
     }
 
     /**

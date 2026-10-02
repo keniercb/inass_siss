@@ -52,6 +52,13 @@ declare(strict_types=1);
  * general y el económico como proyecciones completas de Persona (null
  * cuando la entidad no los declara, igual que el detalle).
  *
+ * Task 41 (SGP-35, corrección de usuario): el listado de expedientes
+ * está ALCANCE TERRITORIAL — solo cargan los expedientes cuya
+ * oficina coincide con la oficina del usuario autenticado (la
+ * oficina NO viaja en la query: 422 prohibido si llega; el actor sin
+ * oficina recibe una página VACÍA, fail-closed; reasignar al actor a
+ * otra oficina mueve el scope de punta a punta).
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -214,6 +221,13 @@ try {
     // ---- Regla 0: el actor SIN oficina no puede registrar ----
     $noOffice = $base('POST', '/pension-cases', $payload);
     check('regla 0: actor sin oficina responde 422', $noOffice->status() === 422, detail($noOffice));
+
+    // ---- SGP-35: el actor SIN oficina tampoco ve expediente alguno ----
+    // (fail-closed: corridas previas dejan expedientes de SUS oficinas
+    // en la BD, y el listado sin scope NO puede responderlos)
+    $noScope = $base('GET', '/pension-cases');
+    check('SGP-35: actor sin oficina recibe listado VACÍO', $noScope->status() === 200
+        && count($noScope->json('data') ?? []) === 0, detail($noScope));
 
     // El admin asume la oficina municipal (ADR-33/ADR-29).
     $assign = $base('PATCH', "/users/{$adminId}", ['office_id' => $municipalId]);
@@ -808,9 +822,37 @@ try {
         && ($row['applicant']['identity_number'] ?? null) === $applicant->identity_number;
     check('regla 3: listado con proyección completa del promovente', $fullApplicant, detail($listing));
 
+    // ---- SGP-35: la oficina NO viaja en la query ----
+    $scopedQuery = $base('GET', '/pension-cases?office_id='.$municipalId);
+    check('SGP-35: office_id en la query responde 422', $scopedQuery->status() === 422
+        && is_array($scopedQuery->json('errors.office_id')), detail($scopedQuery));
+
+    // ---- SGP-35: reasignar al actor MUEVE el scope de punta a punta ----
+    $toProvincial = $base('PATCH', "/users/{$adminId}", ['office_id' => $provincialId]);
+    check('SGP-35: actor reasignado a la provincial (200)', $toProvincial->status() === 200, detail($toProvincial));
+
+    $provincialListing = $base('GET', '/pension-cases?per_page=50');
+    check('SGP-35: el scope provincial NO carga los expedientes municipales', $provincialListing->status() === 200
+        && count($provincialListing->json('data') ?? []) === 0, detail($provincialListing));
+
+    $backToMunicipal = $base('PATCH', "/users/{$adminId}", ['office_id' => $municipalId]);
+    check('SGP-35: actor devuelto a la municipal (200)', $backToMunicipal->status() === 200, detail($backToMunicipal));
+
+    $municipalListing = $base('GET', '/pension-cases?per_page=50');
+    $municipalRows = $municipalListing->json('data') ?? [];
+    $scopedAgain = count($municipalRows) > 0
+        && collect($municipalRows)->firstWhere('applicant.id', $applicant->id) !== null
+        && collect($municipalRows)->every(fn (array $r): bool => (int) ($r['office_id'] ?? 0) === $municipalId);
+    check('SGP-35: el scope municipal vuelve a cargar SUS expedientes (y solo los suyos)', $scopedAgain, detail($municipalListing));
+
     // ---- Regla 0 (higiene): restaurar al admin sin oficina ----
     $restore = $base('PATCH', "/users/{$adminId}", ['office_id' => null]);
     check('higiene: admin restaurado sin oficina', $restore->status() === 200, detail($restore));
+
+    // ---- SGP-35 (higiene): sin oficina, el listado vuelve a VACÍO ----
+    $officelessListing = $base('GET', '/pension-cases');
+    check('SGP-35: higiene — actor sin oficina, listado VACÍO de nuevo', $officelessListing->status() === 200
+        && count($officelessListing->json('data') ?? []) === 0, detail($officelessListing));
 } finally {
     proc_terminate($server);
     proc_close($server);
