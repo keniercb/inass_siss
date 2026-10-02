@@ -1255,3 +1255,22 @@ Stage Summary:
 - Suite 1050/3495 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga TODO OK sobre la BD sgp
 - Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-30-english-column-names, push y PR
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 36-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-30 — PR #35, CI y merge a main (columnas de BD al patrón inglés), con la regla ADR-03 fijada como vinculante para todo el desarrollo
+
+Work Log:
+- Entrega: rama feat/SGP-30-english-column-names (4 commits: feat 3306ee4 + test b486ef8 + docs 3573551 + worklog e3cf61b — separados tras un reset --soft que corrigió un feat que había absorbido los tests por un add demasiado amplio), push y PR #35 creada por API: https://github.com/keniercb/inass_siss/pull/35
+- CI (run 36943232649, "CI" #73) SUCCESS a la primera sobre e3cf61b: pint + phpstan 8 + pest contra MySQL del runner (1050/3495) + deptrac + build Docker
+- PR #35 mergeeada a main como 6304269 con merge commit; main local sincronizado y regresión final sobre main en verde: Pest 1050 tests / 3495 aserciones, Pint PASS (404 archivos), PHPStan nivel 8 sin errores, deptrac 0 violaciones / 0 uncovered
+- Incidente del daemon: un commit basura de permisos (e9a5654, mensaje UUID, 0 cambios de contenido) descartado de main con reset --hard al arranque de la tarea; los múltiples volteos de HEAD entre comandos quedaron contenidos por los guards de rama encadenados en cada operación sensible (switch, suite, fumiga, commits, push)
+
+Stage Summary:
+- COLUMNAS AL PATRÓN INGLÉS EN MAIN (Task 36/SGP-30, PR #35): service_records.declaration_form (CHECK chk_service_records_declaration_form) y pension_cases.filed_by_person_id (FK pension_cases_filed_by_person_id_foreign → people) — el wire, las proyecciones (filed_by) y los schemas OA quedaron en inglés; los valores Documental|Testifical permanecen como dominio del usuario; recuento de suite idéntico al de main (1050/3495, refactorización pura)
+- REGLA VINCULANTE REGISTRADA en los cuatro documentos (changelogs 1.22/1.28/1.20) y en el worklog: toda columna/identificador de BD nuevo nace en inglés (ADR-03), como todo el esquema previo
+- Las CINCO correcciones de usuario del ciclo viven en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35) y columnas al patrón inglés (36)
+- Suite 1050/3495 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga TODO OK
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
