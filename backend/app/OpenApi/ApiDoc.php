@@ -15,7 +15,7 @@ use OpenApi\Attributes as OA;
  * and never drifts from the routes it describes (ADR-13).
  */
 #[OA\Info(
-    version: '1.0.0',
+    version: '1.1.0',
     title: 'SGP API',
     description: 'API del Sistema de Gestión de Pensionados (SGP) del Ministerio de Trabajo. Todos los endpoints viven bajo el prefijo /api/v1. Envelope de respuestas conforme RF-API-002: campo `data` en éxito, `message` para respuestas de un solo mensaje y 422 con errores por campo.',
     contact: new OA\Contact(name: 'Equipo Backend SGP'),

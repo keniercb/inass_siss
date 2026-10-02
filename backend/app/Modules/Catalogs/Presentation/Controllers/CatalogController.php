@@ -115,7 +115,7 @@ final class CatalogController
                     new OA\Property(property: 'months_per_year', type: 'integer', minimum: 1, maximum: 12, example: 12),
                     new OA\Property(property: 'applies_base_salary', type: 'boolean', example: true),
                     new OA\Property(property: 'sector', type: 'integer', nullable: true, example: 2, description: 'Solo pension-regimes (Task 38): sector opcional; la omisión persiste null'),
-                    new OA\Property(property: 'deceased_person', type: 'boolean', example: false, description: 'Solo pension-types (Task 38): persona fallecida; la omisión persiste el default false'),
+                    new OA\Property(property: 'deceased_person', type: 'boolean', default: false, example: false, description: 'Solo pension-types (Task 38): persona fallecida; la omisión persiste el default false'),
                 ],
             ),
         ),

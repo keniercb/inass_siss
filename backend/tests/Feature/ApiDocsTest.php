@@ -206,6 +206,51 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['Person']['properties']['father_name']['type'])->toBe('string');
     });
 
+    // Task 39 (user correction, SGP-33): the catalog INPUT schema must
+    // recognize the fields incorporated by the Task 38 correction — the
+    // régimen de jubilación sector (integer, optional) and the tipo de
+    // pensión persona fallecida flag (deceased_person, boolean that
+    // defaults to false when omitted). The served spec is regenerated on
+    // every docs request (L5_SWAGGER_GENERATE_ALWAYS), so these anchors
+    // keep the Schema de Entrada from drifting away from the wire the
+    // FormRequests actually validate.
+    it('documents the catalog input schema with the incorporated fields', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        $store = $spec['paths']['/api/v1/catalogs/{type}']['post']['requestBody']['content']['application/json']['schema'];
+        $update = $spec['paths']['/api/v1/catalogs/{type}/{id}']['patch']['requestBody']['content']['application/json']['schema'];
+
+        // The spec version is the freshness signal of the served schema:
+        // 1.1.0 is the revision that documents the incorporated fields.
+        expect($spec['info']['version'])->toBe('1.1.0')
+
+            // Schema de Entrada del alta: the sector travels as an optional
+            // integer and the persona fallecida flag as a boolean whose
+            // omission the API resolves to the documented default false.
+            ->and($store['required'])->toBe(['name'])
+            ->and($store['properties'])->toHaveKey('sector')
+            ->and($store['properties']['sector']['type'])->toBe('integer')
+            ->and($store['properties']['sector']['nullable'])->toBe(true)
+            ->and($store['properties'])->toHaveKey('deceased_person')
+            ->and($store['properties']['deceased_person']['type'])->toBe('boolean')
+            ->and($store['properties']['deceased_person']['default'])->toBe(false)
+
+            // Schema de Entrada de la edición: both fields ride the PATCH
+            // semantics (optional, sector null uproots the value).
+            ->and($update['properties'])->toHaveKey('sector')
+            ->and($update['properties']['sector']['type'])->toBe('integer')
+            ->and($update['properties']['sector']['nullable'])->toBe(true)
+            ->and($update['properties'])->toHaveKey('deceased_person')
+            ->and($update['properties']['deceased_person']['type'])->toBe('boolean')
+
+            // Output mirror: CatalogItem answers with both fields so the
+            // listing, detail and write projections stay symmetric.
+            ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('sector')
+            ->and($spec['components']['schemas']['CatalogItem']['properties']['sector']['type'])->toBe('integer')
+            ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('deceased_person')
+            ->and($spec['components']['schemas']['CatalogItem']['properties']['deceased_person']['type'])->toBe('boolean');
+    });
+
     it('documents the response envelope and error shapes', function () {
         $spec = $this->getJson('/api/docs')->json();
 

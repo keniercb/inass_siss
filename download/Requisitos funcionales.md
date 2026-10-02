@@ -447,6 +447,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 
 **RF-API-004 (S) — Documentación (DA)**
 - [ ] Especificación OpenAPI generada y publicada en el entorno de desarrollo.
+- [x] Spec servida siempre vigente (corrección de usuario, Task 39/SGP-33): la regeneración `L5_SWAGGER_GENERATE_ALWAYS` está activa en desarrollo, tests y staging (`docker-compose.yml`), de modo que la spec publicada en el entorno refleja SIEMPRE el código desplegado — sin ella, el volumen persistente `app-storage` sirve un api-docs.json cacheado de una imagen anterior y el Schema de Entrada de los catálogos deja de reconocer los campos incorporados (`sector`, `deceased_person`) —; el contrato de ApiDocsTest ancla ambos campos en los schemas de entrada del POST y del PATCH, y `info.version` (1.1.0) es la señal de frescura de la spec servida.
 
 ---
 
