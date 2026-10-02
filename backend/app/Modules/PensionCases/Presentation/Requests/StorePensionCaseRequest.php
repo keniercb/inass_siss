@@ -31,6 +31,14 @@ use Illuminate\Foundation\Http\FormRequest;
  * registry probe (unknown or DEACTIVATED person answers 422)
  * lives in the service, exactly like the applicant and the rest
  * of the references: the FormRequest guards shape only.
+ *
+ * Task 37 (user correction, SGP-31): the internationalist flag —
+ * REQUIRED boolean, parallel of rebel_army_member — plus the
+ * promovente contact pair (phone, popular_council: nullable
+ * strings with a ceiling). The nested service rows demand a
+ * MANDATORY end_date; the strictly-posterior and no-overlap rules
+ * are semantic probes of the service (the database CHECK is the
+ * last line), exactly like the rest of the date rules.
  */
 final class StorePensionCaseRequest extends FormRequest
 {
@@ -67,6 +75,12 @@ final class StorePensionCaseRequest extends FormRequest
                 // …and rejected when it is false.
                 'prohibited_unless:rebel_army_member,1,true',
             ],
+            // Task 37: internationalist flag of the promovente —
+            // required boolean, parallel of rebel_army_member.
+            'internationalist' => ['required', 'boolean'],
+            // Task 37: promovente contact pair — nullable free text.
+            'phone' => ['nullable', 'string', 'max:30'],
+            'popular_council' => ['nullable', 'string', 'max:120'],
             // Task 35: reference to a REGISTERED person — the
             // existence/active probe is semantic (service), like
             // applicant_person_id.
@@ -85,7 +99,10 @@ final class StorePensionCaseRequest extends FormRequest
             'service_records' => ['nullable', 'array', 'max:200'],
             'service_records.*.entity_id' => ['required_with:service_records', 'integer', 'min:1'],
             'service_records.*.start_date' => ['required_with:service_records', 'date_format:Y-m-d'],
-            'service_records.*.end_date' => ['nullable', 'date_format:Y-m-d'],
+            // Task 37: the end date is MANDATORY — the open link no
+            // longer exists; strictly-posterior and disjointness are
+            // semantic probes of the service.
+            'service_records.*.end_date' => ['required_with:service_records', 'date_format:Y-m-d'],
             'service_records.*.is_appendix' => ['nullable', 'boolean'],
             // Declaration form per row (Task 33; English name since
             // Task 36): the nested

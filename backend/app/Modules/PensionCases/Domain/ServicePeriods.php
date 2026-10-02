@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Domain;
 
 /**
- * Overlap and open-link detection over the declared services
- * (RF-EXP-003, H-15). Two periods overlap when they share at least
- * one day — inclusive bounds — which is exactly the classic
- * interval intersection: a.start <= b.end AND b.start <= a.end. An
- * open link (end NULL) stretches to infinity, so it overlaps
- * anything starting on or after its own start.
- *
- * The outcome is a WARNING, never a rejection: the requirement says
- * the system "detects and advertises", leaving the judgement to the
- * specialist. Pairs are reported once with ascending ids so the API
- * response is stable and diff-friendly.
+ * Overlap detection over the declared services (RF-EXP-003, H-15).
+ * Two periods overlap when they share at least one day — inclusive
+ * bounds — which is exactly the classic interval intersection:
+ * a.start <= b.end AND b.start <= a.end. Since the Task 37 user
+ * correction every period is closed (mandatory end, strictly after
+ * the start) and the outcome is a REJECTION, never a warning: no two
+ * subrecords of a case may share time, so the application layer
+ * probes both entry points — the nested rows of the creation payload
+ * (pairwise, overlappingPairs) and the individual alta against the
+ * rows the case already holds (idsOverlappingWith) — answering 422
+ * before anything is written. Pairs are reported once with ascending
+ * ids so the rejection message is stable and diff-friendly.
  */
 final class ServicePeriods
 {
@@ -23,7 +24,9 @@ final class ServicePeriods
 
     /**
      * Overlapping id pairs, each once, ids ascending, pairs ordered
-     * by first id then second.
+     * by first id then second — the probe of the NESTED creation
+     * payload, where the rows are simultaneous and no single row owns
+     * the fault.
      *
      * @param  list<DeclaredService>  $services
      * @return list<array{int, int}>
@@ -50,33 +53,34 @@ final class ServicePeriods
     }
 
     /**
-     * Ids of the services still without an end date, in the order
-     * they were declared.
+     * Ids of the declared services that share at least one day with
+     * the candidate period, in the order they were declared — the
+     * probe of the INDIVIDUAL alta, where the candidate is the only
+     * new row and the returned ids name the stored records the 422
+     * message must mention.
      *
      * @param  list<DeclaredService>  $services
      * @return list<int>
      */
-    public static function openServiceIds(array $services): array
+    public static function idsOverlappingWith(DeclaredService $candidate, array $services): array
     {
-        $open = [];
+        $overlapping = [];
 
         foreach ($services as $service) {
-            if ($service->endDate === null) {
-                $open[] = $service->id;
+            if (self::periodsOverlap($candidate, $service)) {
+                $overlapping[] = $service->id;
             }
         }
 
-        return $open;
+        return $overlapping;
     }
 
+    /**
+     * Inclusive-day interval intersection.
+     */
     private static function periodsOverlap(DeclaredService $left, DeclaredService $right): bool
     {
-        $leftEnd = $left->endDate ?? '9999-12-31';
-        $rightEnd = $right->endDate ?? '9999-12-31';
-
-        // Inclusive-day interval intersection with open links
-        // extended to the end of time.
-        return $left->startDate <= $rightEnd && $right->startDate <= $leftEnd;
+        return $left->startDate <= $right->endDate && $right->startDate <= $left->endDate;
     }
 
     /** @return array{int, int} */

@@ -23,7 +23,10 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  * salaries capped at fifteen, services, cycles and income concept
  * records —, the subrecord highs/removals gated by the editable
  * state, and the advisory analysis the responses carry (missing
- * salary years, overlapping and open services).
+ * salary years). Since the Task 37 user correction the service
+ * periods are CLOSED (mandatory end strictly after the start) and
+ * DISJOINT (no overlap between subrecords): both rules answer 422
+ * at every write path.
  *
  * The OFFICE of a new case is the registering user's — the
  * Presentation layer resolves it through the Shared office port and
@@ -64,12 +67,15 @@ interface PensionCaseServiceInterface
     public function get(int $id): ?PensionCase;
 
     /**
-     * Advisory analysis of the declared evidence (RF-EXP-002/003):
-     * missing interior salary years, overlapping service pairs and
-     * services still without an end date. Pure reading of the loaded
-     * relations (call get() first) — never a write, never a block.
+     * Advisory analysis of the declared evidence (RF-EXP-002): the
+     * missing interior salary years of the series. Since Task 37 the
+     * service periods are closed and disjoint by construction — both
+     * conditions are rejected (422) at every write path — so the
+     * overlap/open analysis left the envelope. Pure reading of the
+     * loaded relations (call get() first) — never a write, never a
+     * block.
      *
-     * @return array{missing_salary_years: list<int>, overlapping_services: list<array{int, int}>, open_services: list<int>}
+     * @return array{missing_salary_years: list<int>}
      */
     public function warnings(PensionCase $case): array;
 
@@ -89,7 +95,12 @@ interface PensionCaseServiceInterface
     public function removeSalaryRecord(int $caseId, int $recordId): ?bool;
 
     /**
-     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, declaration_form?: string}  $attributes
+     * Adds one work service to a submitted case (RF-EXP-003). Task 37:
+     * the period is CLOSED (mandatory end_date strictly after the
+     * start) and DISJOINT (no overlap with the stored services of
+     * the case) — both violations answer 422.
+     *
+     * @param  array{entity_id: int, start_date: string, end_date: string, is_appendix: bool, declaration_form?: string}  $attributes
      * @return null when the case does not exist (controller: 404)
      *
      * @throws CaseNotEditableException

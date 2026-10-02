@@ -65,6 +65,13 @@ use Tests\TestCase;
  * declaration_form and persona_por_id became filed_by_person_id —
  * and that pattern is binding for all future development.
  *
+ * Task 37 (user correction, SGP-31): the case carries the promovente
+ * contact pair (phone, popular_council — both nullable strings) and
+ * the internationalist flag (required boolean, parallel of
+ * rebel_army_member); the nested service rows demand a MANDATORY
+ * end_date strictly after the start and accept NO overlapping pair
+ * (422 on service_records with nothing created).
+ *
  * The one-open-case rule, eligibility of the applicant and the
  * all-or-nothing subrecord creation stay as Sprint 5 left them.
  */
@@ -186,6 +193,9 @@ final class PensionCaseCreationApiTest extends TestCase
             'pension_type_id' => $this->pensionTypeId,
             'pension_regime_id' => $this->pensionRegimeId,
             'rebel_army_member' => false,
+            // Task 37: promovente classification flag — required at
+            // the wire exactly like rebel_army_member.
+            'internationalist' => false,
             'last_salary' => '5000.00',
         ], $overrides);
     }
@@ -213,7 +223,13 @@ final class PensionCaseCreationApiTest extends TestCase
             ->assertJsonPath('data.pension_type_id', $this->pensionTypeId)
             ->assertJsonPath('data.pension_regime_id', $this->pensionRegimeId)
             ->assertJsonPath('data.rebel_army_member', false)
-            ->assertJsonPath('data.rebel_army_join_date', null);
+            ->assertJsonPath('data.rebel_army_join_date', null)
+            // Task 37: the promovente contact pair defaults to NULL and
+            // the internationalist flag travels with the classification
+            // block of the response.
+            ->assertJsonPath('data.internationalist', false)
+            ->assertJsonPath('data.phone', null)
+            ->assertJsonPath('data.popular_council', null);
 
         // Default requested_at: today (resolved through the clock).
         $this->assertSame(now()->toDateString(), $response->json('data.requested_at'));
@@ -313,6 +329,98 @@ final class PensionCaseCreationApiTest extends TestCase
         ]))
             ->assertStatus(422)
             ->assertJsonValidationErrors(['filed_by_person_id']);
+
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_creates_a_case_with_the_promovente_contact_and_internationalist_fields(): void
+    {
+        // Task 37 (user correction, SGP-31): the expediente carries the
+        // promovente's phone and popular council (nullable strings) and
+        // the internationalist flag — the wire RECEIVES them and the
+        // 201, the detail and the listing RETURN them.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload([
+            'phone' => '+53 5 555 1234',
+            'popular_council' => 'Consejo Popular Playa',
+            'internationalist' => true,
+        ]));
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.phone', '+53 5 555 1234')
+            ->assertJsonPath('data.popular_council', 'Consejo Popular Playa')
+            ->assertJsonPath('data.internationalist', true);
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'phone' => '+53 5 555 1234',
+            'popular_council' => 'Consejo Popular Playa',
+            'internationalist' => true,
+        ]);
+
+        $this->getJson('/api/v1/pension-cases/'.$response->json('data.id'))
+            ->assertOk()
+            ->assertJsonPath('data.phone', '+53 5 555 1234')
+            ->assertJsonPath('data.popular_council', 'Consejo Popular Playa')
+            ->assertJsonPath('data.internationalist', true);
+
+        $this->getJson('/api/v1/pension-cases')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.phone', '+53 5 555 1234')
+            ->assertJsonPath('data.0.popular_council', 'Consejo Popular Playa')
+            ->assertJsonPath('data.0.internationalist', true);
+    }
+
+    public function test_phone_and_popular_council_are_optional_and_default_to_null(): void
+    {
+        // The promovente contact pair is optional: an omitted phone
+        // and popular_council create the case with NULL — never a 422.
+        $response = $this->postJson('/api/v1/pension-cases', $this->payload());
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.phone', null)
+            ->assertJsonPath('data.popular_council', null);
+
+        $this->assertDatabaseHas('pension_cases', [
+            'id' => $response->json('data.id'),
+            'phone' => null,
+            'popular_council' => null,
+        ]);
+    }
+
+    public function test_rejects_a_missing_internationalist_flag(): void
+    {
+        // The flag is REQUIRED at the wire (parallel of
+        // rebel_army_member): an omitted internationalist answers 422
+        // and creates nothing.
+        $payload = $this->payload();
+        unset($payload['internationalist']);
+
+        $this->postJson('/api/v1/pension-cases', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['internationalist']);
+
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_an_oversized_phone(): void
+    {
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'phone' => str_repeat('5', 31),
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone']);
+
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_an_oversized_popular_council(): void
+    {
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'popular_council' => str_repeat('Consejo Popular ', 9),
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['popular_council']);
 
         $this->assertSame(0, PensionCase::query()->count());
     }
@@ -626,7 +734,7 @@ final class PensionCaseCreationApiTest extends TestCase
             ],
             'service_records' => [
                 ['entity_id' => $this->entity->id, 'start_date' => '2000-01-01', 'end_date' => '2015-12-31', 'is_appendix' => false],
-                ['entity_id' => $this->entity->id, 'start_date' => '2016-01-01', 'end_date' => null, 'is_appendix' => true],
+                ['entity_id' => $this->entity->id, 'start_date' => '2016-01-01', 'end_date' => '2020-12-31', 'is_appendix' => true],
             ],
             'work_cycles' => [
                 ['planned_days' => 300, 'actual_days' => 280, 'cycles_count' => 1],
@@ -669,6 +777,7 @@ final class PensionCaseCreationApiTest extends TestCase
                 [
                     'entity_id' => $this->entity->id,
                     'start_date' => '2000-01-01',
+                    'end_date' => '2010-12-31',
                 ],
             ],
         ]))
@@ -698,6 +807,7 @@ final class PensionCaseCreationApiTest extends TestCase
                 [
                     'entity_id' => $this->entity->id,
                     'start_date' => '1980-01-01',
+                    'end_date' => '1990-12-31',
                     'declaration_form' => 'Mixta',
                 ],
             ],
@@ -709,6 +819,72 @@ final class PensionCaseCreationApiTest extends TestCase
         // sequence number burned.
         $this->assertSame(0, ServiceRecord::query()->count());
         $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_a_nested_service_without_an_end_date(): void
+    {
+        // Task 37: the end date is MANDATORY — a nested row without it
+        // answers 422 on its own field and leaves nothing behind.
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                ['entity_id' => $this->entity->id, 'start_date' => '2000-01-01'],
+            ],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['service_records.0.end_date']);
+
+        $this->assertSame(0, ServiceRecord::query()->count());
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_a_nested_service_ending_when_it_starts(): void
+    {
+        // Task 37: the end must be STRICTLY after the start — a
+        // one-day service (end == start) is a 422, never a quiet
+        // acceptance.
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                ['entity_id' => $this->entity->id, 'start_date' => '2000-01-01', 'end_date' => '2000-01-01'],
+            ],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['service_records.0.end_date']);
+
+        $this->assertSame(0, ServiceRecord::query()->count());
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_rejects_overlapping_nested_service_records(): void
+    {
+        // Task 37: no two declared periods may share a day — the
+        // overlap is a 422 on service_records (the rows are
+        // simultaneous, so no single row owns the fault) and the
+        // all-or-nothing of S5.5 leaves no case behind.
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                ['entity_id' => $this->entity->id, 'start_date' => '2000-01-01', 'end_date' => '2005-12-31'],
+                ['entity_id' => $this->entity->id, 'start_date' => '2004-06-01', 'end_date' => '2008-12-31'],
+            ],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['service_records']);
+
+        $this->assertSame(0, ServiceRecord::query()->count());
+        $this->assertSame(0, PensionCase::query()->count());
+    }
+
+    public function test_adjacent_nested_service_records_are_accepted(): void
+    {
+        // The day after one end starts clean (inclusive bounds): the
+        // classic consecutive-employment history stays declarable.
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'service_records' => [
+                ['entity_id' => $this->entity->id, 'start_date' => '2000-01-01', 'end_date' => '2005-12-31'],
+                ['entity_id' => $this->entity->id, 'start_date' => '2006-01-01', 'end_date' => '2010-12-31'],
+            ],
+        ]))
+            ->assertStatus(201)
+            ->assertJsonCount(2, 'data.service_records');
     }
 
     public function test_an_invalid_subrecord_leaves_nothing_behind(): void

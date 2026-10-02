@@ -38,9 +38,11 @@ use Tests\TestCase;
  * user rule 5): highs and removals gated by the editable state,
  * semantic probes of the uniqueness and date rules, the FIFTEEN row
  * ceiling of the salary series (user rule 1) and the income concept
- * records — one declared value per (case, concept) pair — plus the
- * advisory warnings (missing salary years, overlapping and open
- * services) that travel beside every response.
+ * records — one declared value per (case, concept) pair. Since the
+ * Task 37 user correction the service periods are CLOSED AND
+ * DISJOINT: the end date is mandatory and strictly after the start
+ * (422) and no period may overlap an existing one (422) — only the
+ * missing salary years of RF-EXP-002 remain an advisory warning.
  */
 final class PensionCaseSubrecordsApiTest extends TestCase
 {
@@ -213,36 +215,93 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             ->assertStatus(404);
     }
 
-    public function test_adds_a_service_record_and_advertises_overlaps(): void
+    public function test_adds_disjoint_service_records_and_rejects_overlaps(): void
     {
+        // Task 37: two periods may never share a day — the first
+        // closed link stands and a disjoint later one joins it, but
+        // a third crossing the first is REJECTED (422), not
+        // advertised.
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
             'end_date' => '2005-12-31',
         ])->assertStatus(201)->assertJsonPath('data.is_appendix', false)->assertJsonPath('data.declaration_form', 'Documental');
 
-        // A later open link: no overlap with the closed one above…
+        // Disjoint: the day after the stored end starts clean.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2006-01-01',
+            'end_date' => '2010-12-31',
+        ])->assertStatus(201);
+
+        // Overlapping: shares 2010-12-31 with the second link.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2010-12-31',
+            'end_date' => '2015-12-31',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
+
+        $this->assertSame(2, ServiceRecord::query()->count());
+    }
+
+    public function test_rejects_a_service_overlapping_an_earlier_period(): void
+    {
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2000-01-01',
+            'end_date' => '2005-12-31',
+        ])->assertStatus(201);
+
+        // Partial cross inside the stored period.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2004-06-01',
+            'end_date' => '2008-12-31',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
+
+        // Containment inside the stored period overlaps too.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+            'entity_id' => $this->entity->id,
+            'start_date' => '2001-01-01',
+            'end_date' => '2004-12-31',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
+
+        $this->assertSame(1, ServiceRecord::query()->count());
+    }
+
+    public function test_rejects_a_service_without_an_end_date(): void
+    {
+        // Task 37: the end date is MANDATORY — an omitted end_date is
+        // a 422 on the field, never an open link.
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2010-01-01',
-            'end_date' => null,
         ])
-            ->assertStatus(201)
-            ->assertJsonPath('warnings.overlapping_services', [])
-            ->assertJsonPath('warnings.open_services', function (array $ids): bool {
-                return $ids !== [];
-            });
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
 
-        // …but a third link crossing the open one overlaps it and is
-        // ADVERTISED, not rejected (RF-EXP-003: detection, not block).
-        $third = $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
+        $this->assertSame(0, ServiceRecord::query()->count());
+    }
+
+    public function test_rejects_a_service_ending_when_it_starts(): void
+    {
+        // Task 37: posterior means STRICTLY after — a one-day service
+        // (end == start) is a 422.
+        $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
-            'start_date' => '2013-06-01',
-            'end_date' => '2015-12-31',
-        ])->assertStatus(201);
+            'start_date' => '2010-01-01',
+            'end_date' => '2010-01-01',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['end_date']);
 
-        $pairs = $third->json('warnings.overlapping_services');
-        $this->assertNotEmpty($pairs);
+        $this->assertSame(0, ServiceRecord::query()->count());
     }
 
     public function test_rejects_a_service_ending_before_it_starts(): void
@@ -261,6 +320,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => 999999,
             'start_date' => '2010-01-01',
+            'end_date' => '2015-12-31',
         ])->assertStatus(422)->assertJsonValidationErrors(['entity_id']);
     }
 
@@ -288,6 +348,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2010-01-01',
+            'end_date' => '2015-12-31',
             'declaration_form' => 'Oral',
         ])->assertStatus(422)->assertJsonValidationErrors(['declaration_form']);
     }
@@ -307,6 +368,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
+            'end_date' => '2010-12-31',
         ])->assertStatus(201);
 
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")
@@ -321,6 +383,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $id = $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2010-01-01',
+            'end_date' => '2015-12-31',
         ])->json('data.id');
 
         $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/service-records/{$id}")
@@ -405,6 +468,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
+            'end_date' => '2010-12-31',
         ])->assertStatus(201);
 
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")
@@ -412,9 +476,10 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             ->assertJsonCount(2, 'data.salary_records')
             ->assertJsonCount(1, 'data.service_records')
             ->assertJsonPath('warnings.missing_salary_years', [2019, 2020])
-            ->assertJsonPath('warnings.open_services', function (array $ids): bool {
-                return $ids !== [];
-            });
+            // Task 37: overlaps and open links are impossible now —
+            // the envelope carries the salary analysis only.
+            ->assertJsonMissingPath('warnings.overlapping_services')
+            ->assertJsonMissingPath('warnings.open_services');
     }
 
     public function test_subrecord_writes_land_in_the_trail_with_their_values(): void

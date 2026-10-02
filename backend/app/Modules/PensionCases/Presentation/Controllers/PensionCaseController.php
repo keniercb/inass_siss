@@ -40,9 +40,13 @@ use OpenApi\Attributes as OA;
  * FormRequests, the creation, eligibility, uniqueness and
  * editability rules sit behind the PensionCaseServiceInterface port
  * and all data access lives in the repository behind it. The
- * advisory analysis (missing salary years, overlapping/open
- * services, RF-EXP-002/003) travels as a sibling `warnings` object
- * of the envelope: evidence for the specialist, never case state.
+ * advisory analysis travels as a sibling `warnings` object of the
+ * envelope: evidence for the specialist, never case state. Since
+ * the Task 37 user correction the service periods are CLOSED and
+ * DISJOINT by construction — mandatory end strictly after the
+ * start (422) and no overlap between subrecords (422) — so the
+ * warnings envelope carries the missing salary years alone; the
+ * overlapping/open services keys left the contract.
  *
  * User rule 0 (ADR-33): store() never reads office_id from the
  * payload — the Shared office port resolves the REGISTERING USER's
@@ -125,7 +129,7 @@ final class PensionCaseController
         operationId: 'pensionCasesShow',
         tags: ['Expedientes'],
         summary: 'Detalle de un expediente',
-        description: 'Devuelve el expediente con sus subregistros (salarios, servicios, ciclos) y el resumen del proponente, junto al objeto warnings: años salariales interiores ausentes (RF-EXP-002), pares de servicios solapados y vínculos sin cerrar (RF-EXP-003). Las advertencias son evidencia para el especialista, nunca bloqueos.',
+        description: 'Devuelve el expediente con sus subregistros (salarios, servicios, ciclos) y la proyección completa del promovente, junto al objeto warnings: años salariales interiores ausentes (RF-EXP-002). Las advertencias son evidencia para el especialista, nunca bloqueos; los períodos de servicio llegan cerrados y disjuntos por construcción (Task 37).',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -141,10 +145,9 @@ final class PensionCaseController
                         new OA\Property(
                             property: 'warnings',
                             type: 'object',
+                            description: 'Análisis de evidencia (Task 37): solo los años interiores ausentes de la serie salarial — los períodos de servicio son cerrados y disjuntos por construcción',
                             properties: [
                                 new OA\Property(property: 'missing_salary_years', type: 'array', items: new OA\Items(type: 'integer'), example: [2019, 2020]),
-                                new OA\Property(property: 'overlapping_services', type: 'array', items: new OA\Items(type: 'array', items: new OA\Items(type: 'integer')), example: [[1, 2]]),
-                                new OA\Property(property: 'open_services', type: 'array', items: new OA\Items(type: 'integer'), example: [3]),
                             ],
                         ),
                     ],
@@ -171,12 +174,12 @@ final class PensionCaseController
         operationId: 'pensionCasesStore',
         tags: ['Expedientes'],
         summary: 'Apertura de un expediente',
-        description: 'Alta del expediente (RF-EXP-001, reglas de usuario 0-5/ADR-32/33/34): el expediente ASUME la oficina del usuario que lo registra — office_id no se envía en el POST (422 si llega) — y el número se compone PPMMAACCCCC (códigos de provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio rellenado con ceros, once dígitos contiguos). El proponente debe estar vivo y activo (RF-SEG-003: 422) y no puede tener otro expediente abierto (409). La serie salarial admite máximo 15 filas (regla 1); el par de Ejército Rebelde exige la fecha de alta cuando el booleano es true y la rechaza cuando es false (regla 4); los conceptos de ingreso se declaran como subregistros anidados (regla 5). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; los pares año-expediente y concepto-expediente son únicos (422). Las advertencias viajan junto a data.',
+        description: 'Alta del expediente (RF-EXP-001, reglas de usuario 0-5/ADR-32/33/34): el expediente ASUME la oficina del usuario que lo registra — office_id no se envía en el POST (422 si llega) — y el número se compone PPMMAACCCCC (códigos de provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio rellenado con ceros, once dígitos contiguos). El proponente debe estar vivo y activo (RF-SEG-003: 422) y no puede tener otro expediente abierto (409). La serie salarial admite máximo 15 filas (regla 1); el par de Ejército Rebelde exige la fecha de alta cuando el booleano es true y la rechaza cuando es false (regla 4); los conceptos de ingreso se declaran como subregistros anidados (regla 5). Task 37: la marca internacionalista del promovente es booleana OBLIGATORIA (paralelo del par rebelde) y el par de contacto (phone, popular_council) viaja opcional; los subregistros de servicio exigen end_date OBLIGATORIA, estrictamente posterior a start_date y SIN solapamiento entre filas (422 con nada creado). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; los pares año-expediente y concepto-expediente son únicos (422). Las advertencias viajan junto a data.',
         security: [['sanctumAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['applicant_person_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary'],
+                required: ['applicant_person_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'internationalist', 'last_salary'],
                 properties: [
                     new OA\Property(property: 'applicant_person_id', type: 'integer', example: 7),
                     new OA\Property(property: 'office_id', type: 'integer', nullable: true, example: null, description: 'PROHIBIDO (regla 0): el expediente asume la oficina del usuario autenticado'),
@@ -189,7 +192,10 @@ final class PensionCaseController
                     new OA\Property(property: 'pension_regime_id', type: 'integer', example: 1, description: 'Régimen de pensión del catálogo (regla 4)'),
                     new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'Pertenece al Ejército Rebelde (regla 4)'),
                     new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'Fecha de alta en el Ejército Rebelde: obligatoria si rebel_army_member=true, rechazada si false'),
+                    new OA\Property(property: 'internationalist', type: 'boolean', example: true, description: 'Internacionalista (Task 37, corrección de usuario): el promovente cumplió misión internacionalista — booleano OBLIGATORIO, paralelo de rebel_army_member; 422 si se omite'),
                     new OA\Property(property: 'filed_by_person_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'Persona por (Task 35, corrección de usuario; columna inglesa desde Task 36): id de la persona REGISTRADA que presenta o gestiona el expediente cuando no es el propio proponente — 422 si no existe o está desactivada; la omisión persiste null; el response devuelve además la proyección completa bajo filed_by'),
+                    new OA\Property(property: 'phone', type: 'string', nullable: true, maxLength: 30, example: '+53 5 555 1234', description: 'Teléfono de contacto del promovente (Task 37): texto libre opcional, 30 caracteres como techo; la omisión persiste null'),
+                    new OA\Property(property: 'popular_council', type: 'string', nullable: true, maxLength: 120, example: 'Consejo Popular Playa', description: 'Consejo popular del promovente (Task 37): división territorial cubana, texto libre opcional de 120 caracteres como techo; la omisión persiste null'),
                     new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, decimal exacto no negativo (RN-005)'),
                     new OA\Property(property: 'requested_at', type: 'string', format: 'date', nullable: true, example: '2026-09-30', description: 'Opcional; por defecto hoy; nunca futura'),
                     new OA\Property(
@@ -208,12 +214,12 @@ final class PensionCaseController
                     new OA\Property(
                         property: 'service_records',
                         type: 'array',
-                        description: 'Historial laboral inicial (todo o nada)',
+                        description: 'Historial laboral inicial (todo o nada; Task 37: end_date obligatoria, estrictamente posterior a start_date y sin solapamiento entre filas — 422)',
                         items: new OA\Items(
                             properties: [
                                 new OA\Property(property: 'entity_id', type: 'integer', example: 3),
                                 new OA\Property(property: 'start_date', type: 'string', format: 'date', example: '2000-01-01'),
-                                new OA\Property(property: 'end_date', type: 'string', format: 'date', nullable: true, example: null),
+                                new OA\Property(property: 'end_date', type: 'string', format: 'date', example: '2005-12-31', description: 'Fecha de fin del vínculo: OBLIGATORIA y estrictamente posterior a start_date'),
                                 new OA\Property(property: 'is_appendix', type: 'boolean', example: false),
                                 new OA\Property(property: 'declaration_form', type: 'string', enum: ['Documental', 'Testifical'], example: 'Documental', description: 'Forma de declaración del vínculo; Documental por omisión'),
                             ],
@@ -256,7 +262,7 @@ final class PensionCaseController
                     required: ['data'],
                     properties: [
                         new OA\Property(property: 'data', ref: '#/components/schemas/PensionCase'),
-                        new OA\Property(property: 'warnings', type: 'object', description: 'Análisis de evidencia (huecos, solapamientos, vínculos abiertos)'),
+                        new OA\Property(property: 'warnings', type: 'object', description: 'Análisis de evidencia (Task 37): años interiores ausentes de la serie salarial'),
                     ],
                 ),
             ),
@@ -398,7 +404,7 @@ final class PensionCaseController
         operationId: 'pensionCasesAddServiceRecord',
         tags: ['Expedientes'],
         summary: 'Alta de un registro de servicio',
-        description: 'Añade un vínculo laboral (RF-EXP-003) mientras el expediente está en submitted. end_date null = vínculo vigente y debe ser ≥ start_date (422). Los solapamientos y vínculos abiertos NO bloquean: viajan en warnings (id de pares solapados, ids de vínculos abiertos).',
+        description: 'Añade un vínculo laboral (RF-EXP-003) mientras el expediente está en submitted. Task 37 (corrección de usuario): end_date es OBLIGATORIA, estrictamente posterior a start_date (422) y el período no puede solapar NINGÚN subregistro existente del expediente (422 sobre end_date nombrando los registros cruzados) — los vínculos abiertos y los solapamientos advertidos de Sprint 5 ya no existen.',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -406,11 +412,11 @@ final class PensionCaseController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['entity_id', 'start_date'],
+                required: ['entity_id', 'start_date', 'end_date'],
                 properties: [
                     new OA\Property(property: 'entity_id', type: 'integer', example: 3),
                     new OA\Property(property: 'start_date', type: 'string', format: 'date', example: '2000-01-01'),
-                    new OA\Property(property: 'end_date', type: 'string', format: 'date', nullable: true, example: null, description: 'null = vínculo vigente'),
+                    new OA\Property(property: 'end_date', type: 'string', format: 'date', example: '2005-12-31', description: 'OBLIGATORIA (Task 37) y estrictamente posterior a start_date; sin solapamiento con los subregistros existentes'),
                     new OA\Property(property: 'is_appendix', type: 'boolean', example: false, description: 'Coletilla'),
                     new OA\Property(property: 'declaration_form', type: 'string', enum: ['Documental', 'Testifical'], example: 'Documental', description: 'Forma de declaración del vínculo; por defecto Documental'),
                 ],
@@ -419,7 +425,7 @@ final class PensionCaseController
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Registro añadido con advertencias de solapamiento',
+                description: 'Registro añadido con advertencias de la serie salarial',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', ref: '#/components/schemas/ServiceRecord'),
@@ -442,7 +448,9 @@ final class PensionCaseController
             fn (): ?ServiceRecord => $this->cases->addServiceRecord($id, [
                 'entity_id' => (int) $validated['entity_id'],
                 'start_date' => (string) $validated['start_date'],
-                'end_date' => $validated['end_date'] ?? null,
+                // Task 37: mandatory end — validated() guarantees the
+                // key because the FormRequest requires it.
+                'end_date' => (string) $validated['end_date'],
                 'is_appendix' => (bool) ($validated['is_appendix'] ?? false),
                 'declaration_form' => (string) ($validated['declaration_form'] ?? ServiceDeclarationForm::Documental->value),
             ]),

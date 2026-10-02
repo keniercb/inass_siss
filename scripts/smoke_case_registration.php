@@ -33,6 +33,13 @@ declare(strict_types=1);
  * desarrollo): forma_declaracion → declaration_form y persona_por_id
  * → filed_by_person_id.
  *
+ * Task 37 (SGP-31, corrección de usuario): el expediente lleva la
+ * marca internacionalista del promovente (booleana OBLIGATORIA) y el
+ * par de contacto (phone, popular_council — textos opcionales); los
+ * subregistros de servicio exigen fecha de fin OBLIGATORIA y
+ * ESTRICTAMENTE posterior al inicio, y NINGÚN par de períodos puede
+ * solaparse (422 en ambos puntos de entrada, sin vínculos abiertos).
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -186,6 +193,9 @@ try {
         'pension_type_id' => PensionType::query()->orderBy('id')->firstOrFail()->id,
         'pension_regime_id' => PensionRegime::query()->orderBy('id')->firstOrFail()->id,
         'rebel_army_member' => false,
+        // Task 37: marca de internacionalista del promovente —
+        // obligatoria en el wire, como rebel_army_member.
+        'internationalist' => false,
         'last_salary' => '5000.00',
     ];
 
@@ -233,6 +243,63 @@ try {
         'primero='.$number.' segundo='.$secondNumber,
     );
 
+    // ---- Task 37: internacionalista + contacto del promovente ----
+    // (tras el sondeo del consecutivo: esta sección consume números
+    // y rompería la aritmética primero→segundo si corriera antes)
+    $contactApplicant = Person::factory()->create();
+    $withFields = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $contactApplicant->id,
+        'internationalist' => true,
+        'phone' => '+53 5 555 1234',
+        'popular_council' => 'Consejo Popular Playa',
+    ]));
+    $withFieldsId = (int) ($withFields->json('data.id') ?? 0);
+    check(
+        'task 37: internacionalista y contacto del promovente recibidos y devueltos (201, detalle y listado)',
+        $withFields->status() === 201
+            && $withFields->json('data.internationalist') === true
+            && ($withFields->json('data.phone') ?? '') === '+53 5 555 1234'
+            && ($withFields->json('data.popular_council') ?? '') === 'Consejo Popular Playa'
+            && ($base('GET', "/pension-cases/{$withFieldsId}")->json('data.internationalist') ?? null) === true
+            && ($base('GET', "/pension-cases/{$withFieldsId}")->json('data.phone') ?? '') === '+53 5 555 1234'
+            && ($base('GET', '/pension-cases?applicant_person_id='.$contactApplicant->id)->json('data.0.popular_council') ?? '') === 'Consejo Popular Playa',
+        detail($withFields),
+    );
+
+    $missingFlag = $payload;
+    unset($missingFlag['internationalist']);
+    $missingFlagApplicant = Person::factory()->create();
+    $noFlag = $base('POST', '/pension-cases', array_merge($missingFlag, [
+        'applicant_person_id' => $missingFlagApplicant->id,
+    ]));
+    check(
+        'task 37: internationalist omitida responde 422',
+        $noFlag->status() === 422 && isset($noFlag->json('errors')['internationalist']),
+        detail($noFlag),
+    );
+
+    $oversizedPhoneApplicant = Person::factory()->create();
+    $oversizedPhone = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $oversizedPhoneApplicant->id,
+        'phone' => str_repeat('5', 31),
+    ]));
+    check(
+        'task 37: teléfono de 31 caracteres responde 422',
+        $oversizedPhone->status() === 422 && isset($oversizedPhone->json('errors')['phone']),
+        detail($oversizedPhone),
+    );
+
+    $oversizedCouncilApplicant = Person::factory()->create();
+    $oversizedCouncil = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $oversizedCouncilApplicant->id,
+        'popular_council' => str_repeat('Consejo Popular ', 9),
+    ]));
+    check(
+        'task 37: consejo popular de 121+ caracteres responde 422',
+        $oversizedCouncil->status() === 422 && isset($oversizedCouncil->json('errors')['popular_council']),
+        detail($oversizedCouncil),
+    );
+
     // ---- Forma de declaración del tiempo de servicio (Task 33;
     //     columna declaration_form desde Task 36) ----
     // El payload anidado la declara por fila: una Testifical y una
@@ -242,7 +309,7 @@ try {
         'applicant_person_id' => $thirdApplicant->id,
         'service_records' => [
             ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31', 'declaration_form' => 'Testifical'],
-            ['entity_id' => $entity->id, 'start_date' => '2000-01-01'],
+            ['entity_id' => $entity->id, 'start_date' => '2000-01-01', 'end_date' => '2010-12-31'],
         ],
     ]);
     $nested = $base('POST', '/pension-cases', $nestedPayload);
@@ -256,7 +323,7 @@ try {
     $nestedInvalid = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $thirdApplicant->id,
         'service_records' => [
-            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'declaration_form' => 'Mixta'],
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31', 'declaration_form' => 'Mixta'],
         ],
     ]));
     check(
@@ -264,6 +331,61 @@ try {
         $nestedInvalid->status() === 422 && isset($nestedInvalid->json('errors')['service_records.0.declaration_form']),
         detail($nestedInvalid),
     );
+
+    // ---- Task 37: períodos de servicio cerrados y disjuntos ----
+    // (cada sondeo usa promovente recién creado: el sondeo de
+    // expediente abierto corre ANTES que el de filas, y un 409
+    // enmascararía el 422 esperado)
+    $nestedNoEnd = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01'],
+        ],
+    ]));
+    check(
+        'task 37: fila anidada sin end_date responde 422',
+        $nestedNoEnd->status() === 422 && isset($nestedNoEnd->json('errors')['service_records.0.end_date']),
+        detail($nestedNoEnd),
+    );
+
+    $nestedSameDay = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1980-01-01'],
+        ],
+    ]));
+    check(
+        'task 37: fila anidada con fin igual al inicio responde 422',
+        $nestedSameDay->status() === 422 && isset($nestedSameDay->json('errors')['service_records.0.end_date']),
+        detail($nestedSameDay),
+    );
+
+    $nestedOverlap = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31'],
+            ['entity_id' => $entity->id, 'start_date' => '1985-06-01', 'end_date' => '1995-12-31'],
+        ],
+    ]));
+    check(
+        'task 37: filas anidadas solapadas responde 422',
+        $nestedOverlap->status() === 422 && isset($nestedOverlap->json('errors')['service_records']),
+        detail($nestedOverlap),
+    );
+
+    $nestedAdjacent = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'service_records' => [
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31'],
+            ['entity_id' => $entity->id, 'start_date' => '1991-01-01', 'end_date' => '2000-12-31'],
+        ],
+    ]));
+    check(
+        'task 37: filas anidadas contiguas admitidas',
+        $nestedAdjacent->status() === 201 && count($nestedAdjacent->json('data.service_records') ?? []) === 2,
+        detail($nestedAdjacent),
+    );
+    $adjacentCaseId = (int) ($nestedAdjacent->json('data.id') ?? 0);
 
     // ---- Task 35: persona por del expediente (referencia a una
     // persona REGISTRADA — corrección de usuario sobre Task 34;
@@ -319,6 +441,64 @@ try {
         'persona por: una persona desactivada responde 422',
         $deactivatedFiledBy->status() === 422 && isset($deactivatedFiledBy->json('errors')['filed_by_person_id']),
         detail($deactivatedFiledBy),
+    );
+
+    // ---- Task 37: alta individual de servicio — fin obligatorio,
+    //      estrictamente posterior y sin solapamiento ----
+    $individualNoEnd = $base('POST', "/pension-cases/{$adjacentCaseId}/service-records", [
+        'entity_id' => $entity->id,
+        'start_date' => '2005-01-01',
+    ]);
+    check(
+        'task 37: alta individual sin end_date responde 422',
+        $individualNoEnd->status() === 422 && isset($individualNoEnd->json('errors')['end_date']),
+        detail($individualNoEnd),
+    );
+
+    $individualBefore = $base('POST', "/pension-cases/{$adjacentCaseId}/service-records", [
+        'entity_id' => $entity->id,
+        'start_date' => '2005-01-01',
+        'end_date' => '2004-12-31',
+    ]);
+    check(
+        'task 37: fin anterior al inicio responde 422',
+        $individualBefore->status() === 422 && isset($individualBefore->json('errors')['end_date']),
+        detail($individualBefore),
+    );
+
+    $individualSameDay = $base('POST', "/pension-cases/{$adjacentCaseId}/service-records", [
+        'entity_id' => $entity->id,
+        'start_date' => '2005-01-01',
+        'end_date' => '2005-01-01',
+    ]);
+    check(
+        'task 37: fin igual al inicio responde 422',
+        $individualSameDay->status() === 422 && isset($individualSameDay->json('errors')['end_date']),
+        detail($individualSameDay),
+    );
+
+    // Cruza la segunda fila almacenada (1991-01-01…2000-12-31):
+    // comparte 2000-12-31.
+    $individualOverlap = $base('POST', "/pension-cases/{$adjacentCaseId}/service-records", [
+        'entity_id' => $entity->id,
+        'start_date' => '2000-12-31',
+        'end_date' => '2010-12-31',
+    ]);
+    check(
+        'task 37: período que solapa un subregistro existente responde 422',
+        $individualOverlap->status() === 422 && isset($individualOverlap->json('errors')['end_date']),
+        detail($individualOverlap),
+    );
+
+    $individualDisjoint = $base('POST', "/pension-cases/{$adjacentCaseId}/service-records", [
+        'entity_id' => $entity->id,
+        'start_date' => '2001-01-01',
+        'end_date' => '2010-12-31',
+    ]);
+    check(
+        'task 37: período disjunto admitido (día siguiente al fin almacenado)',
+        $individualDisjoint->status() === 201 && ($individualDisjoint->json('data.end_date') ?? '') === '2010-12-31',
+        detail($individualDisjoint),
     );
 
     // ---- Regla 1: 15 salarios admitidos, el 16º rechazado, el cupo se libera ----
@@ -406,7 +586,10 @@ try {
     check('regla 5: baja del concepto de ingreso', $conceptRemoved->status() === 200, detail($conceptRemoved));
 
     // ---- Regla 3: el listado devuelve el promovente COMPLETO ----
-    $listing = $base('GET', '/pension-cases?per_page=5&status=submitted');
+    // (per_page ampliado: la fumiga crea más expedientes desde la
+    // Task 37 y el expediente del promovente original debe seguir
+    // dentro de la página)
+    $listing = $base('GET', '/pension-cases?per_page=50&status=submitted');
     $rows = $listing->json('data') ?? [];
     $row = collect($rows)->firstWhere('applicant.id', $applicant->id) ?? collect($rows)->first();
     $fullApplicant = $row !== null

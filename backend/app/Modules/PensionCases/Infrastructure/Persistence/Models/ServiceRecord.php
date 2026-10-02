@@ -12,17 +12,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Eloquent model for the work history rows (RF-EXP-003, model data
- * 5.7). End date NULL means the employment link is still open; the
- * date order is backed by a database CHECK (RN-006) and overlaps
- * are detected and advertised by the pure Domain ServicePeriods
- * analysis. No timestamps: the bitacora keeps the values of every
- * high and removal through the Shared AuditTrailObserver.
+ * 5.7). Since the Task 37 user correction every period is CLOSED:
+ * the end date is mandatory and STRICTLY posterior to the start —
+ * backed by the database CHECK — and no two rows of a case may
+ * share a day, a rule the pure Domain ServicePeriods analysis
+ * enforces as a 422 at both entry points. No timestamps: the bitacora
+ * keeps the values of every high and removal through the Shared
+ * AuditTrailObserver.
  *
  * @property int $id
  * @property int $pension_case_id
  * @property int $entity_id
  * @property CarbonImmutable $start_date
- * @property CarbonImmutable|null $end_date
+ * @property CarbonImmutable $end_date
  * @property bool $is_appendix
  * @property ServiceDeclarationForm $declaration_form
  * @property Entity|null $entity

@@ -134,6 +134,9 @@ final class RbacPensionCasesApiTest extends TestCase
             'pension_type_id' => $case->pension_type_id,
             'pension_regime_id' => $case->pension_regime_id,
             'rebel_army_member' => false,
+            // Task 37: promovente classification flag — required at
+            // the wire exactly like rebel_army_member.
+            'internationalist' => false,
             'last_salary' => '5000.00',
         ];
     }
