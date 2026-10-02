@@ -1471,3 +1471,21 @@ Stage Summary:
 - Suite 1113/3829 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes con 61 comprobaciones TODO OK sobre la BD sgp
 - Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-35-case-list-office-scope; push/PR/CI/merge a continuación
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 41-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-35 — PR #45, CI y merge a main (listado de expedientes con alcance territorial: la oficina del usuario autenticado, nunca en la query)
+
+Work Log:
+- Entrega: rama feat/SGP-35-case-list-office-scope (4 commits: feat aa1dc6b + test a948ef7 + docs d839e40 + worklog 8866c43 sobre 0cf6fdd), push explícito por nombre de rama y PR #45 creada por API: https://github.com/keniercb/inass_siss/pull/45
+- Incidente del daemon recurrente: UN volteo de HEAD a main justo antes de la cadena de commits — el guard de rama abortó limpio (cero commits fuera de su rama; el índice sobrevivió y la cadena se re-ejecutó íntegra tras el switch de regreso); otro volteo posterior desmontó el push inicial, corregido con switch + push re-encadenados; además el reset del sandbox había perdido el credential.helper global — re-configurado (store) antes del push
+- CI (Quality gate PHP 8.3) SUCCESS sobre 8866c43 tras ~5 minutos de sondeo
+- PR #45 mergeeada a main como 84bc7b8 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1113 tests / 3829 aserciones contra MySQL real (69 s), Pint PASS (413 archivos), PHPStan nivel 8 sin errores, deptrac 0 violaciones / 0 uncovered
+- Fumiga re-ejecutada sobre main tras migrate:fresh --seed en la BD sgp: 61 comprobaciones TODO OK (exit 0) — el síntoma original del usuario verificado de extremo a extremo: el listado carga SOLO los expedientes de la oficina del actor, la query con office_id responde 422 y reasignar al actor mueve el scope de punta a punta
+
+Stage Summary:
+- EL LISTADO CON ALCANCE TERRITORIAL EN MAIN (Task 41/SGP-35, PR #45): GET /pension-cases solo carga los expedientes cuya oficina coincide con la OFICINA DEL USUARIO AUTENTICADO — office_id salió de la query (422 prohibido conversacional) y el scope se deriva del puerto Shared CurrentUserOfficeProviderInterface (el seam de la regla 0 del alta) con guard fail-closed en el servicio (actor sin oficina o criterio ausente → página VACÍA, jamás el directorio sin alcance); los filtros restantes angulan DENTRO del alcance y el detalle queda sin scope; spec OpenAPI 1.3.0 con el parámetro retirado, anclada por ApiDocsTest
+- Las DOCE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37), el lote del SGP-32 (38), el Schema de Entrada del catálogo (39), el ciclo de vida del expediente (40) y el alcance territorial del listado (41)
+- Suite 1113/3829 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes 61/61 TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada (la que ahora hereda el alcance territorial de esta corrección)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
