@@ -16,20 +16,50 @@ use Carbon\CarbonImmutable;
  * by the Shared AuditableObserver, so this class deliberately imports
  * no Security types (deptrac: Catalogs depends on Shared only).
  *
+ * Since Task 38 (user correction, SGP-32) the type carries the persona
+ * fallecida flag — deceased_person, a boolean whose database DEFAULT
+ * false answers every store payload that omits it, exactly like the
+ * applies_base_salary precedent of the income concepts.
+ *
  * @property int $id
- * @property string $code
+ * @property string|null $code
  * @property string $name
+ * @property bool $deceased_person
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property CarbonImmutable|null $deleted_at
  */
 class PensionType extends CatalogModel
 {
+    /**
+     * Task 38: the in-memory default mirrors the database DEFAULT, so
+     * a store payload that omits the flag answers false in the 201
+     * projection without a reload — the same observable contract the
+     * column default gives the stored row.
+     *
+     * @var array<string, bool>
+     */
+    protected $attributes = [
+        'deceased_person' => false,
+    ];
+
     /** @var list<string> */
     protected $fillable = [
         'code',
         'name',
+        // Task 38 (user correction, SGP-32): persona fallecida flag.
+        'deceased_person',
         'created_by',
         'updated_by',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return array_merge(parent::casts(), [
+            'deceased_person' => 'boolean',
+        ]);
+    }
 }

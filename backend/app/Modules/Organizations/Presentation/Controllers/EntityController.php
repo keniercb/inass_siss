@@ -33,7 +33,7 @@ final class EntityController
         operationId: 'entitiesIndex',
         tags: ['Estructura'],
         summary: 'Listado paginado de entidades',
-        description: 'Entidades activas con referencias anidadas (RF-ENT-005): búsqueda por fragmentos de código, nombre, NIT u objeto social (Task 31; documentado en Task 34), y filtros por organismo, provincia, municipio y tipo. Código y NIT quedan reservados tras desactivar.',
+        description: 'Entidades activas con referencias anidadas (RF-ENT-005): búsqueda por fragmentos de código, nombre, NIT u objeto social (Task 31; documentado en Task 34), y filtros por organismo, provincia, municipio y tipo. Código y NIT quedan reservados tras desactivar. Task 38 (FIX): cada fila devuelve los datos del director general y el económico como proyecciones completas de Persona (director, economic_director), null cuando la entidad no los declara.',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\QueryParameter(name: 'q', description: 'Fragmentos de código, nombre, NIT u objeto social', schema: new OA\Schema(type: 'string', maxLength: 120)),

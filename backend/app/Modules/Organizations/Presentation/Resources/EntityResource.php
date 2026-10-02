@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Organizations\Presentation\Resources;
 
 use App\Modules\Organizations\Infrastructure\Persistence\Models\Entity;
+use App\Modules\People\Presentation\Resources\PersonResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use OpenApi\Attributes as OA;
@@ -13,14 +14,19 @@ use OpenApi\Attributes as OA;
  * Entity projection (RF-ENT-001/005): the natural keys, contact
  * data, directors and the direct parent summary. The directors
  * reference the People registry by id — person details belong to the
- * People module surface.
+ * People module surface. Since the Task 38 user correction FIX
+ * (SGP-32) the LISTING also answers with the DATA of the director
+ * general and the económico: the FULL Person projections under
+ * director and economic_director (the filed_by shape of Task 35 —
+ * reused from the People module's resource so the projections never
+ * drift), null when the entity declares no director.
  *
  * @mixin Entity
  */
 #[OA\Schema(
     schema: 'Entity',
     title: 'Entidad',
-    description: 'Entidad empleadora / centro de trabajo (RF-ENT-001). Código y NIT únicos e inmutables; la jerarquía (parent) es acíclica (RN-003) y la pareja municipio-provincia coherente (RN-04).',
+    description: 'Entidad empleadora / centro de trabajo (RF-ENT-001). Código y NIT únicos e inmutables; la jerarquía (parent) es acíclica (RN-003) y la pareja municipio-provincia coherente (RN-04). Desde la Task 38 el listado y el detalle devuelven los datos del director general y el económico como proyecciones completas de Persona.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
         new OA\Property(property: 'code', type: 'string', example: 'ENT-0001', description: 'Código único; queda reservado tras desactivar'),
@@ -70,6 +76,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'email', type: 'string', nullable: true, example: 'contacto@ent.gob.cu'),
         new OA\Property(property: 'director_person_id', type: 'integer', format: 'int64', nullable: true, description: 'Director general (persona registrada, RF-ENT-001)'),
         new OA\Property(property: 'economic_director_person_id', type: 'integer', format: 'int64', nullable: true, description: 'Director económico (persona registrada)'),
+        new OA\Property(property: 'director', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA del director general (Task 38, FIX): null cuando la entidad no declara director'),
+        new OA\Property(property: 'economic_director', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA del director económico (Task 38, FIX): null cuando la entidad no lo declara'),
         new OA\Property(property: 'parent_entity_id', type: 'integer', format: 'int64', nullable: true, description: 'Entidad superior (jerarquía acíclica RN-003)'),
         new OA\Property(property: 'parent', type: 'object', nullable: true, description: 'Resumen de la entidad superior'),
         new OA\Property(property: 'social_purpose', type: 'string', example: 'Servicios técnicos especializados'),
@@ -113,6 +121,17 @@ final class EntityResource extends JsonResource
             'email' => $this->email,
             'director_person_id' => $this->director_person_id,
             'economic_director_person_id' => $this->economic_director_person_id,
+            // Task 38 FIX: the full Person projections of both
+            // directors — null (never a broken resource) when the
+            // references are NULL, the filed_by shape of Task 35.
+            'director' => $this->whenLoaded(
+                'director',
+                fn () => $this->director === null ? null : new PersonResource($this->director),
+            ),
+            'economic_director' => $this->whenLoaded(
+                'economicDirector',
+                fn () => $this->economicDirector === null ? null : new PersonResource($this->economicDirector),
+            ),
             'parent_entity_id' => $this->parent_entity_id,
             'parent' => $this->whenLoaded('parent', fn () => $this->parent === null ? null : [
                 'id' => $this->parent->id,

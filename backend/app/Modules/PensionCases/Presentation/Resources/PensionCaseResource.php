@@ -31,14 +31,17 @@ use OpenApi\Attributes as OA;
  * internationalist flag of the promovente (beside the rebel army
  * pair) and the promovente contact pair (phone, popular_council) —
  * and the service periods travel closed and disjoint, so the
- * warnings envelope only carries the salary analysis.
+ * warnings envelope only carries the salary analysis. Since the
+ * Task 38 user correction (SGP-32) the case also answers the
+ * promovente's fecha de desvinculación — termination_date, an
+ * optional date serialized as Y-m-d and null when absent.
  *
  * @mixin PensionCase
  */
 #[OA\Schema(
     schema: 'PensionCase',
     title: 'Expediente de pensión',
-    description: 'Expediente de pensión (RF-EXP-001): número compuesto PPMMAACCCCC — provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio, once dígitos contiguos (regla de usuario 2/ADR-34) —, estado de la sección 2.4, clasificación de pensión, par de Ejército Rebelde y marca de internacionalista (Task 37), contacto del promovente (teléfono y consejo popular, Task 37) y subregistros declarados — con los períodos de servicio cerrados y disjuntos. Los campos de decisión quedan null hasta las transiciones de S6.',
+    description: 'Expediente de pensión (RF-EXP-001): número compuesto PPMMAACCCCC — provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio, once dígitos contiguos (regla de usuario 2/ADR-34) —, estado de la sección 2.4, clasificación de pensión, par de Ejército Rebelde y marca de internacionalista (Task 37), contacto del promovente (teléfono y consejo popular, Task 37), fecha de desvinculación del promovente (Task 38) y subregistros declarados — con los períodos de servicio cerrados y disjuntos. Los campos de decisión quedan null hasta las transiciones de S6.',
     properties: [
         new OA\Property(property: 'id', type: 'integer', format: 'int64', example: 1),
         new OA\Property(property: 'number', type: 'string', example: '11032600001', description: 'Número del expediente: PPMMAACCCCC (provincia-municipio-año-consecutivo territorial), único'),
@@ -60,6 +63,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'filed_by_person_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'Persona por (Task 35, corrección de usuario; columna inglesa desde Task 36): id de la persona REGISTRADA que presenta o gestiona el expediente cuando no es el propio proponente; 422 si no existe o está desactivada, NULL si se omite'),
         new OA\Property(property: 'phone', type: 'string', nullable: true, maxLength: 30, example: '+53 5 555 1234', description: 'Teléfono de contacto del promovente (Task 37): texto libre opcional'),
         new OA\Property(property: 'popular_council', type: 'string', nullable: true, maxLength: 120, example: 'Consejo Popular Playa', description: 'Consejo popular del promovente (Task 37): división territorial cubana, texto libre opcional'),
+        new OA\Property(property: 'termination_date', type: 'string', format: 'date', nullable: true, example: '2025-07-31', description: 'Fecha de desvinculación del promovente (Task 38, corrección de usuario): opcional, Y-m-d; la omisión persiste null'),
         new OA\Property(property: 'filed_by', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA de la persona por (Task 35): misma forma que applicant'),
         new OA\Property(property: 'approval_legal_basis_id', type: 'integer', format: 'int64', nullable: true, example: null, description: 'Resolución aprobatoria (H-05); la fija la aprobación de S6'),
         new OA\Property(property: 'decision_notes', type: 'string', nullable: true, example: null, description: 'Nota de resolución o motivo de denegación (S6)'),
@@ -102,6 +106,7 @@ final class PensionCaseResource extends JsonResource
             'filed_by_person_id' => $this->filed_by_person_id,
             'phone' => $this->phone,
             'popular_council' => $this->popular_council,
+            'termination_date' => $this->termination_date?->format('Y-m-d'),
             'approval_legal_basis_id' => $this->approval_legal_basis_id,
             'decision_notes' => $this->decision_notes,
             'decided_at' => $this->decided_at?->format('Y-m-d H:i:s'),

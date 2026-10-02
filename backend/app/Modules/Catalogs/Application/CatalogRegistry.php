@@ -24,6 +24,13 @@ use App\Modules\Catalogs\Application\Exceptions\UnknownCatalogException;
  * immutability/uniqueness rules of the rest — so every catalog listing
  * answers with the code field.
  *
+ * Since the Task 38 correction two catalogs carry type-specific extra
+ * columns: the pension regimes add the OPTIONAL sector (integer) and
+ * the pension types add the persona fallecida flag (deceased_person,
+ * boolean with database DEFAULT false) — both ride the generic
+ * extraRules machinery, so every endpoint of the generic resource
+ * answers with them.
+ *
  * The registry lives in the Application layer, not in Presentation,
  * so both the request rules and the service invariants are driven by
  * the same map; it is pure data and never touches the database.
@@ -220,7 +227,7 @@ final class CatalogRegistry
                 codeMax: 10,
                 nameMax: 80,
                 hasDescription: false,
-                extraRules: [],
+                extraRules: ['deceased_person' => 'boolean'],
                 dependents: [],
             ),
             'beneficiary-types' => new CatalogDefinition(
@@ -264,7 +271,12 @@ final class CatalogRegistry
                 codeMax: 10,
                 nameMax: 80,
                 hasDescription: true,
-                extraRules: ['months_per_year' => 'required|integer|min:1|max:12'],
+                extraRules: [
+                    'months_per_year' => 'required|integer|min:1|max:12',
+                    // Task 38 (user correction, SGP-32): optional sector,
+                    // returned by every endpoint of the catalog.
+                    'sector' => 'nullable|integer',
+                ],
                 dependents: [],
             ),
             'payment-types' => new CatalogDefinition(
