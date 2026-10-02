@@ -1344,3 +1344,22 @@ Stage Summary:
 - Suite 1069/3635 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes con 54 comprobaciones TODO OK sobre la BD sgp
 - Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-32-termination-date-sector-deceased-directors, push y PR
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 38-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-32 — PR #39, CI y merge a main (fecha de desvinculación, sector del régimen de jubilación, persona fallecida del tipo de pensión y FIX del listado de entidades con los directores)
+
+Work Log:
+- Entrega: rama feat/SGP-32-termination-date-sector-deceased-directors (4 commits: feat 1d3b1fc + test 94d6b3a + docs 99f02a0 + worklog e80d71d), push explícito por nombre de rama y PR #39 creada por API: https://github.com/keniercb/inass_siss/pull/39
+- CI (run 36957824589, "CI") SUCCESS sobre e80d71d tras ~5 minutos de sondeo: pint + phpstan 8 + pest contra MySQL del runner (1069/3635) + deptrac + build Docker
+- PR #39 mergeeada a main como ef4c3e9 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1069 tests / 3635 aserciones (63 s), Pint PASS, PHPStan nivel 8 sin errores (--memory-limit=1G), deptrac 0 violaciones / 0 uncovered
+- Fumiga re-ejecutada sobre main tras migrate:fresh --seed en la BD sgp: 54 comprobaciones TODO OK
+- Incidente del daemon: MÚLTIPLES volteos de HEAD a main entre comandos (dos abortos limpios de los guards de rama durante la secuencia de commits) — todas las operaciones sensibles se ejecutaron encadenadas con guard de rama; ningún commit aterrizó fuera de su rama y el índice sobrevivió a cada voltéo sin pérdida de trabajo
+
+Stage Summary:
+- LAS CUATRO CORRECCIONES DEL SGP-32 EN MAIN (Task 38, PR #39): pension_cases.termination_date DATE NULL (opcional, regla de forma Y-m-d, devuelta en 201/detalle/listado); pension_regimes.sector INT NULL devuelto por TODOS los endpoints del catálogo genérico (PATCH sin el campo intacto, 422 no entero); pension_types.deceased_person TINYINT(1) NOT NULL DEFAULT 0 devuelta por TODOS los endpoints (omisión → false); y GET /entities devolviendo los DATOS del director general y el económico como proyecciones COMPLETAS de Persona (null sin directores)
+- Fix colateral del genérico en main: el PATCH de los catálogos relaja a sometimes las reglas required de las columnas propias (semántica PATCH documentada restaurada)
+- Las NUEVE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37) y el lote del SGP-32 (38)
+- Suite 1069/3635 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes con 54 comprobaciones TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
