@@ -21,9 +21,10 @@ use OpenApi\Attributes as OA;
  * derived evidence for the specialist, not case state. The decision
  * fields (approval_legal_basis_id, decision_notes, decided_at,
  * decided_by, computed_amount) stay null until the S6 transitions
- * write them. The persona por (Task 35, user correction over Task
- * 34) is a REFERENCE to a registered person: persona_por_id plus
- * the FULL Person projection of the filer under persona_por — the
+ * write them. The filer (Task 35, user correction over Task
+ * 34; English column names since Task 36) is a REFERENCE to a
+ * registered person: filed_by_person_id plus
+ * the FULL Person projection of the filer under filed_by — the
  * same shape as the applicant (user rule 3, reused from the People
  * module's resource so the projection never drifts).
  *
@@ -50,8 +51,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, DECIMAL(12,2) no negativo (RN-005)'),
         new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'Pertenece al Ejército Rebelde (regla 4)'),
         new OA\Property(property: 'rebel_army_join_date', type: 'string', format: 'date', nullable: true, example: null, description: 'Fecha de alta en el Ejército Rebelde: obligatoria si rebel_army_member es true'),
-        new OA\Property(property: 'persona_por_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'Persona por (Task 35, corrección de usuario): id de la persona REGISTRADA que presenta o gestiona el expediente cuando no es el propio proponente; 422 si no existe o está desactivada, NULL si se omite'),
-        new OA\Property(property: 'persona_por', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA de la persona por (Task 35): misma forma que applicant'),
+        new OA\Property(property: 'filed_by_person_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'Persona por (Task 35, corrección de usuario; columna inglesa desde Task 36): id de la persona REGISTRADA que presenta o gestiona el expediente cuando no es el propio proponente; 422 si no existe o está desactivada, NULL si se omite'),
+        new OA\Property(property: 'filed_by', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA de la persona por (Task 35): misma forma que applicant'),
         new OA\Property(property: 'approval_legal_basis_id', type: 'integer', format: 'int64', nullable: true, example: null, description: 'Resolución aprobatoria (H-05); la fija la aprobación de S6'),
         new OA\Property(property: 'decision_notes', type: 'string', nullable: true, example: null, description: 'Nota de resolución o motivo de denegación (S6)'),
         new OA\Property(property: 'decided_at', type: 'string', format: 'date-time', nullable: true, example: null),
@@ -89,7 +90,7 @@ final class PensionCaseResource extends JsonResource
             'last_salary' => (string) $this->last_salary,
             'rebel_army_member' => $this->rebel_army_member,
             'rebel_army_join_date' => $this->rebel_army_join_date?->format('Y-m-d'),
-            'persona_por_id' => $this->persona_por_id,
+            'filed_by_person_id' => $this->filed_by_person_id,
             'approval_legal_basis_id' => $this->approval_legal_basis_id,
             'decision_notes' => $this->decision_notes,
             'decided_at' => $this->decided_at?->format('Y-m-d H:i:s'),
@@ -103,9 +104,9 @@ final class PensionCaseResource extends JsonResource
             'applicant' => $this->whenLoaded('applicant', fn () => new PersonResource($this->applicant)),
             // Task 35: full Person projection of the filer — null
             // (never a broken resource) when the reference is NULL.
-            'persona_por' => $this->whenLoaded(
-                'personaPor',
-                fn () => $this->personaPor === null ? null : new PersonResource($this->personaPor),
+            'filed_by' => $this->whenLoaded(
+                'filedBy',
+                fn () => $this->filedBy === null ? null : new PersonResource($this->filedBy),
             ),
         ];
     }

@@ -219,7 +219,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
             'end_date' => '2005-12-31',
-        ])->assertStatus(201)->assertJsonPath('data.is_appendix', false)->assertJsonPath('data.forma_declaracion', 'Documental');
+        ])->assertStatus(201)->assertJsonPath('data.is_appendix', false)->assertJsonPath('data.declaration_form', 'Documental');
 
         // A later open link: no overlap with the closed one above…
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
@@ -270,7 +270,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
             'end_date' => '2005-12-31',
-        ])->assertStatus(201)->assertJsonPath('data.forma_declaracion', 'Documental');
+        ])->assertStatus(201)->assertJsonPath('data.declaration_form', 'Documental');
     }
 
     public function test_adds_a_service_record_declared_by_testimony(): void
@@ -279,8 +279,8 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => $this->entity->id,
             'start_date' => '2000-01-01',
             'end_date' => '2005-12-31',
-            'forma_declaracion' => 'Testifical',
-        ])->assertStatus(201)->assertJsonPath('data.forma_declaracion', 'Testifical');
+            'declaration_form' => 'Testifical',
+        ])->assertStatus(201)->assertJsonPath('data.declaration_form', 'Testifical');
     }
 
     public function test_rejects_an_unknown_declaration_form(): void
@@ -288,8 +288,8 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
             'entity_id' => $this->entity->id,
             'start_date' => '2010-01-01',
-            'forma_declaracion' => 'Oral',
-        ])->assertStatus(422)->assertJsonValidationErrors(['forma_declaracion']);
+            'declaration_form' => 'Oral',
+        ])->assertStatus(422)->assertJsonValidationErrors(['declaration_form']);
     }
 
     public function test_the_detail_carries_the_declaration_form_of_every_service(): void
@@ -301,7 +301,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             'entity_id' => $this->entity->id,
             'start_date' => '1980-01-01',
             'end_date' => '1990-12-31',
-            'forma_declaracion' => 'Testifical',
+            'declaration_form' => 'Testifical',
         ])->assertStatus(201);
 
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/service-records", [
@@ -312,8 +312,8 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")
             ->assertStatus(200)
             ->assertJsonCount(2, 'data.service_records')
-            ->assertJsonPath('data.service_records.0.forma_declaracion', 'Testifical')
-            ->assertJsonPath('data.service_records.1.forma_declaracion', 'Documental');
+            ->assertJsonPath('data.service_records.0.declaration_form', 'Testifical')
+            ->assertJsonPath('data.service_records.1.declaration_form', 'Documental');
     }
 
     public function test_removes_a_service_record(): void

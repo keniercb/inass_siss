@@ -23,9 +23,15 @@ declare(strict_types=1);
  *
  * Task 35 (corrección de usuario sobre Task 34): persona por del
  * expediente como REFERENCIA a una persona registrada — el alta
- * recibe persona_por_id y el 201, el detalle y el listado devuelven
+ * recibe filed_by_person_id y el 201, el detalle y el listado devuelven
  * el id más la proyección completa de la persona (422 si el id no
  * existe o está desactivada; la omisión persiste NULL).
+ *
+ * Task 36 (SGP-30, corrección de usuario): las columnas añadidas en
+ * español por las correcciones Task 32-35 pasan al patrón inglés de
+ * todas las columnas previas (ADR-03, vinculante para todo el
+ * desarrollo): forma_declaracion → declaration_form y persona_por_id
+ * → filed_by_person_id.
  *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
@@ -227,14 +233,15 @@ try {
         'primero='.$number.' segundo='.$secondNumber,
     );
 
-    // ---- Forma de declaración del tiempo de servicio (Task 33) ----
+    // ---- Forma de declaración del tiempo de servicio (Task 33;
+    //     columna declaration_form desde Task 36) ----
     // El payload anidado la declara por fila: una Testifical y una
     // omitida (default Documental); un valor desconocido es 422 y no
     // deja nada detrás.
     $nestedPayload = array_merge($payload, [
         'applicant_person_id' => $thirdApplicant->id,
         'service_records' => [
-            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31', 'forma_declaracion' => 'Testifical'],
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'end_date' => '1990-12-31', 'declaration_form' => 'Testifical'],
             ['entity_id' => $entity->id, 'start_date' => '2000-01-01'],
         ],
     ]);
@@ -242,24 +249,25 @@ try {
     check(
         'forma de declaración: filas anidadas con Testifical y default Documental',
         $nested->status() === 201
-            && ($nested->json('data.service_records.0.forma_declaracion') ?? '') === 'Testifical'
-            && ($nested->json('data.service_records.1.forma_declaracion') ?? '') === 'Documental',
+            && ($nested->json('data.service_records.0.declaration_form') ?? '') === 'Testifical'
+            && ($nested->json('data.service_records.1.declaration_form') ?? '') === 'Documental',
         detail($nested),
     );
     $nestedInvalid = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $thirdApplicant->id,
         'service_records' => [
-            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'forma_declaracion' => 'Mixta'],
+            ['entity_id' => $entity->id, 'start_date' => '1980-01-01', 'declaration_form' => 'Mixta'],
         ],
     ]));
     check(
         'forma de declaración: valor desconocido en el payload anidado responde 422',
-        $nestedInvalid->status() === 422 && isset($nestedInvalid->json('errors')['service_records.0.forma_declaracion']),
+        $nestedInvalid->status() === 422 && isset($nestedInvalid->json('errors')['service_records.0.declaration_form']),
         detail($nestedInvalid),
     );
 
     // ---- Task 35: persona por del expediente (referencia a una
-    // persona REGISTRADA — corrección de usuario sobre Task 34) ----
+    // persona REGISTRADA — corrección de usuario sobre Task 34;
+    // columna filed_by_person_id desde Task 36) ----
     $fourthApplicant = Person::factory()->create();
     $filer = Person::factory()->create([
         'identity_number' => PersonFactory::identity('F', '1980-07-12'),
@@ -268,34 +276,34 @@ try {
         'first_name' => 'María',
         'first_surname' => 'Fernández',
     ]);
-    $personaPorCase = $base('POST', '/pension-cases', array_merge($payload, [
+    $filedByCase = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $fourthApplicant->id,
-        'persona_por_id' => $filer->id,
+        'filed_by_person_id' => $filer->id,
     ]));
-    $personaPorId = (int) ($personaPorCase->json('data.id') ?? 0);
+    $filedByCaseId = (int) ($filedByCase->json('data.id') ?? 0);
     check(
         'persona por: referencia recibida en el alta y devuelta (id + proyección) en el 201 y el detalle',
-        $personaPorCase->status() === 201
-            && (int) ($personaPorCase->json('data.persona_por_id') ?? 0) === $filer->id
-            && (int) ($personaPorCase->json('data.persona_por.id') ?? 0) === $filer->id
-            && ($personaPorCase->json('data.persona_por.first_name') ?? '') === 'María'
-            && (int) ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por_id') ?? 0) === $filer->id
-            && ($base('GET', "/pension-cases/{$personaPorId}")->json('data.persona_por.identity_number') ?? '') === $filer->identity_number,
-        detail($personaPorCase),
+        $filedByCase->status() === 201
+            && (int) ($filedByCase->json('data.filed_by_person_id') ?? 0) === $filer->id
+            && (int) ($filedByCase->json('data.filed_by.id') ?? 0) === $filer->id
+            && ($filedByCase->json('data.filed_by.first_name') ?? '') === 'María'
+            && (int) ($base('GET', "/pension-cases/{$filedByCaseId}")->json('data.filed_by_person_id') ?? 0) === $filer->id
+            && ($base('GET', "/pension-cases/{$filedByCaseId}")->json('data.filed_by.identity_number') ?? '') === $filer->identity_number,
+        detail($filedByCase),
     );
     check(
         'persona por: el listado filtrado por promovente devuelve el id y la proyección',
-        (int) ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por_id') ?? 0) === $filer->id
-            && ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.persona_por.first_name') ?? '') === 'María',
+        (int) ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.filed_by_person_id') ?? 0) === $filer->id
+            && ($base('GET', '/pension-cases?applicant_person_id='.$fourthApplicant->id)->json('data.0.filed_by.first_name') ?? '') === 'María',
     );
-    $unknownPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
+    $unknownFiledBy = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $fourthApplicant->id,
-        'persona_por_id' => 999999,
+        'filed_by_person_id' => 999999,
     ]));
     check(
         'persona por: un id de persona no registrada responde 422',
-        $unknownPersonaPor->status() === 422 && isset($unknownPersonaPor->json('errors')['persona_por_id']),
-        detail($unknownPersonaPor),
+        $unknownFiledBy->status() === 422 && isset($unknownFiledBy->json('errors')['filed_by_person_id']),
+        detail($unknownFiledBy),
     );
     $deactivatedFiler = Person::factory()->create([
         'identity_number' => PersonFactory::identity('F', '1975-02-03'),
@@ -303,14 +311,14 @@ try {
         'sex' => 'F',
     ]);
     $deactivatedFiler->delete();
-    $deactivatedPersonaPor = $base('POST', '/pension-cases', array_merge($payload, [
+    $deactivatedFiledBy = $base('POST', '/pension-cases', array_merge($payload, [
         'applicant_person_id' => $fourthApplicant->id,
-        'persona_por_id' => $deactivatedFiler->id,
+        'filed_by_person_id' => $deactivatedFiler->id,
     ]));
     check(
         'persona por: una persona desactivada responde 422',
-        $deactivatedPersonaPor->status() === 422 && isset($deactivatedPersonaPor->json('errors')['persona_por_id']),
-        detail($deactivatedPersonaPor),
+        $deactivatedFiledBy->status() === 422 && isset($deactivatedFiledBy->json('errors')['filed_by_person_id']),
+        detail($deactivatedFiledBy),
     );
 
     // ---- Regla 1: 15 salarios admitidos, el 16º rechazado, el cupo se libera ----

@@ -53,10 +53,11 @@ use Illuminate\Validation\ValidationException;
  * layer through the Shared office port (user rule 0/ADR-33) — and
  * the employer entity must exist and stay active; every catalog
  * reference (including the pension type/regime of user rule 4) is
- * probed before writing. The persona por (Task 35, user correction
- * over Task 34) is a REFERENCE to a registered person: the optional
- * persona_por_id is probed against the ACTIVE registry surface of
- * People (unknown or deactivated answers 422 on persona_por_id)
+ * probed before writing. The filer (Task 35, user correction
+ * over Task 34; English column name filed_by_person_id since Task
+ * 36) is a REFERENCE to a registered person: the optional
+ * filed_by_person_id is probed against the ACTIVE registry surface of
+ * People (unknown or deactivated answers 422 on filed_by_person_id)
  * before any number is burned or row written. The
  * one-open-case-per-person rule answers 409 with the open case,
  * backed physically by the open_case_key generated column.
@@ -107,7 +108,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'pension_regime_id',
         'rebel_army_member',
         'rebel_army_join_date',
-        'persona_por_id',
+        'filed_by_person_id',
         'last_salary',
     ];
 
@@ -136,14 +137,14 @@ final class PensionCaseService implements PensionCaseServiceInterface
             'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'last_salary',
         ]);
 
-        // Task 35: the persona por reference normalized BEFORE the
+        // Task 35: the filer reference normalized BEFORE the
         // probes — an absent, null or empty wire value all mean
         // "no filer" (NULL).
-        $personaPorId = $this->normalizePersonaPorId($payload);
+        $filedByPersonId = $this->normalizeFiledByPersonId($payload);
 
         $this->assertApplicantIsEligible((int) $payload['applicant_person_id']);
         $this->assertReferencesAreActive($payload);
-        $this->assertPersonaPorIsRegistered($personaPorId);
+        $this->assertFiledByPersonIsRegistered($filedByPersonId);
         $this->assertRebelArmyPairIsCoherent($payload);
         $this->assertNoOpenCase((int) $payload['applicant_person_id']);
         $this->assertRequestedAtIsNotFuture($payload);
@@ -180,7 +181,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         /** @var PensionCase $case */
         $case = $this->transactions->execute(
-            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $personaPorId, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
+            function () use ($payload, $lastSalary, $number, $rebelArmyMember, $rebelArmyJoinDate, $filedByPersonId, $salaryRows, $serviceRows, $cycleRows, $incomeRows): PensionCase {
                 $case = $this->cases->create([
                     'number' => $number,
                     'requested_at' => $payload['requested_at'] ?? $this->clock->now()->format('Y-m-d'),
@@ -200,7 +201,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     // Task 35: reference to a registered person,
                     // normalized before the probes (never a silent
                     // discard — the lesson of Task 33).
-                    'persona_por_id' => $personaPorId,
+                    'filed_by_person_id' => $filedByPersonId,
                 ]);
 
                 if ($salaryRows !== []) {
@@ -324,7 +325,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion?: string}  $attributes
+     * @param  array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, declaration_form?: string}  $attributes
      */
     public function addServiceRecord(int $caseId, array $attributes): ?ServiceRecord
     {
@@ -361,7 +362,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 'start_date' => $startDate,
                 'end_date' => $endDate,
                 'is_appendix' => $attributes['is_appendix'],
-                'forma_declaracion' => (string) ($attributes['forma_declaracion'] ?? ServiceDeclarationForm::Documental->value),
+                'declaration_form' => (string) ($attributes['declaration_form'] ?? ServiceDeclarationForm::Documental->value),
             ]),
         );
     }
@@ -555,40 +556,40 @@ final class PensionCaseService implements PensionCaseServiceInterface
     }
 
     /**
-     * Task 35: normalize the optional persona por reference before
+     * Task 35: normalize the optional filer reference before
      * the probes — an absent, null or empty wire value all mean
      * "no filer" (NULL); anything else becomes the int the registry
      * probe and the FK expect.
      *
      * @param  array<string, mixed>  $payload
      */
-    private function normalizePersonaPorId(array $payload): ?int
+    private function normalizeFiledByPersonId(array $payload): ?int
     {
-        $value = $payload['persona_por_id'] ?? null;
+        $value = $payload['filed_by_person_id'] ?? null;
 
         return $value === null || $value === '' ? null : (int) $value;
     }
 
     /**
-     * Task 35 (user correction over Task 34): the persona por is a
+     * Task 35 (user correction over Task 34): the filer is a
      * REFERENCE to a registered person, not free text. The probe uses
      * the ACTIVE registry surface of People — a soft-deleted person
      * is history, not a filer — so an unknown or deactivated id
-     * answers 422 on persona_por_id BEFORE any number is burned or
+     * answers 422 on filed_by_person_id BEFORE any number is burned or
      * row written, mirroring assertReferencesAreActive. The rule
      * itself (who may file) stays intentionally open: any active
      * registered person qualifies, no eligibility state is demanded
      * from the filer.
      */
-    private function assertPersonaPorIsRegistered(?int $personaPorId): void
+    private function assertFiledByPersonIsRegistered(?int $filedByPersonId): void
     {
-        if ($personaPorId === null) {
+        if ($filedByPersonId === null) {
             return;
         }
 
-        if ($this->peopleRegistry->find($personaPorId) === null) {
+        if ($this->peopleRegistry->find($filedByPersonId) === null) {
             throw ValidationException::withMessages([
-                'persona_por_id' => 'The referenced person does not exist or is deactivated.',
+                'filed_by_person_id' => 'The referenced person does not exist or is deactivated.',
             ]);
         }
     }
@@ -731,7 +732,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
      * Normalizes the declared service rows (creation payload).
      *
      * @param  list<array<string, mixed>>  $rows
-     * @return list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, forma_declaracion: string}>
+     * @return list<array{entity_id: int, start_date: string, end_date: string|null, is_appendix: bool, declaration_form: string}>
      */
     private function serviceRows(array $rows): array
     {
@@ -766,7 +767,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
                 // travels the same Documental|Testifical enum as the
                 // individual endpoint — omitted rows keep the
                 // declared default, never a silent drop.
-                'forma_declaracion' => (string) ($row['forma_declaracion'] ?? ServiceDeclarationForm::Documental->value),
+                'declaration_form' => (string) ($row['declaration_form'] ?? ServiceDeclarationForm::Documental->value),
             ];
         }
 
