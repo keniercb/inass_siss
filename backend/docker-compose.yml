@@ -18,6 +18,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-sgp_secret}
       QUEUE_CONNECTION: database
       CACHE_STORE: database
+      # Task 39 (user correction, SGP-33): regenerate the OpenAPI spec on
+      # every docs request. The persistent app-storage volume otherwise
+      # serves a spec cached from a previous image, so the catalog Schema
+      # de Entrada went stale after the Task 38 fields were incorporated.
+      # Staging browses the docs occasionally; the annotation scan only
+      # costs on /api/docs. Keep false in production (ADR-13) and generate
+      # at deploy time instead.
+      L5_SWAGGER_GENERATE_ALWAYS: true
     volumes:
       - app-storage:/var/www/html/storage
     depends_on:
