@@ -40,6 +40,18 @@ declare(strict_types=1);
  * ESTRICTAMENTE posterior al inicio, y NINGÚN par de períodos puede
  * solaparse (422 en ambos puntos de entrada, sin vínculos abiertos).
  *
+ * Task 38 (SGP-32, corrección de usuario): el expediente lleva la
+ * fecha de desvinculación del promovente (termination_date, fecha
+ * OPCIONAL — 201/detalle/listado la devuelven, 422 con formato
+ * inválido, la omisión persiste NULL); el régimen de jubilación
+ * lleva un sector entero OPCIONAL devuelto por TODOS los endpoints
+ * del catálogo (201/detalle/listado/PATCH; PATCH sin sector no lo
+ * toca); el tipo de pensión lleva persona fallecida (deceased_person,
+ * booleano con default false devuelto por TODOS los endpoints); y el
+ * GET del listado de entidades devuelve los DATOS del director
+ * general y el económico como proyecciones completas de Persona (null
+ * cuando la entidad no los declara, igual que el detalle).
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -298,6 +310,203 @@ try {
         'task 37: consejo popular de 121+ caracteres responde 422',
         $oversizedCouncil->status() === 422 && isset($oversizedCouncil->json('errors')['popular_council']),
         detail($oversizedCouncil),
+    );
+
+    // ---- Task 38: fecha de desvinculación del promovente ----
+    $terminationApplicant = Person::factory()->create();
+    $withTermination = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $terminationApplicant->id,
+        'termination_date' => '2025-07-31',
+    ]));
+    $withTerminationId = (int) ($withTermination->json('data.id') ?? 0);
+    check(
+        'task 38: fecha de desvinculación recibida y devuelta (201, detalle y listado)',
+        $withTermination->status() === 201
+            && ($withTermination->json('data.termination_date') ?? '') === '2025-07-31'
+            && ($base('GET', "/pension-cases/{$withTerminationId}")->json('data.termination_date') ?? '') === '2025-07-31'
+            && ($base('GET', '/pension-cases?applicant_person_id='.$terminationApplicant->id)->json('data.0.termination_date') ?? '') === '2025-07-31',
+        detail($withTermination),
+    );
+
+    $noTerminationApplicant = Person::factory()->create();
+    $noTermination = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $noTerminationApplicant->id,
+    ]));
+    $noTerminationData = (array) ($noTermination->json('data') ?? []);
+    check(
+        'task 38: fecha de desvinculación omitida persiste null',
+        $noTermination->status() === 201
+            && array_key_exists('termination_date', $noTerminationData)
+            && $noTerminationData['termination_date'] === null,
+        detail($noTermination),
+    );
+
+    $malformedTerminationApplicant = Person::factory()->create();
+    $malformedTermination = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $malformedTerminationApplicant->id,
+        'termination_date' => '31-07-2025',
+    ]));
+    check(
+        'task 38: fecha de desvinculación con formato inválido responde 422',
+        $malformedTermination->status() === 422 && isset($malformedTermination->json('errors')['termination_date']),
+        detail($malformedTermination),
+    );
+
+    // ---- Task 38: sector del régimen de jubilación (todos los
+    //      endpoints del catálogo) ----
+    $regimeWithSector = $base('POST', '/catalogs/pension-regimes', [
+        'code' => 'FUMSEC',
+        'name' => 'Régimen de fumiga sectorial',
+        'months_per_year' => 12,
+        'sector' => 2,
+    ]);
+    $regimeId = (int) ($regimeWithSector->json('data.id') ?? 0);
+    check(
+        'task 38: sector del régimen recibido y devuelto (201, detalle y listado)',
+        $regimeWithSector->status() === 201
+            && $regimeWithSector->json('data.sector') === 2
+            && $regimeId > 0
+            && ($base('GET', "/catalogs/pension-regimes/{$regimeId}")->json('data.sector') ?? null) === 2
+            && ($base('GET', '/catalogs/pension-regimes?search=FUMSEC')->json('data.0.sector') ?? null) === 2,
+        detail($regimeWithSector),
+    );
+
+    $sectorPatch = $base('PATCH', "/catalogs/pension-regimes/{$regimeId}", ['sector' => 1]);
+    check(
+        'task 38: PATCH del sector del régimen devuelto en la respuesta',
+        $sectorPatch->status() === 200 && $sectorPatch->json('data.sector') === 1,
+        detail($sectorPatch),
+    );
+
+    $sectorUntouched = $base('PATCH', "/catalogs/pension-regimes/{$regimeId}", ['description' => 'Ajuste de fumiga']);
+    check(
+        'task 38: PATCH sin sector deja el valor intacto',
+        $sectorUntouched->status() === 200 && $sectorUntouched->json('data.sector') === 1,
+        detail($sectorUntouched),
+    );
+
+    $regimeNoSector = $base('POST', '/catalogs/pension-regimes', [
+        'code' => 'FUMSIN',
+        'name' => 'Régimen de fumiga sin sector',
+        'months_per_year' => 12,
+    ]);
+    $regimeNoSectorData = (array) ($regimeNoSector->json('data') ?? []);
+    check(
+        'task 38: sector del régimen omitido persiste null',
+        $regimeNoSector->status() === 201
+            && array_key_exists('sector', $regimeNoSectorData)
+            && $regimeNoSectorData['sector'] === null,
+        detail($regimeNoSector),
+    );
+
+    $regimeBadSector = $base('POST', '/catalogs/pension-regimes', [
+        'code' => 'FUMMAL',
+        'name' => 'Régimen de fumiga inválido',
+        'months_per_year' => 12,
+        'sector' => 'dos',
+    ]);
+    check(
+        'task 38: sector no entero responde 422',
+        $regimeBadSector->status() === 422 && isset($regimeBadSector->json('errors')['sector']),
+        detail($regimeBadSector),
+    );
+
+    // ---- Task 38: persona fallecida del tipo de pensión (default
+    //      false, todos los endpoints del catálogo) ----
+    $typePlain = $base('POST', '/catalogs/pension-types', [
+        'code' => 'FUMEDAD',
+        'name' => 'Tipo de fumiga por edad',
+    ]);
+    check(
+        'task 38: persona fallecida omitida del tipo de pensión responde false (default)',
+        $typePlain->status() === 201 && $typePlain->json('data.deceased_person') === false,
+        detail($typePlain),
+    );
+
+    $typeDeceased = $base('POST', '/catalogs/pension-types', [
+        'code' => 'FUMSOB',
+        'name' => 'Tipo de fumiga por sobrevivencia',
+        'deceased_person' => true,
+    ]);
+    $typeDeceasedId = (int) ($typeDeceased->json('data.id') ?? 0);
+    check(
+        'task 38: persona fallecida del tipo de pensión recibida y devuelta (201, detalle y listado)',
+        $typeDeceased->status() === 201
+            && $typeDeceased->json('data.deceased_person') === true
+            && $typeDeceasedId > 0
+            && ($base('GET', "/catalogs/pension-types/{$typeDeceasedId}")->json('data.deceased_person') ?? null) === true
+            && ($base('GET', '/catalogs/pension-types?search=FUMSOB')->json('data.0.deceased_person') ?? null) === true,
+        detail($typeDeceased),
+    );
+
+    $typePatch = $base('PATCH', "/catalogs/pension-types/{$typeDeceasedId}", ['deceased_person' => false]);
+    check(
+        'task 38: PATCH de persona fallecida devuelto en la respuesta',
+        $typePatch->status() === 200 && $typePatch->json('data.deceased_person') === false,
+        detail($typePatch),
+    );
+
+    $typeBadFlag = $base('POST', '/catalogs/pension-types', [
+        'code' => 'FUMMALFAL',
+        'name' => 'Tipo de fumiga inválido',
+        'deceased_person' => 'yes',
+    ]);
+    check(
+        'task 38: persona fallecida no booleana responde 422',
+        $typeBadFlag->status() === 422 && isset($typeBadFlag->json('errors')['deceased_person']),
+        detail($typeBadFlag),
+    );
+
+    // ---- Task 38 (FIX): el listado de entidades devuelve los datos
+    //      del director general y el económico ----
+    $smokeDirector = Person::factory()->create();
+    $smokeEconomic = Person::factory()->create();
+    $directorEntity = Entity::query()->create([
+        'code' => 'FUM-DIR',
+        'name' => 'Entidad de fumiga con directores',
+        'tax_id_number' => '99000011111',
+        'organization_id' => $entity->organization_id,
+        'province_id' => $entity->province_id,
+        'municipality_id' => $entity->municipality_id,
+        'entity_type_id' => $entity->entity_type_id,
+        'address' => 'Calle de la fumiga #38',
+        'social_purpose' => 'Fumiga de directores',
+        'director_person_id' => $smokeDirector->id,
+        'economic_director_person_id' => $smokeEconomic->id,
+    ]);
+    $entityListing = $base('GET', '/entities?q=FUM-DIR');
+    $entityRow = $entityListing->json('data.0') ?? [];
+    check(
+        'task 38 fix: el listado de entidades devuelve los datos del director general y el económico',
+        $entityListing->status() === 200
+            && ($entityRow['director']['id'] ?? 0) === $smokeDirector->id
+            && ($entityRow['director']['identity_number'] ?? '') === $smokeDirector->identity_number
+            && ($entityRow['director']['first_name'] ?? '') === $smokeDirector->first_name
+            && ($entityRow['economic_director']['id'] ?? 0) === $smokeEconomic->id
+            && ($entityRow['economic_director']['identity_number'] ?? '') === $smokeEconomic->identity_number,
+        detail($entityListing),
+    );
+
+    $entityDetail = $base('GET', "/entities/{$directorEntity->id}");
+    check(
+        'task 38 fix: el detalle de la entidad comparte la proyección de directores',
+        $entityDetail->status() === 200
+            && ($entityDetail->json('data.director.id') ?? 0) === $smokeDirector->id
+            && ($entityDetail->json('data.economic_director.id') ?? 0) === $smokeEconomic->id,
+        detail($entityDetail),
+    );
+
+    $bareEntityListing = $base('GET', '/entities?q='.$entity->code);
+    $bareRow = collect($bareEntityListing->json('data') ?? [])->firstWhere('code', $entity->code);
+    check(
+        'task 38 fix: entidades sin directores devuelven null, nunca un recurso roto',
+        $bareEntityListing->status() === 200
+            && $bareRow !== null
+            && array_key_exists('director', $bareRow)
+            && $bareRow['director'] === null
+            && array_key_exists('economic_director', $bareRow)
+            && $bareRow['economic_director'] === null,
+        detail($bareEntityListing),
     );
 
     // ---- Forma de declaración del tiempo de servicio (Task 33;
