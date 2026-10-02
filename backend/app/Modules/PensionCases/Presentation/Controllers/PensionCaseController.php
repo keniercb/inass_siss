@@ -53,7 +53,12 @@ use OpenApi\Attributes as OA;
  * payload — the Shared office port resolves the REGISTERING USER's
  * office and the controller injects it into the attributes, so the
  * assumption is explicit at the boundary and the service keeps
- * validating it like any other reference.
+ * validating it like any other reference. Since the Task 41 user
+ * correction (SGP-35) the listing rides the SAME seam: index()
+ * never reads office_id from the query — the port resolves the
+ * AUTHENTICATED USER's office and the controller injects it into
+ * the search filters, so the territorial scope is explicit at the
+ * boundary and the service keeps it fail-closed.
  *
  * Conventions of the module's error surface: a deceased or
  * deactivated applicant answers 422 (PersonNotEligibleException), a
@@ -76,11 +81,10 @@ final class PensionCaseController
         operationId: 'pensionCasesIndex',
         tags: ['Expedientes'],
         summary: 'Listado de expedientes',
-        description: 'Listado filtrable por estado, oficina, persona, número y rango de fechas de solicitud, paginado (RF-EXP-011; la búsqueda afinada con volumen llega en S6). Cada fila viaja con la proyección COMPLETA del promovente (regla de usuario 3).',
+        description: 'Listado filtrable por estado, persona, número y rango de fechas de solicitud, paginado (RF-EXP-011; la búsqueda afinada con volumen llega en S6), con ALCANCE TERRITORIAL (SGP-35, corrección de usuario): solo cargan los expedientes cuya oficina coincide con la OFICINA DEL USUARIO AUTENTICADO — la oficina no viaja en la query (422 prohibido si llega) porque el servidor la deriva de la asignación del actor (ADR-33/ADR-29, el mismo patrón del alta), y un actor sin oficina recibe una página VACÍA (fail-closed, nunca el directorio sin scope). Cada fila viaja con la proyección COMPLETA del promovente (regla de usuario 3).',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\QueryParameter(name: 'status', schema: new OA\Schema(type: 'string', enum: ['submitted', 'under_review', 'approved', 'rejected'])),
-            new OA\QueryParameter(name: 'office_id', schema: new OA\Schema(type: 'integer')),
             new OA\QueryParameter(name: 'applicant_person_id', schema: new OA\Schema(type: 'integer')),
             new OA\QueryParameter(name: 'number', schema: new OA\Schema(type: 'string', maxLength: 20)),
             new OA\QueryParameter(name: 'requested_from', schema: new OA\Schema(type: 'string', format: 'date')),
@@ -116,8 +120,17 @@ final class PensionCaseController
     )]
     public function index(PensionCaseIndexRequest $request): JsonResponse
     {
+        // SGP-35 (user correction): the listing is scoped to the
+        // office of the AUTHENTICATED USER — the same ADR-33 seam the
+        // store rides. The wire contract already rejected a query
+        // office_id (422), so the only source left is the actor's
+        // assignment; an actor without an office keeps a fail-closed
+        // empty page (the service owns that guard).
+        $filters = $request->filters();
+        $filters['office_id'] = $this->registeringOffices->currentOfficeId();
+
         $paginator = $this->cases->search(
-            $request->filters(),
+            $filters,
             (int) $request->query('page', '1'),
             (int) $request->query('per_page', '15'),
         );
