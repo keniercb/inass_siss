@@ -28,6 +28,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  * DISJOINT (no overlap between subrecords): both rules answer 422
  * at every write path.
  *
+ * Since the Task 40 user correction (SGP-34) the aggregate itself is
+ * writable: update() edits the case fields while the PROMOVENTE
+ * stays immutable (person-sphere fields answer 422 at the wire), and
+ * delete() soft-deletes a SUBMITTED case — the row survives with
+ * its deleted_at and the one-open-case reservation is released so
+ * the operator can re-capture the applicant after a mistaken
+ * registration.
+ *
  * The OFFICE of a new case is the registering user's — the
  * Presentation layer resolves it through the Shared office port and
  * injects it into the attributes (user rule 0/ADR-33): never a
@@ -65,6 +73,38 @@ interface PensionCaseServiceInterface
      * Detail projection with subrecords and applicant loaded.
      */
     public function get(int $id): ?PensionCase;
+
+    /**
+     * Edits the case fields (SGP-34, user correction) while the
+     * promovente stays immutable: the FormRequest already rejected
+     * every person-sphere field (422), so the payload reaching this
+     * port only carries case proper keys — PATCH semantics: the
+     * declared keys change, the omitted ones keep their stored
+     * value. Semantic probes mirror the store: active entity and
+     * catalog references, non-future request date, RN-005 money.
+     *
+     * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at)
+     *
+     * @return null when the case does not exist (controller: 404)
+     *
+     * @throws CaseNotEditableException case already left submitted (409)
+     */
+    public function update(int $caseId, array $attributes): ?PensionCase;
+
+    /**
+     * Soft-deletes a SUBMITTED case (SGP-34, user correction): the
+     * row survives with its deleted_at — the evidence and the audit
+     * trail stay answerable (RN-001) — and the one-open-case
+     * reservation is RELEASED (the open_case_key generated column
+     * turns NULL on deleted rows) so the operator can re-capture the
+     * applicant after eliminating a mistaken registration. The
+     * subrecords are never touched: the history stays physically.
+     *
+     * @return null when the case does not exist (controller: 404)
+     *
+     * @throws CaseNotEditableException case already left submitted (409)
+     */
+    public function delete(int $caseId): ?bool;
 
     /**
      * Advisory analysis of the declared evidence (RF-EXP-002): the
