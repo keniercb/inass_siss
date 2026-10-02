@@ -1,0 +1,12 @@
+
+    private const array UPDATE_COLUMNS = [
+        'employer_entity_id',
+        'position_id',
+        'occupational_category_id',
+        'educational_level_id',
+        'scientific_category_id',
+        'pension_type_id',
+        'pension_regime_id',
+        'last_salary',
+        'requested_at',
+    ];

@@ -55,6 +55,22 @@ interface PensionCaseRepositoryInterface
     public function create(array $attributes): PensionCase;
 
     /**
+     * SGP-34 (user correction): persists the editable case fields
+     * (PATCH semantics — only the declared keys change; the service
+     * filtered every person-sphere key at the wire).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function update(PensionCase $case, array $attributes): PensionCase;
+
+    /**
+     * SGP-34 (user correction): SOFT-deletes the case row — the
+     * SoftDeletes trait keeps the row with its deleted_at and the
+     * one-open-case reservation turns NULL on the deleted row.
+     */
+    public function delete(PensionCase $case): bool;
+
+    /**
      * Atomic subrecord creation for the S5.5 all-or-nothing flow:
      * the caller drives the TransactionManager, the repository just
      * inserts the rows it is given (already validated).

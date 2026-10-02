@@ -221,8 +221,10 @@ describe('API documentation (Swagger)', function () {
         $update = $spec['paths']['/api/v1/catalogs/{type}/{id}']['patch']['requestBody']['content']['application/json']['schema'];
 
         // The spec version is the freshness signal of the served schema:
-        // 1.1.0 is the revision that documents the incorporated fields.
-        expect($spec['info']['version'])->toBe('1.1.0')
+        // 1.2.0 is the revision that documents the case lifecycle
+        // endpoints (PUT + DELETE, SGP-34) on top of the 1.1.0 catalog
+        // input schema.
+        expect($spec['info']['version'])->toBe('1.2.0')
 
             // Schema de Entrada del alta: the sector travels as an optional
             // integer and the persona fallecida flag as a boolean whose
@@ -249,6 +251,35 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['CatalogItem']['properties']['sector']['type'])->toBe('integer')
             ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('deceased_person')
             ->and($spec['components']['schemas']['CatalogItem']['properties']['deceased_person']['type'])->toBe('boolean');
+    });
+
+    // Task 40 (user correction, SGP-34): the case aggregate gains its
+    // lifecycle writes — PUT /pension-cases/{id} (case edition with an
+    // immutable promovente) and DELETE /pension-cases/{id} (soft delete
+    // of a submitted case). The path anchors keep the surface from
+    // shipping undocumented, mirroring every other endpoint group.
+    it('documents the case lifecycle endpoints', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        expect($spec['paths']['/api/v1/pension-cases/{id}'])->toHaveKeys(['get', 'put', 'delete'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}']['put']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}']['delete']['tags'])->toBe(['Expedientes'])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}']['put']['security'])->toBe([['sanctumAuth' => []]])
+            ->and($spec['paths']['/api/v1/pension-cases/{id}']['delete']['security'])->toBe([['sanctumAuth' => []]]);
+
+        // Schema de Entrada del PUT: the editable case fields travel
+        // optional (PATCH semantics) while the PROMOVENTE fields are
+        // documented as prohibited — the wire never lets them drift.
+        $put = $spec['paths']['/api/v1/pension-cases/{id}']['put']['requestBody']['content']['application/json']['schema'];
+
+        expect($put['properties'])->toHaveKey('last_salary')
+            ->and($put['properties'])->toHaveKey('employer_entity_id')
+            ->and($put['properties'])->toHaveKey('requested_at')
+            ->and($put['properties'])->toHaveKey('applicant_person_id')
+            ->and($put['properties']['applicant_person_id']['description'])->toContain('no modificable')
+            ->and($put['properties'])->toHaveKey('phone')
+            ->and($put['properties'])->toHaveKey('internationalist')
+            ->and($put['properties'])->toHaveKey('termination_date');
     });
 
     it('documents the response envelope and error shapes', function () {

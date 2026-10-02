@@ -1,0 +1,26 @@
+
+    /**
+     * SGP-34 (user correction): persists the editable case fields —
+     * PATCH semantics, only the declared keys change; the fillable
+     * surface of the model keeps guarding the columns.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function update(PensionCase $case, array $attributes): PensionCase
+    {
+        $case->fill($attributes);
+        $case->save();
+
+        return $case->refresh();
+    }
+
+    /**
+     * SGP-34 (user correction): SOFT-deletes the case row — the
+     * SoftDeletes trait keeps the row with its deleted_at so the
+     * evidence and the audit trail stay answerable (RN-001) while
+     * the public surface stops seeing it.
+     */
+    public function delete(PensionCase $case): bool
+    {
+        return (bool) $case->delete();
+    }

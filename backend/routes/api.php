@@ -328,7 +328,11 @@ Route::middleware(['auth:sanctum', 'permission:legalbases.manage'])->group(funct
 // captured), creation answers to cases.create (operator: data capture
 // registers cases in estado Solicitud per section 2.2) and the
 // subrecord highs/removals answer to cases.edit while the case stays
-// in submitted (plan S5.4). Transitions arrive in S6 with their own
+// in submitted (plan S5.4). Since SGP-34 (user correction) the
+// aggregate itself is writable through cases.edit: PUT edits the
+// case fields (the promovente stays immutable) and DELETE
+// soft-deletes a submitted case, releasing the one-open-case
+// reservation. Transitions arrive in S6 with their own
 // review/approve/reject permissions.
 Route::middleware(['auth:sanctum', 'permission:cases.view'])->group(function (): void {
     Route::get('/pension-cases', [PensionCaseController::class, 'index'])
@@ -344,6 +348,17 @@ Route::middleware(['auth:sanctum', 'permission:cases.create'])->group(function (
 });
 
 Route::middleware(['auth:sanctum', 'permission:cases.edit'])->group(function (): void {
+
+    // SGP-34 (user correction): the aggregate itself is writable
+    // through cases.edit — PUT edits the case fields (the promovente
+    // stays immutable) and DELETE soft-deletes a submitted case,
+    // releasing the one-open-case reservation.
+    Route::put('/pension-cases/{id}', [PensionCaseController::class, 'update'])
+        ->whereNumber('id')
+        ->name('pension-cases.update');
+    Route::delete('/pension-cases/{id}', [PensionCaseController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('pension-cases.destroy');
     Route::post('/pension-cases/{id}/salary-records', [PensionCaseController::class, 'addSalaryRecord'])
         ->whereNumber('id')
         ->name('pension-cases.salary-records.store');

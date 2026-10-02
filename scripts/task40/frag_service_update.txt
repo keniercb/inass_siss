@@ -1,0 +1,63 @@
+    /**
+     * SGP-34 (user correction): case edition with an IMMUTABLE
+     * promovente. The FormRequest already rejected every
+     * person-sphere key (422), so only case proper fields reach this
+     * port — PATCH semantics: the declared keys change, the omitted
+     * ones keep their stored value. The semantic probes mirror the
+     * store (active entity/catalog references, non-future request
+     * date) so both write paths answer the same shape, and the money
+     * flows through the Money value object exactly like the create.
+     *
+     * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at)
+     */
+    public function update(int $caseId, array $attributes): ?PensionCase
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        $payload = $this->updatePayload($attributes);
+
+        $this->assertUpdateReferencesAreActive($payload);
+        $this->assertRequestedAtIsNotFuture($payload);
+
+        if (isset($payload['last_salary'])) {
+            $payload['last_salary'] = Money::fromString((string) $payload['last_salary'])->__toString();
+        }
+
+        // An empty update is a no-op that answers the untouched case
+        // — never an empty UPDATE statement nor an audit entry.
+        if ($payload !== []) {
+            $this->cases->update($case, $payload);
+        }
+
+        return $this->cases->findDetailed($caseId);
+    }
+
+    /**
+     * SGP-34 (user correction): SOFT delete of a SUBMITTED case —
+     * the row survives with its deleted_at (RN-001: the evidence and
+     * the audit trail stay answerable, with the previous values per
+     * ADR-19) and the subrecords are never touched: the history
+     * stays physically. The one-open-case reservation is RELEASED by
+     * the widened open_case_key generated column (NULL on deleted
+     * rows) so the operator can re-capture the applicant after
+     * eliminating a mistaken registration.
+     */
+    public function delete(int $caseId): ?bool
+    {
+        $case = $this->caseOrNull($caseId);
+
+        if ($case === null) {
+            return null;
+        }
+
+        $this->assertCaseIsEditable($case);
+
+        return $this->cases->delete($case);
+    }
+

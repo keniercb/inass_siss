@@ -1,0 +1,11 @@
+
+    // SGP-34 (user correction): the aggregate itself is writable
+    // through cases.edit — PUT edits the case fields (the promovente
+    // stays immutable) and DELETE soft-deletes a submitted case,
+    // releasing the one-open-case reservation.
+    Route::put('/pension-cases/{id}', [PensionCaseController::class, 'update'])
+        ->whereNumber('id')
+        ->name('pension-cases.update');
+    Route::delete('/pension-cases/{id}', [PensionCaseController::class, 'destroy'])
+        ->whereNumber('id')
+        ->name('pension-cases.destroy');

@@ -1,0 +1,51 @@
+    /**
+     * SGP-34: the editable surface of the update — only the case
+     * proper columns, only the keys the wire declared. The
+     * promovente and lifecycle fields never reach this method: the
+     * FormRequest already rejected them as prohibited.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function updatePayload(array $attributes): array
+    {
+        return collect($attributes)
+            ->only(self::UPDATE_COLUMNS)
+            ->all();
+    }
+
+    /**
+     * SGP-34: the update's semantic probes mirror the store's
+     * assertReferencesAreActive but only over the PRESENT keys — a
+     * PATCH never drags references it did not declare.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertUpdateReferencesAreActive(array $payload): void
+    {
+        if (isset($payload['employer_entity_id'])
+            && $this->entities->find((int) $payload['employer_entity_id']) === null) {
+            throw ValidationException::withMessages([
+                'employer_entity_id' => 'The employer entity does not exist or is deactivated.',
+            ]);
+        }
+
+        $catalogProbes = [
+            'position_id' => Position::class,
+            'occupational_category_id' => OccupationalCategory::class,
+            'educational_level_id' => EducationalLevel::class,
+            'scientific_category_id' => ScientificCategory::class,
+            'pension_type_id' => PensionType::class,
+            'pension_regime_id' => PensionRegime::class,
+        ];
+
+        foreach ($catalogProbes as $key => $modelClass) {
+            if (isset($payload[$key])
+                && $this->catalogs->find($modelClass, (int) $payload[$key]) === null) {
+                throw ValidationException::withMessages([
+                    $key => 'The referenced catalog entry does not exist or is deactivated.',
+                ]);
+            }
+        }
+    }
+

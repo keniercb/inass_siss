@@ -226,10 +226,41 @@ final class RbacPensionCasesApiTest extends TestCase
             ->assertForbidden();
     }
 
+    #[DataProvider('writerRoles')]
+    public function test_the_capture_roles_update_and_delete_the_case(string $role): void
+    {
+        $this->actingAsRole($role);
+
+        // SGP-34: the PUT edits the case while the promovente stays
+        // immutable, and the DELETE soft-deletes a submitted case —
+        // both answer cases.edit like the subrecord writes.
+        $this->putJson("/api/v1/pension-cases/{$this->case->id}", [
+            'last_salary' => '6200.00',
+        ])->assertStatus(200)->assertJsonPath('data.last_salary', '6200.00');
+
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}")
+            ->assertStatus(200)
+            ->assertJsonPath('message', 'Case deleted.');
+    }
+
+    #[DataProvider('nonWriterRoles')]
+    public function test_consultation_roles_cannot_update_nor_delete(string $role): void
+    {
+        $this->actingAsRole($role);
+
+        $this->putJson("/api/v1/pension-cases/{$this->case->id}", [
+            'last_salary' => '6200.00',
+        ])->assertForbidden();
+
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}")->assertForbidden();
+    }
+
     public function test_requires_authentication(): void
     {
         $this->getJson('/api/v1/pension-cases')->assertUnauthorized();
         $this->getJson("/api/v1/pension-cases/{$this->case->id}")->assertUnauthorized();
         $this->postJson('/api/v1/pension-cases', $this->storePayload())->assertUnauthorized();
+        $this->putJson("/api/v1/pension-cases/{$this->case->id}", ['last_salary' => '6200.00'])->assertUnauthorized();
+        $this->deleteJson("/api/v1/pension-cases/{$this->case->id}")->assertUnauthorized();
     }
 }
