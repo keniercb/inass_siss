@@ -221,10 +221,10 @@ describe('API documentation (Swagger)', function () {
         $update = $spec['paths']['/api/v1/catalogs/{type}/{id}']['patch']['requestBody']['content']['application/json']['schema'];
 
         // The spec version is the freshness signal of the served schema:
-        // 1.2.0 is the revision that documents the case lifecycle
-        // endpoints (PUT + DELETE, SGP-34) on top of the 1.1.0 catalog
-        // input schema.
-        expect($spec['info']['version'])->toBe('1.2.0')
+        // 1.3.0 is the revision that scopes the case listing to the
+        // authenticated user's office (SGP-35) on top of the 1.2.0
+        // lifecycle endpoints (PUT + DELETE, SGP-34).
+        expect($spec['info']['version'])->toBe('1.3.0')
 
             // Schema de Entrada del alta: the sector travels as an optional
             // integer and the persona fallecida flag as a boolean whose
@@ -280,6 +280,32 @@ describe('API documentation (Swagger)', function () {
             ->and($put['properties'])->toHaveKey('phone')
             ->and($put['properties'])->toHaveKey('internationalist')
             ->and($put['properties'])->toHaveKey('termination_date');
+    });
+
+    // Task 41 (user correction, SGP-35): the case listing is scoped
+    // to the office of the AUTHENTICATED USER — the office_id query
+    // filter left the spec the same way it left the wire (the store
+    // dropped the payload field back in rule 0/ADR-33). The parameter
+    // anchors keep the scope contract from drifting: the remaining
+    // filters stay documented, the office never returns as a query
+    // parameter, and the operation description states the scoping.
+    it('documents the case listing scoped to the authenticated user', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        $parameters = collect($spec['paths']['/api/v1/pension-cases']['get']['parameters'] ?? [])
+            ->pluck('name')
+            ->all();
+
+        expect($parameters)->not->toContain('office_id')
+            ->and($parameters)->toContain('status')
+            ->and($parameters)->toContain('applicant_person_id')
+            ->and($parameters)->toContain('number')
+            ->and($parameters)->toContain('requested_from')
+            ->and($parameters)->toContain('requested_to')
+            ->and($parameters)->toContain('page')
+            ->and($parameters)->toContain('per_page')
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['description'])->toContain('OFICINA DEL USUARIO AUTENTICADO')
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['responses'])->toHaveKey('422');
     });
 
     it('documents the response envelope and error shapes', function () {

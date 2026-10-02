@@ -66,9 +66,15 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         // (ADR-17/ADR-32).
         $this->seed(SettingsSeeder::class);
 
-        $this->actingAsRole('operator');
+        $operator = $this->actingAsRole('operator');
 
         [$this->applicant, $this->entity, $this->case] = $this->seedCase();
+
+        // SGP-35: the listing is scoped to the actor's office, so the
+        // operator joins the fixture office for the listing
+        // assertions to stay honest (the subrecord writes never
+        // depended on the assignment).
+        $operator->forceFill(['office_id' => $this->case->office_id])->save();
     }
 
     /**
@@ -510,9 +516,12 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->assertSame(2023, (int) ($deleted->properties['old']['year'] ?? 0));
     }
 
-    public function test_the_listing_filters_by_status_office_and_person(): void
+    public function test_the_listing_filters_by_status_and_person(): void
     {
-        $response = $this->getJson('/api/v1/pension-cases?status=submitted')
+        // SGP-35: the office left the wire — the listing is scoped to
+        // the actor's office server-side — so the remaining filters
+        // (status, persona) narrow inside that scope.
+        $this->getJson('/api/v1/pension-cases?status=submitted')
             ->assertStatus(200)
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.number', '11-2026-90001');
