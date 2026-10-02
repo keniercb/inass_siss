@@ -84,7 +84,6 @@ interface PensionCaseServiceInterface
      * catalog references, non-future request date, RN-005 money.
      *
      * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at)
-     *
      * @return null when the case does not exist (controller: 404)
      *
      * @throws CaseNotEditableException case already left submitted (409)
