@@ -1387,3 +1387,24 @@ Stage Summary:
 - Suite 1070/3652 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga HTTP de la spec servida OK (1.1.0 con sector/deceased_person en POST y PATCH)
 - Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-33-catalog-input-schema; push/PR pendientes del PAT de desarrollo (el sandbox perdió ~/.git-credentials en el reset)
 - Higiene: PAT de desarrollo NO disponible esta sesión — solicitarlo al usuario para push/PR y rotar al cerrar la etapa
+---
+Task ID: 39-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-33 — PR #41, CI y merge a main (Schema de Entrada del catálogo siempre fresco: sector/deceased_person servidos, spec 1.1.0, L5_SWAGGER_GENERATE_ALWAYS en staging)
+
+Work Log:
+- PAT de desarrollo re-suministrado por el usuario al arranque de esta sesión: guardado en ~/.git-credentials con credential.helper store y verificado contra la API (200, usuario keniercb) antes de tocar nada — era exactamente el bloqueo documentado al cierre de la Task 39
+- Sandbox re-provisionado de nuevo (reprovision-sandbox.sh idempotente: PHP 8.3.32 + composer 2.10.3 + MySQL 8.4.6 en 13306; el reset se volvió a llevar el toolchain); datadir de MySQL persistido con el password del usuario sgp desconocido — resuelto con DROP/CREATE limpio de 'sgp'@'%'/'localhost' con sgp_local_dev y grants sobre sgp/sgp_test (la primera ALTER no bastó: el binlog reescribe la autenticación en CREATE USER IF NOT EXISTS sobre usuarios preexistentes, warning MY-010235)
+- Higiene git previa: el daemon dejó OTRO commit basura sobre main local (da01550, mensaje UUID: solo tool-results) — respaldado en scripts/tmp_mermaid/task39b-pre-reset-backup/ (patch completo; el bundle de rango único quedó vacío de nuevo porque el padre es origin/main) y main realineado a origin/main (c7ca8bb)
+- Verificación pre-push de la rama intacta feat/SGP-33-catalog-input-schema (4 commits: feat 74a4136 + test 10cb534 + docs 41b9949 + worklog df03891 sobre c7ca8bb): Pest 1070/3635 primero — el daemon volteó el HEAD a main ENTRE comandos y el run ejecutó el árbol viejo; rehecho con la estrategia de las Tasks 38/39 (checkout + suite encadenados con guards de rama): Pest 1070 tests / 3652 aserciones contra MySQL real (67 s), Pint PASS (409 archivos), PHPStan nivel 8 sin errores, deptrac 0 violaciones / 0 uncovered — un guard abortó limpio un run de Pint tras otro voltéo (el encadenado con checkout re-incorporado salió verde de una pieza)
+- Entrega: push explícito por nombre de rama y PR #41 creada por API: https://github.com/keniercb/inass_siss/pull/41
+- CI (Quality gate PHP 8.3) SUCCESS sobre df03891 tras ~6 minutos de sondeo
+- PR #41 mergeeada a main como 4296145 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1070 tests / 3652 aserciones (64 s), Pint PASS, PHPStan nivel 8 sin errores, deptrac 0 violaciones / 0 uncovered
+- Fumiga de la spec SERVIDA sobre main rehecha como script persistido (scripts/verify_served_spec_task39.py, 11 comprobaciones): artisan l5-swagger:generate + artisan serve + curl /api/docs → info.version 1.1.0; POST con sector {type integer, nullable} y deceased_person {type boolean, default false}; PATCH con ambos; CatalogItem con ambos — TODO OK (el síntoma original del usuario, verificado de extremo a extremo sobre main)
+
+Stage Summary:
+- EL SCHEMA DE ENTRADA DEL CATÁLOGO EN MAIN (Task 39/SGP-33, PR #41): la spec servida reconoce sector (entero opcional) y deceased_person (booleano con default false) en el POST y el PATCH de /api/v1/catalogs/{type} y en el espejo CatalogItem, con info.version 1.1.0 como señal de frescura; staging regenera la spec en cada petición (L5_SWAGGER_GENERATE_ALWAYS en el compose) para que el volumen app-storage no pueda volver a servir la caché de una imagen anterior
+- El contrato queda blindado: ApiDocsTest rompe el build si el Schema de Entrada pierde un campo del wire (1070/3652 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de la spec servida 11/11)
+- Las DIEZ correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37), el lote del SGP-32 (38) y el Schema de Entrada del catálogo (39)
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
