@@ -1299,3 +1299,21 @@ Stage Summary:
 - Suite 1062/3562 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes con 42 comprobaciones TODO OK sobre la BD sgp
 - Entrega: 4 commits (feat + test + docs + worklog) sobre feat/SGP-31-case-promoter-fields-service-period-rules, push y PR
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+
+---
+Task ID: 37-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-31 — PR #37, CI y merge a main (internacionalista + contacto del promovente y revisión de los subregistros de servicio)
+
+Work Log:
+- Entrega: rama feat/SGP-31-case-promoter-fields-service-period-rules (4 commits: feat b2622c5 + test 909f08c + docs ea36cc4 + worklog 4953cca — el feat re-hecho con reset --soft tras absorber los tests del módulo por un add demasiado amplio, la lección de la Task 36-cierre), push explícito por nombre de rama (tip 4953cca idéntico en local y remoto) y PR #37 creada por API: https://github.com/keniercb/inass_siss/pull/37
+- CI (run sobre 4953cca, "CI") SUCCESS a la primera: pint + phpstan 8 + pest contra MySQL del runner (1062/3562) + deptrac + build Docker
+- PR #37 mergeeada a main como 2c4fe16 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1062 tests / 3562 aserciones (62 s), Pint PASS (406 archivos), PHPStan nivel 8 sin errores (--memory-limit=1G), deptrac 0 violaciones / 0 uncovered
+- Incidente del daemon: MÚLTIPLES volteos de HEAD a main entre comandos (arranque, entre commit y verificación, y antes de los commits definitivos) — todas las operaciones sensibles (switch, resets, suite, push, commits) se ejecutaron como comandos encadenados con guard de rama; ningún commit aterrizó fuera de su rama y ningún reset --hard hizo falta sobre trabajo sin respaldar (el único commit basura, b23eeb9 de permisos/logs de la Task 36, se descartó al ARRANQUE con respaldo previo en scripts/tmp_mermaid/task37-pre-reset-backup/)
+
+Stage Summary:
+- CAMPOS DEL PROMOVENTE + REVISIÓN DEL SUBREGISTRO DE SERVICIOS EN MAIN (Task 37/SGP-31, PR #37): pension_cases.internationalist TINYINT(1) NOT NULL DEFAULT 0 (booleana OBLIGATORIA en el wire, 422 si se omite) más phone VARCHAR(30) NULL y popular_council VARCHAR(120) NULL (teléfono y consejo popular del promovente, opcionales con techo) recibidos en el POST y devueltos en 201/detalle/listado; service_records.end_date DATE NOT NULL con CHECK end_date > start_date (fin OBLIGATORIO y ESTRICTAMENTE posterior) y NINGÚN solapamiento entre subregistros — ServicePeriods rechaza con 422 en los dos puntos de entrada (filas anidadas sobre service_records nombrando pares; alta individual sobre end_date nombrando los registros cruzados) —; el vínculo vigente no existe y warnings queda solo con los años salariales ausentes
+- Las SIETE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36) y promovente + períodos de servicio (37)
+- Suite 1062/3562 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes con 42 comprobaciones TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
