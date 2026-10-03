@@ -1508,3 +1508,19 @@ Stage Summary:
 - Pregunta abierta P-09 registrada para la validación junto con la implementación: residencia en el municipio especial Isla de la Juventud (provincia obligatoria + RN-004 plena documentada; alternativa: provincia nullable solo para el especial)
 - Entrega: rama feat/SGP-36-model-docs con commits docs + worklog; push/PR/CI/merge a continuación
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 42-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-36 (fase de documentos) — PR #47, CI y merge a main (los cuatro ajustes de modelo documentados; implementación preparada y EN ESPERA de la validación del usuario)
+
+Work Log:
+- Entrega: rama feat/SGP-36-model-docs (2 commits: docs 8d48350 + worklog 75d0346 sobre 353fa9d), push explícito por nombre de rama y PR #47 creada por API: https://github.com/keniercb/inass_siss/pull/47
+- Incidente del daemon recurrente: UN volteo de HEAD a main entre los commits — el guard de rama abortó el intento y la cadena re-enganchó la rama antes del commit del worklog (cero commits fuera de su rama, el árbol sobrevivió intacto)
+- CI (Quality gate PHP 8.3) SUCCESS sobre 75d0346 tras ~6 minutos de sondeo — la suite de 1113/3829 corrió en verde contra MySQL real sin ningún cambio de código (PR de solo documentos)
+- PR #47 mergeeada a main como 32853f0 con merge commit; main local sincronizado (reset --hard a origin/main) y verificación de las marcas Task 42/SGP-36 presentes en los cuatro documentos y el worklog
+
+Stage Summary:
+- LA DOCUMENTACIÓN DE LOS CUATRO AJUSTES EN MAIN (Task 42/SGP-36, PR #47): Requisitos funcionales, Modelo de datos, Diseño de arquitectura y Plan de desarrollo describen el estado objetivo — eliminación de payment_types (15 uniformes), agency_types.payment_form con el enum minúsculas unificado y DEFAULT tarjeta magnetica, el grupo de domicilio y cobro del promovente en pension_cases (cuenta bancaria obligatoria condicionada a tarjeta magnetica, grupo editable por PUT, P-09 para el municipio especial) e income_concept_records.applied_percent (0–100, 2 decimales) — con ADR-35, changelogs 1.26/1.34/1.25 y los SEIS ítems de implementación preparados al cierre del Sprint 5
+- LA IMPLEMENTACIÓN SIGUE BLOQUEADA POR DISEÑO: ni una línea de backend se ha tocado — la orden del usuario («esperar validación para implementar») se respeta; los puntos de decisión que la validación debería confirmar: (a) la omisión de payment_form en el alta cae en el DEFAULT tarjeta magnetica (lectura patrón deceased_person), (b) la cuenta bancaria con nomina electronica queda OPCIONAL (proveerla se permite, no se prohíbe), (c) P-09 residencia en el municipio especial, (d) los nombres de columna elegidos (current_address, residence_province_id/residence_municipality_id, collection_agency_type_id/collection_agency_id, bank_account VARCHAR(34)) y (e) applied_percent como DECIMAL(5,2)
+- SIGUIENTE: con la validación del usuario, implementar por el plan preparado (migraciones 2026_10_03_100000..100300, TDD rojo primero, spec 1.3.0 → 1.4.0, QA completo, regresión sobre main); después retomar el Sprint 6 original
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
