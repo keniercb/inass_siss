@@ -40,7 +40,7 @@ El análisis completo de hallazgos (severidad y decisiones) consta en `Requisito
 | Hallazgo | Corrección aplicada al esquema |
 |---|---|
 | H-01 Persona como catálogo | `people` es tabla de negocio del módulo People con auditoría y soft delete |
-| H-02/H-03 dinero Double/int | `last_salary`, `earned_salary`, `amount` (cuantía) y montos de pago: `DECIMAL(12,2)` |
+| H-02/H-03 dinero Double/int | `last_salary`, `earned_salary`, `amount` (cuantía) y montos de pago: `DECIMAL(12,2)`; el porciento a aplicar del concepto de ingreso sigue el mismo patrón (Task 42/SGP-36: el Double declarado aterriza como `applied_percentage DECIMAL(5,2)` exacto) |
 | H-04 Expediente↔Pensionado ausente | `pensioners.origin_case_id` FK `UNIQUE` hacia `pension_cases` |
 | H-05 Base legal huérfana | `pension_cases.approval_legal_basis_id` FK hacia `legal_bases` |
 | H-06 contador en configuración | tabla `numbering_sequences` con bloqueo pesimista; `general_settings` queda puramente paramétrica y versionada (`effective_from`) |
@@ -72,7 +72,6 @@ Correcciones semánticas de nomenclatura: `proponente` (era "propovente"), `firm
 | Persona | `people` | `Person` |
 | Cargo | `positions` | `Position` |
 | Régimen de pensión | `pension_regimes` | `PensionRegime` |
-| Tipo de pago | `payment_types` | `PaymentType` |
 | Concepto de ingreso | `income_concepts` | `IncomeConcept` |
 | Configuración general | `general_settings` | `GeneralSetting` |
 | Secuencia de numeración | `numbering_sequences` | `NumberingSequence` |
@@ -133,7 +132,12 @@ erDiagram
     PENSION_CASES ||--o{ SALARY_RECORDS : "registra"
     PENSION_CASES ||--o{ SERVICE_RECORDS : "registra"
     PENSION_CASES ||--o{ WORK_CYCLES : "registra"
+    PENSION_CASES ||--o{ INCOME_CONCEPT_RECORDS : "declara"
     PENSION_CASES ||--o{ PENSION_CASE_HISTORIES : "audita"
+    PROVINCES ||--o{ PENSION_CASES : "residencia del promovente"
+    MUNICIPALITIES ||--o{ PENSION_CASES : "residencia del promovente"
+    AGENCY_TYPES ||--o{ PENSION_CASES : "cobro del promovente"
+    AGENCIES ||--o{ PENSION_CASES : "cobro del promovente"
     ENTITIES ||--o{ SERVICE_RECORDS : "entidad empleadora"
     LEGAL_BASIS_TYPES ||--o{ LEGAL_BASES : "clasifica"
     ORGANIZATIONS ||--o{ LEGAL_BASES : "emite"
@@ -146,7 +150,6 @@ erDiagram
     PENSIONERS ||--o{ BANK_CONTROLS : "cobra via"
     AGENCIES ||--o{ BANK_CONTROLS : "gestiona"
     PENSIONERS ||--o{ PENSION_PAYMENTS : "recibe"
-    PAYMENT_TYPES ||--o{ PENSION_PAYMENTS : "clasifica"
     PEOPLE ||--o| USERS : "vinculada"
 ```
 
@@ -171,6 +174,7 @@ erDiagram
         bigint id PK
         varchar code "Unico"
         varchar name
+        varchar payment_form "tarjeta magnetica o Nomina Electronica, NULL (Task 42)"
     }
     AGENCIES {
         bigint id PK
@@ -321,7 +325,22 @@ erDiagram
         bigint occupational_category_id FK
         bigint educational_level_id FK
         bigint scientific_category_id FK
+        bigint pension_type_id FK
+        bigint pension_regime_id FK
         decimal last_salary "12,2"
+        boolean rebel_army_member
+        date rebel_army_join_date "NULL"
+        boolean internationalist
+        bigint filed_by_person_id FK "NULL"
+        varchar phone "NULL"
+        varchar popular_council "NULL"
+        date termination_date "NULL"
+        varchar current_address "NULL"
+        bigint residence_province_id FK "NULL"
+        bigint residence_municipality_id FK "NULL"
+        varchar bank_account "NULL"
+        bigint collection_agency_type_id FK "NULL"
+        bigint collection_agency_id FK "NULL"
         bigint approval_legal_basis_id FK "NULL"
         text decision_notes "NULL"
         datetime decided_at "NULL"
@@ -351,6 +370,13 @@ erDiagram
         int actual_days
         int cycles_count
     }
+    INCOME_CONCEPT_RECORDS {
+        bigint id PK
+        bigint pension_case_id FK
+        bigint income_concept_id FK
+        decimal amount "12,2"
+        decimal applied_percentage "5,2 porciento a aplicar"
+    }
     PENSION_CASE_HISTORIES {
         bigint id PK
         bigint pension_case_id FK
@@ -363,10 +389,13 @@ erDiagram
     PENSION_CASES ||--o{ SALARY_RECORDS : "registra"
     PENSION_CASES ||--o{ SERVICE_RECORDS : "registra"
     PENSION_CASES ||--o{ WORK_CYCLES : "registra"
+    PENSION_CASES ||--o{ INCOME_CONCEPT_RECORDS : "declara"
     PENSION_CASES ||--o{ PENSION_CASE_HISTORIES : "audita"
 ```
 
 `computed_amount` + `calculation_setting_id` congelan el resultado del cálculo al aprobar (RF-CAL-007/008): el expediente resuelto nunca se recalcula.
+
+Los pares de residencia (municipio, provincia) y de cobro (agencia, tipo de agencia) del promovente — corrección de usuario de Task 42/SGP-36, documentada con implementación pendiente — viajan coherentes por FK COMPUESTAS: el espejo exacto de RN-04 que las agencias ya usan (el municipio pertenece a la provincia declarada; la agencia de cobro es del tipo declarado).
 
 ### 4.6 Pensionados y pagos
 
@@ -406,15 +435,9 @@ erDiagram
         boolean is_active
         datetime deactivated_at "NULL"
     }
-    PAYMENT_TYPES {
-        bigint id PK
-        varchar name "Unico"
-        varchar description
-    }
     PENSION_PAYMENTS {
         bigint id PK
         bigint pensioner_id FK
-        bigint payment_type_id FK
         smallint period_year
         tinyint period_month
         decimal amount "12,2"
@@ -426,11 +449,10 @@ erDiagram
     PENSION_REGIMES ||--o{ PENSIONERS : "clasifica"
     PENSIONERS ||--o{ BANK_CONTROLS : "cobra via"
     PENSIONERS ||--o{ PENSION_PAYMENTS : "recibe"
-    PAYMENT_TYPES ||--o{ PENSION_PAYMENTS : "clasifica"
     BANK_CONTROLS ||--o{ PENSION_PAYMENTS : "liquida"
 ```
 
-`pension_payments` es la extensión propuesta (H-16) para el módulo de pagos; se construye solo si el área funcional valida RF-PAG-005.
+`pension_payments` es la extensión propuesta (H-16) para el módulo de pagos; se construye solo si el área funcional valida RF-PAG-005. Desde la corrección de usuario de Task 42/SGP-36 (documentada, implementación pendiente) la propuesta queda RE-ANCLADA: sin el catálogo `payment_types`, la forma de pago vive como enum `payment_form` del tipo de agencia y los datos de cobro se capturan como datos bancarios del promovente del expediente (RF-EXP-001).
 
 ### 4.7 Configuración, secuencias, seguridad y auditoría
 
@@ -508,7 +530,7 @@ erDiagram
 | name | VARCHAR(80) | NO | — | Nombre |
 | — | — | — | UNIQUE | (`province_id`, `code`) |
 
-**`agency_types`** — Tipos de agencia bancaria. `code VARCHAR(4) UNIQUE`, `name VARCHAR(80) UNIQUE`.
+**`agency_types`** — Tipos de agencia bancaria. `code VARCHAR(4) UNIQUE`, `name VARCHAR(80) UNIQUE` y, desde la corrección de usuario de Task 42/SGP-36 (documentada, implementación pendiente de validación), `payment_form VARCHAR(30) NULL` — forma de pago del tipo de agencia, enum de dominio con DOS valores literales definidos por el usuario, SIN tilde y tal como los escribió: `tarjeta magnetica` y `Nomina Electronica` (enum PHP `PaymentForm` + CHECK `chk_agency_types_payment_form`, migración prevista `2026_10_03_100100`). El campo SUSTITUYE al catálogo `payment_types`, eliminado por la misma corrección: la forma de cobro pasa a ser un ATRIBUTO del tipo de agencia y viaja por la maquinaria genérica `extraRules` del registry (opcional en el POST/PATCH con 422 sobre cualquier otro valor, devuelta por TODOS los endpoints del recurso); las semillas de referencia (AG/Sucursal, SU/PS/Punto de servicio) quedan SIN valor — pendiente de la decisión del área funcional (P-06).
 
 **`agencies`** — Agencias bancarias.
 
@@ -540,10 +562,9 @@ Patrón común: PK surrogate + `code VARCHAR(10) UNIQUE` (clave natural inmutabl
 | `races` | — | BLA/Blanca, NEG/Negra, MUL/Mestiza o Mulata, CHN/China, OTR/Otra |
 | `positions` | `description VARCHAR(255) NULL` | JDEPT/Jefe de Departamento, JAREA/Jefe de Área, ESP/Especialista, TEC/Técnico, ASERV/Auxiliar de Servicios |
 | `pension_regimes` | `months_per_year INT UNSIGNED NOT NULL CHECK (> 0)`, `sector INT NULL` (Task 38) | GEN/General (12); especiales a validar (P-02) |
-| `payment_types` | `description VARCHAR(255) NULL` | ABN/Abono bancario, CHQ/Cheque, EFE/Efectivo |
 | `income_concepts` | `description VARCHAR(255) NULL`, `applies_base_salary TINYINT(1) NOT NULL DEFAULT 0` | SALB/Salario base (1), PGR/pagos por resultados (0)… |
 
-`pension_regimes` incluye además `description VARCHAR(255) NULL` documentando la regla de cómputo del régimen. Desde la Task 38 (corrección de usuario, SGP-32) dos catálogos de pensión ganan columnas propias servidas por la maquinaria genérica de `extraRules`: el régimen de jubilación lleva `sector INT NULL` (opcional, sin constraint — la corrección no declara dominio; migración `2026_10_02_120100`) y el tipo de pensión lleva persona fallecida `deceased_person TINYINT(1) NOT NULL DEFAULT 0` (paralelo de `applies_base_salary`: la omisión del alta cae en el DEFAULT false, y el modelo lleva el mismo default en memoria para que el 201 proyecte false sin recarga; migración `2026_10_02_120200`) — ambos devueltos por TODOS los endpoints del recurso genérico, y el PATCH relaja a `sometimes` las reglas `required` de las columnas propias de modo que editar el sector ya no exige arrastrar `months_per_year`.
+`pension_regimes` incluye además `description VARCHAR(255) NULL` documentando la regla de cómputo del régimen. Desde la Task 38 (corrección de usuario, SGP-32) dos catálogos de pensión ganan columnas propias servidas por la maquinaria genérica de `extraRules`: el régimen de jubilación lleva `sector INT NULL` (opcional, sin constraint — la corrección no declara dominio; migración `2026_10_02_120100`) y el tipo de pensión lleva persona fallecida `deceased_person TINYINT(1) NOT NULL DEFAULT 0` (paralelo de `applies_base_salary`: la omisión del alta cae en el DEFAULT false, y el modelo lleva el mismo default en memoria para que el 201 proyecte false sin recarga; migración `2026_10_02_120200`) — ambos devueltos por TODOS los endpoints del recurso genérico, y el PATCH relaja a `sometimes` las reglas `required` de las columnas propias de modo que editar el sector ya no exige arrastrar `months_per_year`. Desde la corrección de usuario de Task 42/SGP-36 (documentada, implementación pendiente de validación) el tipo de agencia gana la forma de pago `payment_form` VARCHAR(30) NULL — enum de DOS valores literales del usuario SIN tilde: `tarjeta magnetica` y `Nomina Electronica`, con CHECK `chk_agency_types_payment_form` — servida por la MISMA maquinaria `extraRules` (opcional en POST/PATCH con 422 sobre cualquier otro valor, devuelta por TODOS los endpoints del recurso), mientras el catálogo `payment_types` se ELIMINA completo (migración prevista `2026_10_03_100000`: la tabla desaparece con su modelo, entrada del registry, semillas y enumeración OA; `GET /catalogs/payment-types` responde 404 de catálogo desconocido).
 
 ### 5.3 Configuración y secuencias
 
@@ -693,6 +714,12 @@ Semántica de negocio (implementada, ADR-23; migración `2026_09_28_130000_creat
 | phone | VARCHAR(30) | SÍ | — | Teléfono de contacto del promovente (Task 37): texto libre opcional (422 con 31 caracteres; omisión = NULL) |
 | popular_council | VARCHAR(120) | SÍ | — | Consejo popular del promovente (Task 37): división territorial cubana, texto libre opcional (422 con 121 caracteres; omisión = NULL) |
 | termination_date | DATE | SÍ | — | Fecha de desvinculación del promovente (Task 38/SGP-32, corrección de usuario): opcional en el wire con regla de forma Y-m-d única (422 con formato inválido; sin sonda semántica), omisión = NULL; migración `2026_10_02_120000` |
+| current_address | VARCHAR(255) | SÍ | — | Dirección actual del promovente (Task 42/SGP-36, corrección de usuario — documentada, implementación pendiente de validación): texto libre opcional, paralelo de `people.address`; omisión = NULL |
+| residence_province_id | BIGINT UNSIGNED | SÍ | FK → provinces | Provincia de residencia del promovente (Task 42): viaja EN PAREJA con el municipio — ambos o ninguno (422 conversacional si llega la mitad) — y sondeada contra el catálogo ACTIVO |
+| residence_municipality_id | BIGINT UNSIGNED | SÍ | FK → municipalities | Municipio de residencia del promovente (Task 42): debe pertenecer a la provincia declarada — FK compuesta (municipio, provincia) → `municipalities(id, province_id)`, el espejo exacto de RN-04 en las agencias |
+| bank_account | VARCHAR(30) | SÍ | — | Cuenta bancaria del promovente (Task 42): texto libre opcional con techo, sin formato (sin especificación bancaria — paralelo del par de contacto) |
+| collection_agency_type_id | BIGINT UNSIGNED | SÍ | FK → agency_types | Tipo de agencia de cobro del promovente (Task 42): viaja EN PAREJA con la agencia; su `payment_form` (tarjeta magnetica / Nomina Electronica) caracteriza el canal de cobro |
+| collection_agency_id | BIGINT UNSIGNED | SÍ | FK → agencies | Agencia de cobro del promovente (Task 42): debe ser del tipo declarado — FK compuesta (agencia, tipo) → `agencies(id, agency_type_id)` con UNIQUE de respaldo nuevo sobre `agencies` (migración prevista `2026_10_03_100200`) |
 | approval_legal_basis_id | BIGINT UNSIGNED | SÍ | FK → legal_bases | Resolución aprobatoria (H-05); obligatoria al aprobar |
 | decision_notes | TEXT | SÍ | — | Nota de resolución o motivo de denegación |
 | decided_at | DATETIME | SÍ | — | Momento de la decisión |
@@ -742,9 +769,10 @@ El solapamiento se RECHAZA en la capa de aplicación (Task 37, corrección de us
 | pension_case_id | BIGINT UNSIGNED | NO | FK → pension_cases | Expediente |
 | income_concept_id | BIGINT UNSIGNED | NO | FK → income_concepts | Concepto del catálogo (salario en divisas, antigüedad…) |
 | amount | DECIMAL(12,2) | NO | CHECK ≥ 0 | Valor declarado del concepto (RN-005) |
+| applied_percentage | DECIMAL(5,2) | NO | CHECK 0-100 | Porciento a aplicar (Task 42/SGP-36, corrección de usuario — documentada, implementación pendiente de validación): el Double declarado aterriza como decimal EXACTO por RN-005; rango 0.00-100.00; migración prevista `2026_10_03_100300` |
 | — | — | — | UNIQUE | (`pension_case_id`, `income_concept_id`) — un valor por concepto |
 
-Sin timestamps ni autoría propias (las convenciones del agregado): las bajas son físicas y auditadas con los valores previos (ADR-19). El par (caso, concepto) se sondea semánticamente antes del insert (422 sobre `income_concept_id`, RN-008) y el catálogo se exige ACTIVO en alta y edición.
+Sin timestamps ni autoría propias (las convenciones del agregado): las bajas son físicas y auditadas con los valores previos (ADR-19). El par (caso, concepto) se sondea semánticamente antes del insert (422 sobre `income_concept_id`, RN-008) y el catálogo se exige ACTIVO en alta y edición. Desde la corrección de usuario de Task 42/SGP-36 (documentada, implementación pendiente) cada fila declara además el porciento a aplicar `applied_percentage` DECIMAL(5,2) NOT NULL CHECK 0-100 — el Double del usuario como decimal exacto por RN-005 —, OBLIGATORIO en el alta individual y en el payload anidado de creación y devuelto en las proyecciones.
 
 **`pension_case_histories`** — Bitácora de transiciones (append-only, RN-010).
 
@@ -757,7 +785,7 @@ Sin timestamps ni autoría propias (las convenciones del agregado): las bajas so
 | changed_at | DATETIME | NO | — | Momento (índice) |
 | note | TEXT | SÍ | — | Nota de la transición |
 
-Semántica de negocio (implementada, ADR-25 + reglas de usuario 0-5/ADR-32/33; migraciones `2026_09_28_150000_create_pension_cases_table` a `150003_create_work_cycles_table`, `2026_09_30_120000_add_pension_classification_to_pension_cases_table` y `2026_09_30_120100_create_income_concept_records_table`, `2026_10_01_120000_add_forma_declaracion_to_service_records_table`, `2026_10_01_130000_add_persona_por_to_pension_cases_table` y `2026_10_01_140000_reference_persona_por_to_people_on_pension_cases_table`, `2026_10_02_100000_rename_forma_declaracion_to_declaration_form_on_service_records_table` y `2026_10_02_100100_rename_persona_por_id_to_filed_by_person_id_on_pension_cases_table`, `2026_10_02_110000_add_promovente_contact_and_internationalist_to_pension_cases_table` y `2026_10_02_110100_tighten_period_rules_on_service_records_table`, `2026_10_02_120000_add_termination_date_to_pension_cases_table`, `2026_10_02_120100_add_sector_to_pension_regimes_table`, `2026_10_02_120200_add_deceased_person_to_pension_types_table` y `2026_10_02_130000_release_open_case_reservation_on_pension_cases_soft_delete` (Task 40/SGP-34: la columna generada `open_case_key` se re-crea con la expresión ampliada que también anula la reservación en filas soft-deleted — MySQL exige soltar índice y columna antes de re-añadir ambos con la nueva expresión): el número del expediente es COMPUESTO — PPMMAACCCCC, once dígitos contiguos: provincia y municipio de la oficina registrante + últimos dos dígitos del año en curso + consecutivo TERRITORIAL — emitido por el puerto `SequenceGeneratorInterface::nextForTerritory` sobre el scope `pension_case:{año}:{provincia}:{municipio}` de la secuencia centralizada (RN-009/ADR-17/ADR-34), tras completar toda la validación semántica y antes de la transacción de negocio, de modo que un 422 no quema números y un fallo de insert sí (hueco aceptado por diseño, jamás reutilizado); la OFICINA del expediente es la del usuario que REGISTRA (regla 0/ADR-33: resuelta por el puerto Shared `CurrentUserOfficeProviderInterface` e inyectada por el controller — `office_id` prohibido en el payload con 422, actor sin oficina 422) y el estado inicial es `submitted` con el catálogo normativo de la sección 2.4 respaldado por CHECK (la MATRIZ de transiciones llega en S6 como dataset). La clasificación de pensión (tipo y régimen, regla 4) es obligatoria con FK a sus catálogos y el par de Ejército Rebelde es COHERENTE por construcción: el wire exige `rebel_army_join_date` cuando el booleano es true y la rechaza cuando es false, con el guard del servicio y los CHECKs directo e inverso de BD como última línea. La PERSONA POR (corrección de usuario de Task 34, REDEFINIDA como referencia por Task 35 y renombrada a columna inglesa por Task 36) — quien presenta o gestiona el expediente cuando no es el propio proponente, p. ej. un familiar o un apoderado — viaja como `filed_by_person_id` BIGINT UNSIGNED NULL con FK a `people` (restrictOnDelete, como el resto de las referencias de la tabla; migración `2026_10_01_140000` que sustituye el VARCHAR(120) de Task 34, renombrada por la `2026_10_02_100100`): el wire recibe `filed_by_person_id` sondeado contra la superficie ACTIVA del registro por `assertFiledByPersonIsRegistered` — una persona desconocida o DESACTIVADA responde 422 sobre `filed_by_person_id` antes de quemar número o escribir fila (la elegibilidad del promovente NO se exige del presentador) —, la omisión persiste NULL (normalizada por `normalizeFiledByPersonId`) y el 201 del alta, el detalle y el listado devuelven el id más la proyección COMPLETA de la persona bajo `filed_by` (`PersonResource` reutilizado con carga anticipada, misma forma que `applicant`, regla de usuario 3). La serie salarial admite MÁXIMO 15 filas vivas (regla 1, `SalarySeries::MAX_RECORDS`: payload e individuales, borrar libera cupo). Los CONCEPTOS DE INGRESO (regla 5) son un subregistro más del agregado — anidado en la creación atómica y con endpoints propios de alta/baja — con UNIQUE (caso, concepto) sondeado semánticamente (422) y DECIMAL(12,2) no negativo por `Money` (RN-005). La unicidad de «un expediente abierto por persona» es FÍSICA: la columna generada almacenada `open_case_key` vale `IF(status IN ('approved','rejected') OR deleted_at IS NOT NULL, NULL, applicant_person_id)` — expresión AMPLIADA por la migración `2026_10_02_130000_release_open_case_reservation_on_pension_cases_soft_delete` (Task 40/SGP-34, corrección de usuario): el DELETE del expediente es un soft delete disponible solo en `submitted`, y la fila borrada debe LIBERAR la reservación para que el operador pueda re-capturar al mismo solicitante tras eliminar un registro equivocado (la expresión original mantenía la clave en filas borradas bajo la premisa «ningún endpoint público borra expedientes», premisa que esta corrección retira; mantenerla habría convertido cada re-captura en una violación UNIQUE del driver — 500 — tras la sonda del servicio ya en verde) — y su UNIQUE admite tantos casos resueltos y BORRADOS como haga falta pero a lo sumo UNO vivo por proponente (el 409 del servicio con el expediente abierto la anticipa, y `findOpenCaseForPerson` ya excluía las filas borradas por el scope de SoftDeletes). El ciclo de vida del agregado (Task 40) añade el PUT de edición con el PROMOVENTE inmutable — todo campo de la esfera de la persona responde 422 prohibido en el wire — y el DELETE lógico solo en `submitted` (409 fuera, con el estado actual): la fila sobrevive con su `deleted_at`, los subregistros quedan físicos y la eliminación aterriza en la bitácora con los valores previos (ADR-19). El piso del año salarial 1950 está en CHECK y el techo «año actual+1» se decide contra `ClockInterface` porque NOW() no cabe en un CHECK determinista; el par (caso, año) es UNIQUE sondeado semánticamente antes del insert (RN-008). Los subregistros no llevan timestamps ni autoría propias — el expediente es el agregado — y sus bajas son FÍSICAS auditadas con los valores previos (ADR-19; borrado por instancia: el mass delete no dispara eventos Eloquent). La forma de declaración del vínculo — Documental (por defecto) o Testifical, corrección de usuario de Task 32; columna inglesa `declaration_form` desde Task 36 — viaja NOT NULL con DEFAULT 'Documental' y su propio CHECK (`chk_service_records_declaration_form`) — declarada POR FILA tanto en el endpoint propio como en el payload anidado de creación (Task 33: la omisión cae en Documental y un valor desconocido responde 422 sin crear nada; jamás un descarte silencioso) —, y desde la Task 37 (corrección de usuario, SGP-31) todo período de servicio está CERRADO y DISJUNTO: `end_date` es NOT NULL con CHECK `chk_service_records_dates` endurecido a `end_date > start_date` (migración `2026_10_02_110100`) y el solapamiento — no expresable como constraint — se RECHAZA con 422 por el dominio puro `ServicePeriods` en los dos puntos de entrada (filas anidadas del alta por pares sobre `service_records`; alta individual contra lo almacenado sobre `end_date` nombrando los registros cruzados; días inclusivos, el día siguiente al fin arranca limpio), de modo que los vínculos abiertos no existen y el objeto `warnings` solo conserva el análisis salarial de `SalarySeries` (años interiores ausentes) — antes se ADVIERTEN con el dominio puro `ServicePeriods` (objeto `warnings` hermano de `data`, nunca bloque), igual que `SalarySeries` advierte los años interiores ausentes de la serie declarada; el LISTADO carga el promovente completo (regla 3, `PersonResource` reutilizado con carga anticipada). Desde la Task 38 (corrección de usuario, SGP-32) el expediente lleva además la fecha de desvinculación del promovente — `termination_date` DATE NULL (migración `2026_10_02_120000`): opcional en el wire (solo regla de forma Y-m-d, sin sonda semántica), omisión/null/'' persisten NULL normalizadas como el par de contacto y el 201, el detalle y el listado la devuelven. Autoría del expediente estampada por `AuditableObserver` (ADR-14) y toda escritura — expediente y subregistros, incluidos los conceptos de ingreso — aterriza en la bitácora append-only (ADR-19); las columnas de decisión (`approval_legal_basis_id`, `decided_by/decided_at`, `computed_amount`, `calculation_setting_id`) existen con sus FK desde ya para que la aprobación de S6 no toque el esquema. `pension_case_histories` aún no está migrada: llega con las transiciones de S6 (RF-EXP-009, RF-AUD-002).
+Semántica de negocio (implementada, ADR-25 + reglas de usuario 0-5/ADR-32/33; migraciones `2026_09_28_150000_create_pension_cases_table` a `150003_create_work_cycles_table`, `2026_09_30_120000_add_pension_classification_to_pension_cases_table` y `2026_09_30_120100_create_income_concept_records_table`, `2026_10_01_120000_add_forma_declaracion_to_service_records_table`, `2026_10_01_130000_add_persona_por_to_pension_cases_table` y `2026_10_01_140000_reference_persona_por_to_people_on_pension_cases_table`, `2026_10_02_100000_rename_forma_declaracion_to_declaration_form_on_service_records_table` y `2026_10_02_100100_rename_persona_por_id_to_filed_by_person_id_on_pension_cases_table`, `2026_10_02_110000_add_promovente_contact_and_internationalist_to_pension_cases_table` y `2026_10_02_110100_tighten_period_rules_on_service_records_table`, `2026_10_02_120000_add_termination_date_to_pension_cases_table`, `2026_10_02_120100_add_sector_to_pension_regimes_table`, `2026_10_02_120200_add_deceased_person_to_pension_types_table` y `2026_10_02_130000_release_open_case_reservation_on_pension_cases_soft_delete` (Task 40/SGP-34: la columna generada `open_case_key` se re-crea con la expresión ampliada que también anula la reservación en filas soft-deleted — MySQL exige soltar índice y columna antes de re-añadir ambos con la nueva expresión) — y las PREVISTAS por la corrección de usuario de Task 42/SGP-36, DOCUMENTADAS con implementación pendiente de validación: `2026_10_03_100000_drop_payment_types_table` (el catálogo tipos de pago desaparece), `2026_10_03_100100_add_payment_form_to_agency_types_table`, `2026_10_03_100200_add_promovente_residence_and_collection_to_pension_cases_table` y `2026_10_03_100300_add_applied_percentage_to_income_concept_records_table` —: el número del expediente es COMPUESTO — PPMMAACCCCC, once dígitos contiguos: provincia y municipio de la oficina registrante + últimos dos dígitos del año en curso + consecutivo TERRITORIAL — emitido por el puerto `SequenceGeneratorInterface::nextForTerritory` sobre el scope `pension_case:{año}:{provincia}:{municipio}` de la secuencia centralizada (RN-009/ADR-17/ADR-34), tras completar toda la validación semántica y antes de la transacción de negocio, de modo que un 422 no quema números y un fallo de insert sí (hueco aceptado por diseño, jamás reutilizado); la OFICINA del expediente es la del usuario que REGISTRA (regla 0/ADR-33: resuelta por el puerto Shared `CurrentUserOfficeProviderInterface` e inyectada por el controller — `office_id` prohibido en el payload con 422, actor sin oficina 422) y el estado inicial es `submitted` con el catálogo normativo de la sección 2.4 respaldado por CHECK (la MATRIZ de transiciones llega en S6 como dataset). La clasificación de pensión (tipo y régimen, regla 4) es obligatoria con FK a sus catálogos y el par de Ejército Rebelde es COHERENTE por construcción: el wire exige `rebel_army_join_date` cuando el booleano es true y la rechaza cuando es false, con el guard del servicio y los CHECKs directo e inverso de BD como última línea. La PERSONA POR (corrección de usuario de Task 34, REDEFINIDA como referencia por Task 35 y renombrada a columna inglesa por Task 36) — quien presenta o gestiona el expediente cuando no es el propio proponente, p. ej. un familiar o un apoderado — viaja como `filed_by_person_id` BIGINT UNSIGNED NULL con FK a `people` (restrictOnDelete, como el resto de las referencias de la tabla; migración `2026_10_01_140000` que sustituye el VARCHAR(120) de Task 34, renombrada por la `2026_10_02_100100`): el wire recibe `filed_by_person_id` sondeado contra la superficie ACTIVA del registro por `assertFiledByPersonIsRegistered` — una persona desconocida o DESACTIVADA responde 422 sobre `filed_by_person_id` antes de quemar número o escribir fila (la elegibilidad del promovente NO se exige del presentador) —, la omisión persiste NULL (normalizada por `normalizeFiledByPersonId`) y el 201 del alta, el detalle y el listado devuelven el id más la proyección COMPLETA de la persona bajo `filed_by` (`PersonResource` reutilizado con carga anticipada, misma forma que `applicant`, regla de usuario 3). La serie salarial admite MÁXIMO 15 filas vivas (regla 1, `SalarySeries::MAX_RECORDS`: payload e individuales, borrar libera cupo). Los CONCEPTOS DE INGRESO (regla 5) son un subregistro más del agregado — anidado en la creación atómica y con endpoints propios de alta/baja — con UNIQUE (caso, concepto) sondeado semánticamente (422) y DECIMAL(12,2) no negativo por `Money` (RN-005). La unicidad de «un expediente abierto por persona» es FÍSICA: la columna generada almacenada `open_case_key` vale `IF(status IN ('approved','rejected') OR deleted_at IS NOT NULL, NULL, applicant_person_id)` — expresión AMPLIADA por la migración `2026_10_02_130000_release_open_case_reservation_on_pension_cases_soft_delete` (Task 40/SGP-34, corrección de usuario): el DELETE del expediente es un soft delete disponible solo en `submitted`, y la fila borrada debe LIBERAR la reservación para que el operador pueda re-capturar al mismo solicitante tras eliminar un registro equivocado (la expresión original mantenía la clave en filas borradas bajo la premisa «ningún endpoint público borra expedientes», premisa que esta corrección retira; mantenerla habría convertido cada re-captura en una violación UNIQUE del driver — 500 — tras la sonda del servicio ya en verde) — y su UNIQUE admite tantos casos resueltos y BORRADOS como haga falta pero a lo sumo UNO vivo por proponente (el 409 del servicio con el expediente abierto la anticipa, y `findOpenCaseForPerson` ya excluía las filas borradas por el scope de SoftDeletes). El ciclo de vida del agregado (Task 40) añade el PUT de edición con el PROMOVENTE inmutable — todo campo de la esfera de la persona responde 422 prohibido en el wire — y el DELETE lógico solo en `submitted` (409 fuera, con el estado actual): la fila sobrevive con su `deleted_at`, los subregistros quedan físicos y la eliminación aterriza en la bitácora con los valores previos (ADR-19). El piso del año salarial 1950 está en CHECK y el techo «año actual+1» se decide contra `ClockInterface` porque NOW() no cabe en un CHECK determinista; el par (caso, año) es UNIQUE sondeado semánticamente antes del insert (RN-008). Los subregistros no llevan timestamps ni autoría propias — el expediente es el agregado — y sus bajas son FÍSICAS auditadas con los valores previos (ADR-19; borrado por instancia: el mass delete no dispara eventos Eloquent). La forma de declaración del vínculo — Documental (por defecto) o Testifical, corrección de usuario de Task 32; columna inglesa `declaration_form` desde Task 36 — viaja NOT NULL con DEFAULT 'Documental' y su propio CHECK (`chk_service_records_declaration_form`) — declarada POR FILA tanto en el endpoint propio como en el payload anidado de creación (Task 33: la omisión cae en Documental y un valor desconocido responde 422 sin crear nada; jamás un descarte silencioso) —, y desde la Task 37 (corrección de usuario, SGP-31) todo período de servicio está CERRADO y DISJUNTO: `end_date` es NOT NULL con CHECK `chk_service_records_dates` endurecido a `end_date > start_date` (migración `2026_10_02_110100`) y el solapamiento — no expresable como constraint — se RECHAZA con 422 por el dominio puro `ServicePeriods` en los dos puntos de entrada (filas anidadas del alta por pares sobre `service_records`; alta individual contra lo almacenado sobre `end_date` nombrando los registros cruzados; días inclusivos, el día siguiente al fin arranca limpio), de modo que los vínculos abiertos no existen y el objeto `warnings` solo conserva el análisis salarial de `SalarySeries` (años interiores ausentes) — antes se ADVIERTEN con el dominio puro `ServicePeriods` (objeto `warnings` hermano de `data`, nunca bloque), igual que `SalarySeries` advierte los años interiores ausentes de la serie declarada; el LISTADO carga el promovente completo (regla 3, `PersonResource` reutilizado con carga anticipada). Desde la Task 38 (corrección de usuario, SGP-32) el expediente lleva además la fecha de desvinculación del promovente — `termination_date` DATE NULL (migración `2026_10_02_120000`): opcional en el wire (solo regla de forma Y-m-d, sin sonda semántica), omisión/null/'' persisten NULL normalizadas como el par de contacto y el 201, el detalle y el listado la devuelven. Desde la corrección de usuario de Task 42/SGP-36 (DOCUMENTADA, implementación pendiente de validación) el expediente gana DOS grupos de datos del promovente: la DIRECCIÓN — `current_address` VARCHAR(255) NULL (dirección actual) y el par de residencia `residence_province_id`/`residence_municipality_id` BIGINT UNSIGNED NULL FK, que viaja EN PAREJA ambos-o-ninguno (422 conversacional si llega la mitad, la misma maquinaria required_with/prohibited_unless del par rebelde) con coherencia territorial por FK compuesta (municipio, provincia) → `municipalities(id, province_id)`, el espejo exacto de RN-04 — y los BANCARIOS — `bank_account` VARCHAR(30) NULL (cuenta bancaria) y el par de cobro `collection_agency_type_id`/`collection_agency_id` BIGINT UNSIGNED NULL FK, también en pareja, con coherencia por FK compuesta (agencia, tipo) → `agencies(id, agency_type_id)` apoyada en un UNIQUE de respaldo nuevo sobre `agencies` (la agencia de cobro es del tipo declarado, cuyo `payment_form` caracteriza el canal) —; los seis son opcionales (omisión = NULL, como el par de contacto), sondeados contra catálogos ACTIVOS como el resto de las referencias, devueltos como ids planos en el 201, el detalle y el listado (como `position_id` y compañía, sin proyección anidada) y PROHIBIDOS en el PUT: pertenecen a la esfera INMUTABLE del promovente (Task 40). El subregistro de concepto de ingreso gana a la vez el porciento a aplicar — `applied_percentage` DECIMAL(5,2) NOT NULL con CHECK 0-100, el Double declarado por el usuario aterrizado como decimal EXACTO por RN-005 —, OBLIGATORIO en el alta individual y en el payload anidado de creación y devuelto en las proyecciones. Autoría del expediente estampada por `AuditableObserver` (ADR-14) y toda escritura — expediente y subregistros, incluidos los conceptos de ingreso — aterriza en la bitácora append-only (ADR-19); las columnas de decisión (`approval_legal_basis_id`, `decided_by/decided_at`, `computed_amount`, `calculation_setting_id`) existen con sus FK desde ya para que la aprobación de S6 no toque el esquema. `pension_case_histories` aún no está migrada: llega con las transiciones de S6 (RF-EXP-009, RF-AUD-002).
 
 ### 5.8 Pensionados y pagos
 
@@ -787,19 +815,18 @@ Semántica de negocio (implementada, ADR-25 + reglas de usuario 0-5/ADR-32/33; m
 | is_active | TINYINT(1) | NO | DEFAULT 1 | Control activo (unicidad de activo por pensionado en aplicación) |
 | deactivated_at | DATETIME | SÍ | — | Momento de desactivación |
 
-**`pension_payments`** (propuesta, H-16) — Pagos periódicos.
+**`pension_payments`** (propuesta, H-16) — Pagos periódicos. RE-ANCLADA por la corrección de usuario de Task 42/SGP-36 (documentada, implementación pendiente): sin el catálogo `payment_types`, la forma de pago vive en `agency_types.payment_form` y los datos de cobro se capturan en el expediente (RF-EXP-001).
 
 | Columna | Tipo | Nulo | Clave | Descripción |
 |---|---|---|---|---|
 | pensioner_id | BIGINT UNSIGNED | NO | FK → pensioners | Pensionado |
-| payment_type_id | BIGINT UNSIGNED | NO | FK → payment_types | Tipo de pago |
 | period_year | SMALLINT UNSIGNED | NO | — | Año del período |
 | period_month | TINYINT UNSIGNED | NO | CHECK 1-12 | Mes del período |
 | amount | DECIMAL(12,2) | NO | CHECK ≥ 0 | Importe liquidado |
 | status | VARCHAR(20) | NO | DEFAULT 'pending', CHECK | `pending` / `paid` / `cancelled` |
 | paid_at | DATE | SÍ | — | Fecha de pago efectivo |
 | bank_control_id | BIGINT UNSIGNED | SÍ | FK → bank_controls | Control por el que se liquidó |
-| — | — | — | UNIQUE | (`pensioner_id`, `period_year`, `period_month`, `payment_type_id`) |
+| — | — | — | UNIQUE | (`pensioner_id`, `period_year`, `period_month`) — sin `payment_type_id` desde la Task 42/SGP-36 |
 
 ### 5.9 Seguridad y auditoría
 
@@ -818,6 +845,7 @@ Semántica de negocio (implementada, ADR-25 + reglas de usuario 0-5/ADR-32/33; m
 | `CaseStatus` | `submitted`, `under_review`, `approved`, `rejected` | `pension_cases.status` | submitted→under_review/rejected; under_review→approved/rejected/submitted; terminales con reapertura administrativa auditada |
 | `PensionerStatus` | `active`, `suspended`, `terminated` | `pensioners.status` | active↔suspended; active/suspended→terminated (terminal) |
 | `PaymentStatus` | `pending`, `paid`, `cancelled` | `pension_payments.status` | pending→paid/cancelled (propuesta) |
+| `PaymentForm` | `tarjeta magnetica`, `Nomina Electronica` | `agency_types.payment_form` (CHECK) | — (Task 42/SGP-36, corrección de usuario: valores literales SIN tilde tal como los escribió el usuario; documentada, implementación pendiente de validación) |
 | `Sex` | `M`, `F` | `people.sex` (CHECK) | — |
 
 Todos respaldados por `CHECK (col IN (...))` en MySQL 8.4, que los enforcement desde la versión 8.0.16.
@@ -829,6 +857,7 @@ Todos respaldados por `CHECK (col IN (...))` en MySQL 8.4, que los enforcement d
 - **Transacciones**: aprobación de expediente (estado + congelado de cálculo + historial + alta de pensionado) y emisión de números de control son las dos operaciones transaccionales críticas; se describen en `Diseño de arquitectura.md` (secciones 7 y 8).
 - **Anti-ciclos**: jerarquías `entities.parent_entity_id` y `offices.parent_office_id` se validan en dominio al editar (RN-003); no existe constraint nativa equivalente en MySQL.
 - **Coherencia geográfica** (RN-004): validada en dominio; documentada como restricción de aplicación deliberada (la FK a municipio ya restringe el universo válido).
+- **Coherencia de residencia y cobro del promovente** (Task 42/SGP-36, documentada — implementación pendiente de validación): los pares (municipio, provincia) de residencia y (agencia, tipo de agencia) de cobro del expediente se garantizan en BD con FK compuestas — el espejo exacto del patrón RN-04 de las agencias, con UNIQUE de respaldo nuevo sobre `agencies(id, agency_type_id)` — y el «ambos o ninguno» del wire se decide en la capa de aplicación (required_with/prohibited_unless).
 
 ## 8. Índices y rendimiento
 
@@ -844,7 +873,7 @@ Todos respaldados por `CHECK (col IN (...))` en MySQL 8.4, que los enforcement d
 | Pensionados activos por tipo/régimen | `pensioners (status, pension_type_id, pension_regime_id)` |
 | Controles activos por pensionado | `bank_controls (pensioner_id, is_active)` |
 | Bitácora por sujeto | `activity_log (subject_type, subject_id, created_at)` |
-| Pagos por período (propuesta) | UNIQUE (`pensioner_id`, `period_year`, `period_month`, `payment_type_id`) cubre rangos por pensionado; añadir `(period_year, period_month)` si se aprueba el módulo |
+| Pagos por período (propuesta) | UNIQUE (`pensioner_id`, `period_year`, `period_month`) cubre rangos por pensionado; añadir `(period_year, period_month)` si se aprueba el módulo |
 
 Volumetría esperada que calibra estos índices: ~500k personas, ~200k expedientes, ~3M registros de salario, ~600k pensionados acumulados a 10 años. Las agregaciones de reportes pesados se ejecutan en cola con lecturas indexadas por fecha; si RNF-002 se incumple, el plan de contención es tabla de resumen pre-agregada por noche, no desnormalizar el OLTP.
 
@@ -943,7 +972,7 @@ Schema::create('pension_cases', function (Blueprint $table) {
 | `CubaGeographySeeder` | 15 provincias y 168 municipios (Isla de la Juventud con `province_id = NULL`) | `provinces.code`, (`municipalities.province_id`, `code`) |
 | `NationalOfficeSeeder` | La oficina NACIONAL que arranca la estructura territorial (ADR-31, regla 7): La Habana / Plaza de la Revolución, dirección placeholder (P-06), sin parent; solo crea si no existe una nacional ACTIVA | `office_types.code` = NAC (existencia, no upsert) |
 | `OrganizationsSeeder` | Organismos de la Administración Central del Estado | `code` |
-| `CatalogsSeeder` | Razas, niveles educacionales, categorías ocupacionales y científicas, tipos de pensión, tipos de beneficiario, tipos de agencia, tipos de entidad/oficina, tipos de pago, conceptos de ingreso, cargos base | `name` / `code` |
+| `CatalogsSeeder` | Razas, niveles educacionales, categorías ocupacionales y científicas, tipos de pensión, tipos de beneficiario, tipos de agencia (con `payment_form` SIN semilla de referencia hasta la decisión del área funcional, Task 42), tipos de entidad/oficina, conceptos de ingreso, cargos base — los tipos de pago quedaron FUERA: catálogo eliminado por la Task 42/SGP-36 | `name` / `code` |
 | `PensionRegimesSeeder` | Regímenes con `months_per_year` (general = 12; especiales según P-02) | `name` |
 | `RolesAndPermissionsSeeder` | 5 roles y su matriz de permisos `modulo.accion` | `name` |
 | `SettingsSeeder` | Configuración general inicial + secuencias `bank_control` y `pension_case` en 1 | `scope` / `effective_from` |
@@ -1041,6 +1070,7 @@ WHERE pc.status = 'under_review' AND pc.deleted_at IS NULL;
 | 1.23 | 2026-10-02 | Corrección de usuario (Task 37, SGP-31): el expediente gana la marca `internationalist` TINYINT(1) NOT NULL DEFAULT 0 (booleana OBLIGATORIA en el wire, paralelo del par rebelde) y el par de contacto del promovente `phone` VARCHAR(30) NULL / `popular_council` VARCHAR(120) NULL (migración `2026_10_02_110000`; textos opcionales con techo, omisión = NULL), y los subregistros de servicio pasan a períodos CERRADOS y DISJUNTOS — `end_date` DATE NOT NULL con CHECK `end_date > start_date` y solapamiento rechazado con 422 por `ServicePeriods` en los dos puntos de entrada (migración `2026_10_02_110100`; sin vínculos abiertos, `warnings` queda solo con los años salariales ausentes) —; filas de columna, ER, lista de migraciones y semántica 5.7 actualizadas | Arq. Backend |
 | 1.24 | 2026-10-02 | Corrección de usuario (Task 38, SGP-32): el expediente gana la fecha de desvinculación del promovente `termination_date` DATE NULL (migración `2026_10_02_120000`; opcional con regla de forma Y-m-d, omisión = NULL, devuelta en 201/detalle/listado); el régimen de jubilación gana `sector INT NULL` (migración `2026_10_02_120100`) y el tipo de pensión gana persona fallecida `deceased_person TINYINT(1) NOT NULL DEFAULT 0` (migración `2026_10_02_120200`), ambos devueltos por TODOS los endpoints del catálogo genérico con el PATCH relaxado a `sometimes`; y el GET del listado de entidades devuelve los DATOS del director general y el económico como proyecciones completas de Persona (null sin directores) — filas de columna, ER, nota de catálogos, lista de migraciones y semántica 5.7 actualizadas | Arq. Backend |
 | 1.25 | 2026-10-02 | Corrección de usuario (Task 40, SGP-34): ciclo de vida del expediente — `PUT /pension-cases/{id}` con el PROMOVENTE inmutable (los campos de la esfera de la persona y los de ciclo de vida responden 422 prohibido; semántica PATCH sobre los campos propios) y `DELETE /pension-cases/{id}` como soft delete SOLO en `submitted` con la reservación de un-abierto-por-persona liberada (migración `2026_10_02_130000`: `open_case_key` vale NULL también cuando `deleted_at` no es NULL) — semántica 5.7 y lista de migraciones actualizadas | Arq. Backend |
+| 1.26 | 2026-10-03 | Corrección de usuario (Task 42/SGP-36) — AJUSTE DE DOCUMENTACIÓN, implementación pendiente de validación, sin cambios de código: el catálogo `payment_types` se ELIMINA (fila del glosario, entrada 5.2, entidades y relaciones de los ER 4.1/4.6 y semillas fuera; la propuesta `pension_payments` pierde su FK a tipos de pago y queda re-anclada en la forma de pago del tipo de agencia); `agency_types` gana la forma de pago `payment_form` VARCHAR(30) NULL — enum de DOS valores literales del usuario SIN tilde: `tarjeta magnetica` y `Nomina Electronica` (enum PHP `PaymentForm` + CHECK, migración prevista `2026_10_03_100100`) —; el expediente gana los datos de DIRECCIÓN del promovente (`current_address` + par de residencia con FK compuesta RN-04) y los BANCARIOS (`bank_account` + par de cobro con FK compuesta sobre `agencies(id, agency_type_id)` y UNIQUE de respaldo, migración prevista `2026_10_03_100200`), opcionales y en pares ambos-o-ninguno, prohibidos en el PUT; y el subregistro de concepto de ingreso gana el porciento a aplicar `applied_percentage` DECIMAL(5,2) NOT NULL CHECK 0-100 (el Double del usuario como decimal exacto RN-005, migración prevista `2026_10_03_100300`) — entrada 5.7, ER 4.2/4.5/4.6, enums, integridad, índices y semillas actualizados | Arq. Backend |
 
 
 
