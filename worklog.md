@@ -1586,3 +1586,20 @@ Stage Summary:
 - Spec OpenAPI 1.5.0 anclada por ApiDocsTest (descripción del índice con el grupo); suite 1134/3966 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes de 73 comprobaciones TODO OK sobre la BD sgp; los cuatro documentos con la corrección registrada (changelogs 1.27/1.35/1.26 y RF-EXP-011 marcado)
 - Entrega: rama feat/SGP-37-list-projections; push/PR/CI/merge a continuación
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 44-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-37 — PR #51, CI y merge a main (el listado de expedientes devuelve la residencia y la agencia de cobro en cada fila)
+
+Work Log:
+- Entrega: rama feat/SGP-37-list-projections (5 commits por concepto: feat 9a8321d + test 77017f4 + smoke ec52423 + docs 8993e5f + worklog da18745 sobre 8351394), push explícito por nombre de rama y PR #51 creada por API: https://github.com/keniercb/inass_siss/pull/51
+- CI (Quality gate PHP 8.3) SUCCESS sobre da18745 tras ~8 minutos de sondeo (suite completa + Pint + PHPStan 8 + deptrac en el runner)
+- PR #51 mergeeada a main como 38560e8 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1134 tests / 3966 aserciones contra MySQL real (74 s), ApiDocsTest re-verificado con la spec 1.5.0
+- Higiene de cierre: backups/ y tool-results/ quedan SIN trackear (el commit basura del daemon fue respaldado y realineado al arranque; ningún artefacto de sesión entró al repo)
+
+Stage Summary:
+- EL LISTADO RESPONDE LA RESIDENCIA Y EL COBRO EN MAIN (Task 44/SGP-37, PR #51): cada fila del GET /api/v1/pension-cases viaja con provincia y municipio de residencia como {id, code, name} y los datos de la agencia de cobro — tipo con payment_form y agencia COMPLETA (código, nombre, tipo, provincia y municipio) —, las mismas proyecciones del detalle, sin N+1 y sin cambio de esquema; spec OpenAPI 1.5.0 anclada por ApiDocsTest
+- Las CATORCE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37), el lote del SGP-32 (38), el Schema de Entrada del catálogo (39), el ciclo de vida del expediente (40), el alcance territorial del listado (41), la documentación de los cuatro ajustes (42), su implementación validada (43) y ahora las proyecciones del listado (44)
+- Suite 1134/3966 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumiga de expedientes de 73 comprobaciones TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
