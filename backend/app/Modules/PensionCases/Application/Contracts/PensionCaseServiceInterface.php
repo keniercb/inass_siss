@@ -36,6 +36,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  * the operator can re-capture the applicant after a mistaken
  * registration.
  *
+ * Since the Task 42 user correction (SGP-36) the case carries the
+ * promovente residence + collection group (all required at the wire
+ * except the CONDITIONALLY demanded bank account) and every income
+ * concept declaration carries its applied percent (0-100, two
+ * decimals); the group is EDITABLE through update() — the user
+ * explicitly decided it can be modified.
+ *
  * The OFFICE of a new case is the registering user's — the
  * Presentation layer resolves it through the Shared office port and
  * injects it into the attributes (user rule 0/ADR-33): never a
@@ -89,7 +96,7 @@ interface PensionCaseServiceInterface
      * value. Semantic probes mirror the store: active entity and
      * catalog references, non-future request date, RN-005 money.
      *
-     * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at)
+     * @param  array<string, mixed>  $attributes  editable case fields (employer_entity_id, position_id, occupational_category_id, educational_level_id, scientific_category_id, pension_type_id, pension_regime_id, last_salary, requested_at, current_address, residence_province_id, residence_municipality_id, collection_agency_type_id, collection_agency_id, bank_account)
      * @return null when the case does not exist (controller: 404)
      *
      * @throws CaseNotEditableException case already left submitted (409)
@@ -175,14 +182,17 @@ interface PensionCaseServiceInterface
     public function removeWorkCycle(int $caseId, int $recordId): ?bool;
 
     /**
-     * Declares the value of one income concept (user rule 5).
+     * Declares the value of one income concept (user rule 5) with its
+     * percent to apply (Task 42, user correction: REQUIRED Double
+     * materialized as an exact decimal string, range 0-100 with at
+     * most two decimals).
      *
      * @return null when the case does not exist (controller: 404)
      *
      * @throws CaseNotEditableException
      * @throws DuplicateIncomeConceptException the concept is already declared (422)
      */
-    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount): ?IncomeConceptRecord;
+    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount, string $appliedPercent): ?IncomeConceptRecord;
 
     /**
      * @return null when the case does not exist; false when the row was not found

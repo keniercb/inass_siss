@@ -59,6 +59,18 @@ declare(strict_types=1);
  * oficina recibe una página VACÍA, fail-closed; reasignar al actor a
  * otra oficina mueve el scope de punta a punta).
  *
+ * Task 42 (SGP-36, corrección de usuario): el catálogo tipos de pago
+ * queda ELIMINADO (payment-types responde 404; la forma de pago vive
+ * en el tipo de agencia con el enum minúsculas unificadas
+ * tarjeta magnetica|nomina electronica, DEFAULT tarjeta magnetica); el
+ * expediente lleva el DOMICILIO y COBRO del promovente (dirección
+ * actual, provincia y municipio de residencia coherentes, tipo de
+ * agencia y agencia de cobro del tipo declarado, y cuenta bancaria
+ * OBLIGATORIA CONDICIONADA a la forma de pago del tipo — exigida con
+ * tarjeta magnetica, opcional con nomina electronica —, grupo editable
+ * por PUT); y cada concepto de ingreso declarado viaja con su PORCIENTO
+ * A APLICAR (0-100, dos decimales, obligatorio).
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -185,6 +197,70 @@ try {
         'social_purpose' => 'Fumiga de expedientes',
     ]);
 
+    // ---- Task 42: punto de cobro del promovente ----
+    // (los tipos de agencia se crean por el endpoint del catálogo para
+    // ejercer la superficie nueva: la forma de pago explícita, la
+    // omisión que cae en el DEFAULT y el valor desconocido 422)
+    $payrollType = $base('POST', '/catalogs/agency-types', [
+        'code' => 'NE',
+        'name' => 'Agencia de nómina',
+        'payment_form' => 'nomina electronica',
+    ]);
+    check(
+        'task 42: tipo de agencia con nomina electronica creado',
+        $payrollType->status() === 201
+            && ($payrollType->json('data.payment_form') ?? '') === 'nomina electronica',
+        detail($payrollType),
+    );
+
+    $magneticType = $base('POST', '/catalogs/agency-types', [
+        'code' => 'TM',
+        'name' => 'Agencia de tarjeta',
+    ]);
+    check(
+        'task 42: omisión de la forma de pago cae en el DEFAULT tarjeta magnetica',
+        $magneticType->status() === 201
+            && ($magneticType->json('data.payment_form') ?? '') === 'tarjeta magnetica',
+        detail($magneticType),
+    );
+
+    $unknownForm = $base('POST', '/catalogs/agency-types', [
+        'code' => 'XX',
+        'name' => 'Desconocida',
+        'payment_form' => 'cheque',
+    ]);
+    check(
+        'task 42: forma de pago desconocida responde 422',
+        $unknownForm->status() === 422,
+        detail($unknownForm),
+    );
+
+    $payrollTypeId = (int) ($payrollType->json('data.id') ?? 0);
+    $magneticTypeId = (int) ($magneticType->json('data.id') ?? 0);
+
+    $payrollAgency = $base('POST', '/agencies', [
+        'code' => 'FUMNE'.random_int(1000, 9999),
+        'name' => 'Agencia BPA nómina',
+        'province_id' => $habana->id,
+        'municipality_id' => $municipality->id,
+        'agency_type_id' => $payrollTypeId,
+    ]);
+    $payrollAgencyId = (int) ($payrollAgency->json('data.id') ?? 0);
+    check('task 42: agencia de nómina creada', $payrollAgency->status() === 201 && $payrollAgencyId > 0, detail($payrollAgency));
+
+    $magneticAgency = $base('POST', '/agencies', [
+        'code' => 'FUMTM'.random_int(1000, 9999),
+        'name' => 'Agencia BPA tarjeta',
+        'province_id' => $habana->id,
+        'municipality_id' => $municipality->id,
+        'agency_type_id' => $magneticTypeId,
+    ]);
+    $magneticAgencyId = (int) ($magneticAgency->json('data.id') ?? 0);
+    check('task 42: agencia de tarjeta creada', $magneticAgency->status() === 201 && $magneticAgencyId > 0, detail($magneticAgency));
+
+    $paymentTypesGone = $base('GET', '/catalogs/payment-types');
+    check('task 42: payment-types ya no es catálogo (404)', $paymentTypesGone->status() === 404, detail($paymentTypesGone));
+
     $applicant = Person::factory()->create([
         'identity_number' => PersonFactory::identity('M', '1962-03-10'),
         'birth_date' => '1962-03-10',
@@ -216,6 +292,13 @@ try {
         // obligatoria en el wire, como rebel_army_member.
         'internationalist' => false,
         'last_salary' => '5000.00',
+        // Task 42: domicilio y cobro del promovente — el tipo de nómina
+        // deja la cuenta bancaria OPCIONAL.
+        'current_address' => 'Calle de la fumiga #3',
+        'residence_province_id' => $habana->id,
+        'residence_municipality_id' => $municipality->id,
+        'collection_agency_type_id' => $payrollTypeId,
+        'collection_agency_id' => $payrollAgencyId,
     ];
 
     // ---- Regla 0: el actor SIN oficina no puede registrar ----
@@ -324,6 +407,65 @@ try {
         'task 37: consejo popular de 121+ caracteres responde 422',
         $oversizedCouncil->status() === 422 && isset($oversizedCouncil->json('errors')['popular_council']),
         detail($oversizedCouncil),
+    );
+
+    // ---- Task 42: domicilio y cobro del promovente ----
+    // (el tipo de nómina dejó la cuenta OPCIONAL en el payload base;
+    // el tipo de tarjeta la EXIGE: la demanda es condicional)
+    $groupApplicant = Person::factory()->create();
+    $missingAccount = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $groupApplicant->id,
+        'collection_agency_type_id' => $magneticTypeId,
+        'collection_agency_id' => $magneticAgencyId,
+    ]));
+    check(
+        'task 42: tarjeta magnetica exige la cuenta bancaria (422 sobre bank_account)',
+        $missingAccount->status() === 422 && is_array($missingAccount->json('errors.bank_account')),
+        detail($missingAccount),
+    );
+
+    $withAccount = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => $groupApplicant->id,
+        'collection_agency_type_id' => $magneticTypeId,
+        'collection_agency_id' => $magneticAgencyId,
+        'bank_account' => '01234567890123456789012345678',
+    ]));
+    $withAccountId = (int) ($withAccount->json('data.id') ?? 0);
+    check(
+        'task 42: con cuenta y tarjeta magnetica el alta es 201 y devuelve el grupo con sus proyecciones',
+        $withAccount->status() === 201
+            && ($withAccount->json('data.current_address') ?? '') === 'Calle de la fumiga #3'
+            && (int) ($withAccount->json('data.collection_agency_type_id') ?? 0) === $magneticTypeId
+            && ($withAccount->json('data.bank_account') ?? '') === '01234567890123456789012345678'
+            && ($withAccount->json('data.collection_agency_type.payment_form') ?? '') === 'tarjeta magnetica'
+            && ($base('GET', "/pension-cases/{$withAccountId}")->json('data.residence_municipality.code') ?? '') === $municipality->code
+            && ($base('GET', "/pension-cases/{$withAccountId}")->json('data.collection_agency.code') ?? '') !== '',
+        detail($withAccount),
+    );
+
+    $foreignMunicipality = Municipality::query()
+        ->where('province_id', '!=', $habana->id)
+        ->whereNotNull('province_id')
+        ->firstOrFail();
+    $incoherent = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'residence_municipality_id' => $foreignMunicipality->id,
+    ]));
+    check(
+        'task 42: municipio de residencia ajeno a la provincia responde 422',
+        $incoherent->status() === 422 && is_array($incoherent->json('errors.residence_municipality_id')),
+        detail($incoherent),
+    );
+
+    $wrongTypeAgency = $base('POST', '/pension-cases', array_merge($payload, [
+        'applicant_person_id' => Person::factory()->create()->id,
+        'collection_agency_type_id' => $magneticTypeId,
+        'collection_agency_id' => $payrollAgencyId,
+    ]));
+    check(
+        'task 42: agencia de otro tipo responde 422',
+        $wrongTypeAgency->status() === 422 && is_array($wrongTypeAgency->json('errors.collection_agency_id')),
+        detail($wrongTypeAgency),
     );
 
     // ---- Task 38: fecha de desvinculación del promovente ----
@@ -791,18 +933,36 @@ try {
     $conceptRow = $base('POST', "/pension-cases/{$rebelCaseId}/income-concept-records", [
         'income_concept_id' => $concept->id,
         'amount' => '150.00',
+        'applied_percent' => '100',
     ]);
     check(
-        'regla 5: concepto de ingreso declarado',
-        $conceptRow->status() === 201 && $conceptRow->json('data.amount') === '150.00',
+        'regla 5: concepto de ingreso declarado con su porciento a aplicar',
+        $conceptRow->status() === 201
+            && $conceptRow->json('data.amount') === '150.00'
+            && $conceptRow->json('data.applied_percent') === '100.00',
         detail($conceptRow),
     );
 
     $duplicated = $base('POST', "/pension-cases/{$rebelCaseId}/income-concept-records", [
         'income_concept_id' => $concept->id,
         'amount' => '200.00',
+        'applied_percent' => '100',
     ]);
     check('regla 5: concepto duplicado responde 422', $duplicated->status() === 422, detail($duplicated));
+
+    // Task 42: el porciento es OBLIGATORIO — sin él, 422 (se usa el
+    // segundo concepto del seeder para no chocar con el duplicado).
+    $secondConcept = IncomeConcept::query()->whereKeyNot($concept->id)->orderBy('id')->first()
+        ?? IncomeConcept::query()->orderByDesc('id')->first();
+    $noPercent = $base('POST', "/pension-cases/{$rebelCaseId}/income-concept-records", [
+        'income_concept_id' => $secondConcept->id,
+        'amount' => '150.00',
+    ]);
+    check(
+        'task 42: concepto sin porciento responde 422',
+        $noPercent->status() === 422,
+        detail($noPercent),
+    );
 
     $conceptId = (int) ($conceptRow->json('data.id') ?? 0);
     $conceptRemoved = $base('DELETE', "/pension-cases/{$rebelCaseId}/income-concept-records/{$conceptId}");

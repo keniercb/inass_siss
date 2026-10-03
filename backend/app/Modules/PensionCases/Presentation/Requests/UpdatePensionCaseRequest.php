@@ -23,9 +23,16 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * The EDITABLE surface is the case proper — the labour link and the
  * pension classification (entity, position, both category pairs, type
- * and regime), the last salary and the request date — with PATCH
- * semantics: every field is optional, only the declared keys change
- * and the omission of a field never uproots its stored value.
+ * and regime), the last salary and the request date — plus, since
+ * Task 42 (user correction, SGP-36), the promovente residence and
+ * collection group (current_address, residence geography, collection
+ * point and bank account: the user explicitly decided they CAN be
+ * modified) — with PATCH semantics: every field is optional, only the
+ * declared keys change and the omission of a field never uproots its
+ * stored value. An explicit null bank_account CLEARS it, and the
+ * service re-evaluates the conditional demand (422 on bank_account
+ * when the RESULTING payment form is 'tarjeta magnetica' and the
+ * account ended up NULL).
  *
  * Structural validation only (formats, types and the RN-005 money
  * shape): the semantic probes — active entity/catalog references, the
@@ -77,6 +84,16 @@ final class UpdatePensionCaseRequest extends FormRequest
             // RN-005: money travels as an exact decimal string.
             'last_salary' => ['sometimes', ...$money],
             'requested_at' => ['sometimes', 'date_format:Y-m-d'],
+            // Task 42: the promovente residence + collection group is
+            // EDITABLE (explicit user decision) — PATCH semantics, with
+            // the store's mirror probes and the conditional bank
+            // account demand re-evaluated against the RESULTING state.
+            'current_address' => ['sometimes', 'string', 'max:255'],
+            'residence_province_id' => ['sometimes', 'integer', 'min:1'],
+            'residence_municipality_id' => ['sometimes', 'integer', 'min:1'],
+            'collection_agency_type_id' => ['sometimes', 'integer', 'min:1'],
+            'collection_agency_id' => ['sometimes', 'integer', 'min:1'],
+            'bank_account' => ['sometimes', 'nullable', 'string', 'max:34'],
         ];
     }
 

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Tests\Feature;
 
+use App\Modules\Catalogs\Domain\PaymentForm;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\IncomeConcept;
@@ -88,6 +91,23 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $entityType = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 
+        // Task 42 (user correction, SGP-36): the collection point of
+        // the promovente — the electronic payroll form keeps the bank
+        // account OPTIONAL, so the fixtures stay focused on their own
+        // surface (the conditional demand has its own suite).
+        $collectionAgencyType = AgencyType::query()->create([
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => PaymentForm::NominaElectronica->value,
+        ]);
+        $collectionAgency = Agency::query()->create([
+            'code' => 'BPA-NE-1',
+            'name' => 'Agencia BPA nómina',
+            'province_id' => $province->id,
+            'municipality_id' => $municipality->id,
+            'agency_type_id' => $collectionAgencyType->id,
+        ]);
+
         $applicant = Person::factory()->create([
             'identity_number' => PersonFactory::identity('M', '1962-03-10'),
             'birth_date' => '1962-03-10',
@@ -132,6 +152,12 @@ final class PensionCaseSubrecordsApiTest extends TestCase
             ])->id,
             'rebel_army_member' => false,
             'last_salary' => '5000.00',
+            // Task 42: promovente residence + collection group.
+            'current_address' => 'Calle 8 #10 entre 5 y 7, Playa',
+            'residence_province_id' => $province->id,
+            'residence_municipality_id' => $municipality->id,
+            'collection_agency_type_id' => $collectionAgencyType->id,
+            'collection_agency_id' => $collectionAgency->id,
         ]);
 
         $this->incomeConceptId = IncomeConcept::query()->create([
@@ -587,10 +613,12 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])
             ->assertStatus(201)
             ->assertJsonPath('data.income_concept_id', $this->incomeConceptId)
             ->assertJsonPath('data.amount', '150.00')
+            ->assertJsonPath('data.applied_percent', '100.00')
             ->assertJsonPath('data.pension_case_id', $this->case->id);
 
         $this->assertSame(1, IncomeConceptRecord::query()->count());
@@ -603,11 +631,13 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])->assertStatus(201);
 
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '200.00',
+            'applied_percent' => '100',
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['income_concept_id']);
@@ -617,6 +647,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->otherIncomeConceptId,
             'amount' => '80.50',
+            'applied_percent' => '50',
         ])->assertStatus(201);
     }
 
@@ -625,6 +656,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => 999999,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])->assertStatus(422)->assertJsonValidationErrors(['income_concept_id']);
 
         $concept = IncomeConcept::query()->whereKey($this->otherIncomeConceptId)->firstOrFail();
@@ -633,6 +665,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->otherIncomeConceptId,
             'amount' => '80.50',
+            'applied_percent' => '50',
         ])->assertStatus(422)->assertJsonValidationErrors(['income_concept_id']);
     }
 
@@ -655,9 +688,37 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => $amount,
+            'applied_percent' => '100',
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['amount']);
+    }
+
+    /**
+     * Task 42 (user correction, SGP-36): the percent to apply is
+     * REQUIRED at the individual endpoint — 422 when omitted, out of
+     * the 0-100 range or carrying a third decimal.
+     */
+    public function test_rejects_an_income_concept_record_without_a_valid_applied_percent(): void
+    {
+        $endpoint = "/api/v1/pension-cases/{$this->case->id}/income-concept-records";
+
+        $this->postJson($endpoint, [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+        ])->assertStatus(422)->assertJsonValidationErrors(['applied_percent']);
+
+        $this->postJson($endpoint, [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+            'applied_percent' => '100.01',
+        ])->assertStatus(422)->assertJsonValidationErrors(['applied_percent']);
+
+        $this->postJson($endpoint, [
+            'income_concept_id' => $this->incomeConceptId,
+            'amount' => '150.00',
+            'applied_percent' => '25.505',
+        ])->assertStatus(422)->assertJsonValidationErrors(['applied_percent']);
     }
 
     public function test_removes_an_income_concept_record(): void
@@ -665,6 +726,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $id = $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])->json('data.id');
 
         $this->deleteJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records/{$id}")
@@ -689,6 +751,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])
             ->assertStatus(409)
             ->assertJsonPath('status', $status);
@@ -703,6 +766,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson('/api/v1/pension-cases/999/income-concept-records', [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])->assertStatus(404);
     }
 
@@ -717,6 +781,7 @@ final class PensionCaseSubrecordsApiTest extends TestCase
         $this->postJson("/api/v1/pension-cases/{$this->case->id}/income-concept-records", [
             'income_concept_id' => $this->incomeConceptId,
             'amount' => '150.00',
+            'applied_percent' => '100',
         ])->assertUnauthorized();
     }
 }

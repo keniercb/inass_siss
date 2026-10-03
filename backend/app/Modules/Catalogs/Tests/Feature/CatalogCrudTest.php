@@ -231,7 +231,7 @@ final class CatalogCrudTest extends TestCase
     {
         $payloads = [
             'provinces' => ['code' => '99', 'name' => 'Especial'],
-            'agency-types' => ['code' => 'OTR', 'name' => 'Otro tipo'],
+            'agency-types' => ['code' => 'OTR', 'name' => 'Otro tipo', 'payment_form' => 'nomina electronica'],
             'organizations' => ['code' => 'OTRORG', 'name' => 'Otro organismo'],
             'entity-types' => ['code' => 'OTRET', 'name' => 'Otro tipo de entidad'],
             'office-types' => ['code' => 'OTROF', 'name' => 'Otro tipo de oficina'],
@@ -244,7 +244,6 @@ final class CatalogCrudTest extends TestCase
             'races' => ['code' => 'OTRAR', 'name' => 'Otra raza'],
             'positions' => ['code' => 'VICE', 'name' => 'Vicedirector'],
             'pension-regimes' => ['code' => 'ESPR', 'name' => 'Especial', 'months_per_year' => 12],
-            'payment-types' => ['code' => 'TARJ', 'name' => 'Tarjeta', 'description' => 'Pago con tarjeta'],
             'income-concepts' => ['code' => 'OTRIC', 'name' => 'Otros ingresos', 'applies_base_salary' => false],
         ];
 
@@ -271,7 +270,7 @@ final class CatalogCrudTest extends TestCase
      */
     public function test_store_rejects_a_missing_code_on_the_formerly_name_only_catalogs(): void
     {
-        foreach (['races', 'educational-levels', 'payment-types'] as $type) {
+        foreach (['races', 'educational-levels', 'positions'] as $type) {
             $this->postJson("/api/v1/catalogs/{$type}", ['name' => 'Sin código'])
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors('code');
@@ -414,5 +413,63 @@ final class CatalogCrudTest extends TestCase
         $this->getJson('/api/v1/catalogs/pension-types?search=SOB')
             ->assertOk()
             ->assertJsonCount(1, 'data');
+    }
+
+    /**
+     * Task 42 (user correction, SGP-36): the payment_types catalog was
+     * ELIMINATED — its key answers 404 like any other unknown catalog
+     * (the payment form of the collection lives in the agency type).
+     */
+    public function test_payment_types_is_no_longer_a_catalog(): void
+    {
+        $this->getJson('/api/v1/catalogs/payment-types')->assertStatus(404);
+        $this->postJson('/api/v1/catalogs/payment-types', ['code' => 'TARJ', 'name' => 'Tarjeta'])
+            ->assertStatus(404);
+    }
+
+    /**
+     * Task 42: the payment form of the agency types — the omission of
+     * the store falls to the DEFAULT 'tarjeta magnetica' (the
+     * deceased_person precedent of Task 38), unknown values answer
+     * 422 and the PATCH updates it.
+     */
+    public function test_the_agency_type_payment_form_falls_to_the_default_when_omitted(): void
+    {
+        $this->postJson('/api/v1/catalogs/agency-types', ['code' => 'TM', 'name' => 'Agencia de tarjeta'])
+            ->assertCreated()
+            ->assertJsonPath('data.payment_form', 'tarjeta magnetica');
+
+        $this->postJson('/api/v1/catalogs/agency-types', [
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => 'nomina electronica',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.payment_form', 'nomina electronica');
+    }
+
+    public function test_the_agency_type_payment_form_rejects_unknown_values(): void
+    {
+        $this->postJson('/api/v1/catalogs/agency-types', [
+            'code' => 'XX',
+            'name' => 'Desconocida',
+            'payment_form' => 'Tarjeta Bancaria',
+        ])->assertStatus(422)->assertJsonValidationErrors(['payment_form']);
+    }
+
+    public function test_the_agency_type_payment_form_is_patchable(): void
+    {
+        $id = $this->postJson('/api/v1/catalogs/agency-types', ['code' => 'TM', 'name' => 'Agencia de tarjeta'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->patchJson("/api/v1/catalogs/agency-types/{$id}", ['payment_form' => 'nomina electronica'])
+            ->assertOk()
+            ->assertJsonPath('data.payment_form', 'nomina electronica');
+
+        // Absent PATCH keys never uproot the stored value.
+        $this->patchJson("/api/v1/catalogs/agency-types/{$id}", ['name' => 'Agencia de tarjeta y nómina'])
+            ->assertOk()
+            ->assertJsonPath('data.payment_form', 'nomina electronica');
     }
 }

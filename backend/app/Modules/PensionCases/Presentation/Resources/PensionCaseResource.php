@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Presentation\Resources;
 
+use App\Modules\Catalogs\Presentation\Resources\AgencyResource;
+use App\Modules\Catalogs\Presentation\Resources\CatalogResource;
 use App\Modules\PensionCases\Infrastructure\Persistence\Models\PensionCase;
 use App\Modules\People\Presentation\Resources\PersonResource;
 use Illuminate\Http\Request;
@@ -34,7 +36,13 @@ use OpenApi\Attributes as OA;
  * warnings envelope only carries the salary analysis. Since the
  * Task 38 user correction (SGP-32) the case also answers the
  * promovente's fecha de desvinculación — termination_date, an
- * optional date serialized as Y-m-d and null when absent.
+ * optional date serialized as Y-m-d and null when absent. Since the
+ * Task 42 user correction (SGP-36) the case answers the promovente
+ * residence + collection group — current_address, the residence
+ * geography and the collection point with their projections
+ * (province, municipality, agency type carrying its payment form,
+ * full agency) and the bank account, null when the payment form of
+ * the collection agency type leaves it optional.
  *
  * @mixin PensionCase
  */
@@ -64,6 +72,24 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'phone', type: 'string', nullable: true, maxLength: 30, example: '+53 5 555 1234', description: 'Teléfono de contacto del promovente (Task 37): texto libre opcional'),
         new OA\Property(property: 'popular_council', type: 'string', nullable: true, maxLength: 120, example: 'Consejo Popular Playa', description: 'Consejo popular del promovente (Task 37): división territorial cubana, texto libre opcional'),
         new OA\Property(property: 'termination_date', type: 'string', format: 'date', nullable: true, example: '2025-07-31', description: 'Fecha de desvinculación del promovente (Task 38, corrección de usuario): opcional, Y-m-d; la omisión persiste null'),
+        new OA\Property(property: 'current_address', type: 'string', example: 'Calle 8 #10 entre 5 y 7, Playa', description: 'Dirección actual del promovente (Task 42, corrección de usuario): obligatoria en el alta'),
+        new OA\Property(property: 'residence_province_id', type: 'integer', format: 'int64', example: 11, description: 'Provincia de residencia del promovente (Task 42): obligatoria, coherente con el municipio (RN-04)'),
+        new OA\Property(property: 'residence_municipality_id', type: 'integer', format: 'int64', example: 3, description: 'Municipio de residencia del promovente (Task 42): obligatorio, pertenece a la provincia declarada'),
+        new OA\Property(property: 'collection_agency_type_id', type: 'integer', format: 'int64', example: 1, description: 'Tipo de agencia de cobro (Task 42): obligatorio; su forma de pago decide la exigencia de la cuenta bancaria'),
+        new OA\Property(property: 'collection_agency_id', type: 'integer', format: 'int64', example: 7, description: 'Agencia de cobro (Task 42): obligatoria, activa y del tipo declarado'),
+        new OA\Property(property: 'bank_account', type: 'string', nullable: true, maxLength: 34, example: '01234567890123456789012345678', description: 'Cuenta bancaria del cobro (Task 42): OBLIGATORIA cuando la forma de pago del tipo de agencia de cobro es tarjeta magnetica (422 si falta), opcional con nomina electronica'),
+        new OA\Property(property: 'residence_province', nullable: true, type: 'object', description: 'Provincia de residencia (Task 42)', properties: [
+            new OA\Property(property: 'id', type: 'integer', format: 'int64'),
+            new OA\Property(property: 'code', type: 'string'),
+            new OA\Property(property: 'name', type: 'string'),
+        ]),
+        new OA\Property(property: 'residence_municipality', nullable: true, type: 'object', description: 'Municipio de residencia (Task 42)', properties: [
+            new OA\Property(property: 'id', type: 'integer', format: 'int64'),
+            new OA\Property(property: 'code', type: 'string'),
+            new OA\Property(property: 'name', type: 'string'),
+        ]),
+        new OA\Property(property: 'collection_agency_type', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/CatalogItem')], description: 'Tipo de agencia de cobro con su payment_form (Task 42): misma forma que el catálogo agency-types'),
+        new OA\Property(property: 'collection_agency', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Agency')], description: 'Agencia de cobro completa (Task 42): misma forma que el catálogo de agencias'),
         new OA\Property(property: 'filed_by', nullable: true, allOf: [new OA\Schema(ref: '#/components/schemas/Person')], description: 'Proyección COMPLETA de la persona por (Task 35): misma forma que applicant'),
         new OA\Property(property: 'approval_legal_basis_id', type: 'integer', format: 'int64', nullable: true, example: null, description: 'Resolución aprobatoria (H-05); la fija la aprobación de S6'),
         new OA\Property(property: 'decision_notes', type: 'string', nullable: true, example: null, description: 'Nota de resolución o motivo de denegación (S6)'),
@@ -107,6 +133,13 @@ final class PensionCaseResource extends JsonResource
             'phone' => $this->phone,
             'popular_council' => $this->popular_council,
             'termination_date' => $this->termination_date?->format('Y-m-d'),
+            // Task 42: promovente residence + collection group.
+            'current_address' => $this->current_address,
+            'residence_province_id' => $this->residence_province_id,
+            'residence_municipality_id' => $this->residence_municipality_id,
+            'collection_agency_type_id' => $this->collection_agency_type_id,
+            'collection_agency_id' => $this->collection_agency_id,
+            'bank_account' => $this->bank_account,
             'approval_legal_basis_id' => $this->approval_legal_basis_id,
             'decision_notes' => $this->decision_notes,
             'decided_at' => $this->decided_at?->format('Y-m-d H:i:s'),
@@ -123,6 +156,27 @@ final class PensionCaseResource extends JsonResource
             'filed_by' => $this->whenLoaded(
                 'filedBy',
                 fn () => $this->filedBy === null ? null : new PersonResource($this->filedBy),
+            ),
+            // Task 42: residence + collection projections — the agency
+            // type rides the generic catalog resource (it carries the
+            // payment form) and the agency its full resource shape.
+            'residence_province' => $this->whenLoaded('residenceProvince', fn () => [
+                'id' => $this->residenceProvince?->id,
+                'code' => $this->residenceProvince?->code,
+                'name' => $this->residenceProvince?->name,
+            ]),
+            'residence_municipality' => $this->whenLoaded('residenceMunicipality', fn () => [
+                'id' => $this->residenceMunicipality?->id,
+                'code' => $this->residenceMunicipality?->code,
+                'name' => $this->residenceMunicipality?->name,
+            ]),
+            'collection_agency_type' => $this->whenLoaded(
+                'collectionAgencyType',
+                fn () => $this->collectionAgencyType === null ? null : new CatalogResource($this->collectionAgencyType),
+            ),
+            'collection_agency' => $this->whenLoaded(
+                'collectionAgency',
+                fn () => $this->collectionAgency === null ? null : new AgencyResource($this->collectionAgency),
             ),
         ];
     }

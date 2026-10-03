@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\PensionCases\Application\Services;
 
 use App\Modules\Catalogs\Application\Contracts\CatalogRepositoryInterface;
+use App\Modules\Catalogs\Domain\PaymentForm;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\IncomeConcept;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\ScientificCategory;
 use App\Modules\Organizations\Application\Contracts\EntityRepositoryInterface;
 use App\Modules\Organizations\Application\Contracts\OfficeRepositoryInterface;
@@ -76,6 +81,22 @@ use Illuminate\Validation\ValidationException;
  * declares the field plain optional, so only the Y-m-d shape rule of
  * the FormRequest guards it.
  *
+ * Task 42 (user correction, SGP-36): the case carries the promovente
+ * residence + collection group — current_address, the residence
+ * geography (province + municipality, RN-04 coherent: the municipality
+ * belongs to the declared province; the special municipality stays out
+ * of the residence domain, P-09), the collection point (agency type +
+ * agency, the agency ACTIVE and of the declared type) and the bank
+ * account, REQUIRED CONDITIONALLY: demanded (422 on bank_account) when
+ * the payment form of the collection agency type is 'tarjeta
+ * magnetica', optional with 'nomina electronica'. Every field is
+ * required at the wire EXCEPT the account, and the whole group is
+ * EDITABLE through update() — the user explicitly decided it can be
+ * modified — with the conditional demand re-evaluated against the
+ * RESULTING state of the PATCH semantics. The income concept records
+ * additionally carry their applied percent (0-100, two decimals,
+ * RN-005 doctrine: exact decimal string, never a binary float).
+ *
  * The NUMBER (user rule 2/ADR-34) is eleven contiguous digits: the
  * registering office's province (2) and municipality (2) codes, the
  * last two digits of the current year (2) and the TERRITORIAL
@@ -113,6 +134,13 @@ final class PensionCaseService implements PensionCaseServiceInterface
 {
     private const string CASE_SEQUENCE = 'pension_case';
 
+    /**
+     * Task 42: shape of the applied percent (range 0-100, at most two
+     * decimals) — the same doctrine the money regex applies to every
+     * importe (RN-005: exact decimal string, never a binary float).
+     */
+    private const string APPLIED_PERCENT_PATTERN = '/^\d{1,3}(\.\d{1,2})?$/';
+
     private const array PAYLOAD_COLUMNS = [
         'requested_at',
         'applicant_person_id',
@@ -131,6 +159,12 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'phone',
         'popular_council',
         'termination_date',
+        'current_address',
+        'residence_province_id',
+        'residence_municipality_id',
+        'collection_agency_type_id',
+        'collection_agency_id',
+        'bank_account',
         'last_salary',
     ];
 
@@ -144,6 +178,12 @@ final class PensionCaseService implements PensionCaseServiceInterface
         'pension_regime_id',
         'last_salary',
         'requested_at',
+        'current_address',
+        'residence_province_id',
+        'residence_municipality_id',
+        'collection_agency_type_id',
+        'collection_agency_id',
+        'bank_account',
     ];
 
     /**
@@ -169,6 +209,8 @@ final class PensionCaseService implements PensionCaseServiceInterface
             'applicant_person_id', 'office_id', 'employer_entity_id', 'position_id',
             'occupational_category_id', 'educational_level_id', 'scientific_category_id',
             'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'internationalist',
+            'current_address', 'residence_province_id', 'residence_municipality_id',
+            'collection_agency_type_id', 'collection_agency_id',
             'last_salary',
         ]);
 
@@ -179,6 +221,9 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
         $this->assertApplicantIsEligible((int) $payload['applicant_person_id']);
         $this->assertReferencesAreActive($payload);
+        // Task 42: residence + collection coherence (including the
+        // conditional bank-account demand).
+        $this->assertResidenceAndCollectionAreCoherent($payload);
         $this->assertFiledByPersonIsRegistered($filedByPersonId);
         $this->assertRebelArmyPairIsCoherent($payload);
         $this->assertNoOpenCase((int) $payload['applicant_person_id']);
@@ -258,6 +303,16 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     // normalized before the probes (never a silent
                     // discard — the lesson of Task 33).
                     'filed_by_person_id' => $filedByPersonId,
+                    // Task 42: residence + collection group — the
+                    // bank account normalized like the contact pair
+                    // (absent/null/'' all mean NULL); the conditional
+                    // demand was already decided by the probe above.
+                    'current_address' => (string) $payload['current_address'],
+                    'residence_province_id' => (int) $payload['residence_province_id'],
+                    'residence_municipality_id' => (int) $payload['residence_municipality_id'],
+                    'collection_agency_type_id' => (int) $payload['collection_agency_type_id'],
+                    'collection_agency_id' => (int) $payload['collection_agency_id'],
+                    'bank_account' => $this->normalizePromoventeText($payload, 'bank_account'),
                 ]);
 
                 if ($salaryRows !== []) {
@@ -371,10 +426,21 @@ final class PensionCaseService implements PensionCaseServiceInterface
         $payload = $this->updatePayload($attributes);
 
         $this->assertUpdateReferencesAreActive($payload);
+        // Task 42: the residence + collection group is editable — the
+        // probe mirrors the store against the RESULTING state (the
+        // stored case answers every key the PATCH did not declare).
+        $this->assertResidenceAndCollectionAreCoherent($payload, $case);
         $this->assertRequestedAtIsNotFuture($payload);
 
         if (isset($payload['last_salary'])) {
             $payload['last_salary'] = Money::fromString((string) $payload['last_salary'])->__toString();
+        }
+
+        if (array_key_exists('bank_account', $payload)) {
+            // Task 42: an explicit null/'' CLEARS the account (the
+            // conditional demand was already re-evaluated against the
+            // resulting state by the probe above).
+            $payload['bank_account'] = $this->normalizePromoventeText($payload, 'bank_account');
         }
 
         // An empty update is a no-op that answers the untouched case
@@ -546,7 +612,7 @@ final class PensionCaseService implements PensionCaseServiceInterface
         return $this->cases->removeWorkCycle($case, $recordId);
     }
 
-    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount): ?IncomeConceptRecord
+    public function addIncomeConceptRecord(int $caseId, int $incomeConceptId, string $amount, string $appliedPercent): ?IncomeConceptRecord
     {
         $case = $this->caseOrNull($caseId);
 
@@ -569,10 +635,19 @@ final class PensionCaseService implements PensionCaseServiceInterface
             throw new DuplicateIncomeConceptException($incomeConceptId, $caseId);
         }
 
+        // Task 42: the percent to apply is REQUIRED — same doctrine as
+        // the money shape (RN-005).
+        $this->assertAppliedPercentIsWellFormed($appliedPercent, 'applied_percent');
+
         $money = Money::fromString($amount);
 
         return $this->transactions->execute(
-            fn (): IncomeConceptRecord => $this->cases->addIncomeConceptRecord($case, $incomeConceptId, $money->__toString()),
+            fn (): IncomeConceptRecord => $this->cases->addIncomeConceptRecord(
+                $case,
+                $incomeConceptId,
+                $money->__toString(),
+                $appliedPercent,
+            ),
         );
     }
 
@@ -683,6 +758,121 @@ final class PensionCaseService implements PensionCaseServiceInterface
                     $key => 'The referenced catalog entry does not exist or is deactivated.',
                 ]);
             }
+        }
+    }
+
+    /**
+     * Task 42 (user correction, SGP-36): coherence of the promovente
+     * residence + collection group. Probes the ACTIVE surface of every
+     * reference (province, municipality, agency type, agency), the
+     * RN-04 municipality-province coherence of the residence, the
+     * agency-of-the-declared-type rule of the collection point and the
+     * CONDITIONAL bank-account demand: the account is required (422 on
+     * bank_account) when the payment form of the collection agency
+     * type is 'tarjeta magnetica', optional with 'nomina electronica'.
+     *
+     * The optional $stored case carries the RESULTING state on the
+     * update path (PATCH semantics: every key the wire did not declare
+     * keeps its stored value), so the very same probe guards both
+     * write paths.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertResidenceAndCollectionAreCoherent(array $payload, ?PensionCase $stored = null): void
+    {
+        $groupKeys = [
+            'current_address',
+            'residence_province_id',
+            'residence_municipality_id',
+            'collection_agency_type_id',
+            'collection_agency_id',
+            'bank_account',
+        ];
+
+        if (array_intersect($groupKeys, array_keys($payload)) === []) {
+            return;
+        }
+
+        // Residence geography: ACTIVE surface + RN-04 coherence.
+        $provinceId = (int) ($payload['residence_province_id'] ?? $stored?->residence_province_id);
+        $municipalityId = (int) ($payload['residence_municipality_id'] ?? $stored?->residence_municipality_id);
+
+        if ($this->catalogs->find(Province::class, $provinceId) === null) {
+            throw ValidationException::withMessages([
+                'residence_province_id' => 'The residence province does not exist or is deactivated.',
+            ]);
+        }
+
+        $municipality = $this->catalogs->find(Municipality::class, $municipalityId);
+
+        if (! $municipality instanceof Municipality) {
+            throw ValidationException::withMessages([
+                'residence_municipality_id' => 'The residence municipality does not exist or is deactivated.',
+            ]);
+        }
+
+        if ($municipality->province_id !== $provinceId) {
+            // RN-04: the municipality belongs to the declared province —
+            // the special municipality (province NULL) stays out of the
+            // residence domain (P-09).
+            throw ValidationException::withMessages([
+                'residence_municipality_id' => 'The residence municipality does not belong to the declared residence province.',
+            ]);
+        }
+
+        // Collection point: ACTIVE agency of the declared type.
+        $agencyTypeId = (int) ($payload['collection_agency_type_id'] ?? $stored?->collection_agency_type_id);
+        $agencyId = (int) ($payload['collection_agency_id'] ?? $stored?->collection_agency_id);
+
+        $agencyType = $this->catalogs->find(AgencyType::class, $agencyTypeId);
+
+        if (! $agencyType instanceof AgencyType) {
+            throw ValidationException::withMessages([
+                'collection_agency_type_id' => 'The collection agency type does not exist or is deactivated.',
+            ]);
+        }
+
+        $agency = $this->catalogs->find(Agency::class, $agencyId);
+
+        if (! $agency instanceof Agency) {
+            throw ValidationException::withMessages([
+                'collection_agency_id' => 'The collection agency does not exist or is deactivated.',
+            ]);
+        }
+
+        if ($agency->agency_type_id !== $agencyTypeId) {
+            throw ValidationException::withMessages([
+                'collection_agency_id' => 'The collection agency does not belong to the declared collection agency type.',
+            ]);
+        }
+
+        // Conditional bank account: demanded by the payment form of the
+        // collection agency type — an explicit null CLEARS on the update
+        // path, so array_key_exists (not ??) resolves the resulting
+        // value.
+        $bankAccount = array_key_exists('bank_account', $payload)
+            ? $payload['bank_account']
+            : $stored?->bank_account;
+        $bankAccount = $bankAccount === null || $bankAccount === '' ? null : (string) $bankAccount;
+
+        if ($agencyType->payment_form === PaymentForm::TarjetaMagnetica->value && $bankAccount === null) {
+            throw ValidationException::withMessages([
+                'bank_account' => 'The bank account is required when the payment form of the collection agency type is tarjeta magnetica.',
+            ]);
+        }
+    }
+
+    /**
+     * Task 42 (user correction, SGP-36): shape of the applied percent
+     * — range 0-100 with at most two decimals, exact decimal string
+     * (the RN-005 doctrine: never a binary float).
+     */
+    private function assertAppliedPercentIsWellFormed(string $percent, string $field): void
+    {
+        if (preg_match(self::APPLIED_PERCENT_PATTERN, $percent) !== 1 || (float) $percent > 100.0) {
+            throw ValidationException::withMessages([
+                $field => 'The applied percent must be a decimal between 0 and 100 with at most two decimals.',
+            ]);
         }
     }
 
@@ -1020,10 +1210,12 @@ final class PensionCaseService implements PensionCaseServiceInterface
     /**
      * Normalizes the declared income concept rows (creation payload,
      * user rule 5): catalog probe, one value per concept inside the
-     * payload and money through the value object.
+     * payload, money through the value object and — since Task 42 —
+     * the REQUIRED applied percent (0-100, at most two decimals) of
+     * every row.
      *
      * @param  list<array<string, mixed>>  $rows
-     * @return list<array{income_concept_id: int, amount: string}>
+     * @return list<array{income_concept_id: int, amount: string, applied_percent: string}>
      */
     private function incomeConceptRows(array $rows): array
     {
@@ -1050,9 +1242,18 @@ final class PensionCaseService implements PensionCaseServiceInterface
 
             $seen[$conceptId] = true;
 
+            // Task 42: the percent to apply is REQUIRED per row — same
+            // doctrine as the money shape (RN-005).
+            $appliedPercent = (string) ($row['applied_percent'] ?? '');
+            $this->assertAppliedPercentIsWellFormed(
+                $appliedPercent,
+                "income_concept_records.{$index}.applied_percent",
+            );
+
             $normalized[] = [
                 'income_concept_id' => $conceptId,
                 'amount' => Money::fromString((string) ($row['amount'] ?? ''))->__toString(),
+                'applied_percent' => $appliedPercent,
             ];
         }
 

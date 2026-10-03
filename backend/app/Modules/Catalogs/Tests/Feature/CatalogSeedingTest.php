@@ -70,7 +70,6 @@ final class CatalogSeedingTest extends TestCase
             'races' => 5,
             'positions' => 5,
             'pension_regimes' => 1,
-            'payment_types' => 3,
             'income_concepts' => 2,
         ];
 
@@ -108,7 +107,6 @@ final class CatalogSeedingTest extends TestCase
             'races' => ['BLA', 'NEG', 'MUL', 'CHN', 'OTR'],
             'positions' => ['JDEPT', 'JAREA', 'ESP', 'TEC', 'ASERV'],
             'pension_regimes' => ['GEN'],
-            'payment_types' => ['ABN', 'CHQ', 'EFE'],
             'income_concepts' => ['SALB', 'PGR'],
         ];
 
@@ -121,5 +119,20 @@ final class CatalogSeedingTest extends TestCase
                 "Seeded codes mismatch for [{$table}]."
             );
         }
+    }
+
+    /**
+     * Task 42 (user correction, SGP-36): the agency types seed their
+     * payment form explicitly (the column default answers the same
+     * value — the reference data stays honest about the field).
+     */
+    public function test_the_seeded_agency_types_carry_their_payment_form(): void
+    {
+        $this->seed(CatalogsSeeder::class);
+
+        $this->assertSame(
+            ['tarjeta magnetica', 'tarjeta magnetica', 'tarjeta magnetica'],
+            \DB::table('agency_types')->orderBy('id')->pluck('payment_form')->all()
+        );
     }
 }

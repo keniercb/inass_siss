@@ -11,7 +11,7 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\CatalogModel;
 // Registry integrity
 // ---------------------------------------------------------------------------
 
-it('exposes the sixteen uniform catalogs of phase 1', function () {
+it('exposes the fifteen uniform catalogs of phase 1', function () {
     expect(CatalogRegistry::keys())->toBe([
         'provinces',
         'agency-types',
@@ -27,7 +27,6 @@ it('exposes the sixteen uniform catalogs of phase 1', function () {
         'races',
         'positions',
         'pension-regimes',
-        'payment-types',
         'income-concepts',
     ]);
 });
@@ -49,6 +48,9 @@ it('rejects unknown catalogs and the dedicated resources', function (string $key
     'agencies',
     'bank-controls',
     'unknown-thing',
+    // Task 42 (SGP-36): the payment_types catalog was ELIMINATED —
+    // its key answers like any other unknown catalog now.
+    'payment-types',
 ]);
 
 it('fails with a typed exception for unknown catalogs', function () {
@@ -59,13 +61,13 @@ it('fails with a typed exception for unknown catalogs', function () {
 // Models
 // ---------------------------------------------------------------------------
 
-it('observes the eighteen catalog models for authorship stamping', function () {
+it('observes the seventeen catalog models for authorship stamping', function () {
     $models = CatalogRegistry::observedModels();
 
-    expect($models)->toHaveLength(18)
+    expect($models)->toHaveLength(17)
         ->and($models)->toContain(Agency::class)
         ->and($models)->not->toContain(CatalogModel::class)
-        ->and(array_unique($models))->toHaveLength(18);
+        ->and(array_unique($models))->toHaveLength(17);
 });
 
 it('gives every catalog model an audit-ready fillable set', function (string $model) {
@@ -92,7 +94,6 @@ it('marks the catalogs with code as such', function (string $key, bool $hasCode)
     ['educational-levels', true],
     ['beneficiary-types', true],
     ['positions', true],
-    ['payment-types', true],
 ]);
 
 it('declares the reference guards of the geographic catalogs', function () {
@@ -103,4 +104,13 @@ it('declares the reference guards of the geographic catalogs', function () {
         ->and(array_values($provinces->dependents))->toContain('province_id')
         ->and($agencyTypes->dependents)->toHaveCount(1)
         ->and(CatalogRegistry::definition('races')->dependents)->toBe([]);
+});
+
+// Task 42 (user correction, SGP-36): the agency types carry the
+// payment form of the collection — the lowercase-unified enum the
+// user fixed, riding the generic extraRules machinery.
+it('declares the payment form rule of the agency types', function () {
+    expect(CatalogRegistry::definition('agency-types')->extraRules)->toBe([
+        'payment_form' => 'in:tarjeta magnetica,nomina electronica',
+    ]);
 });
