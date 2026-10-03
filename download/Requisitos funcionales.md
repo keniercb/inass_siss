@@ -301,6 +301,7 @@ El sistema administra los parámetros de cálculo: años mínimos de trabajo, ed
 - [ ] Listado filtrable por estado, persona, rango de fechas de solicitud y número.
 - [ ] Exportación CSV del resultado filtrado (ver RF-REP-004).
 - [x] ALCANCE TERRITORIAL del listado (corrección de usuario, Task 41/SGP-35): solo cargan los expedientes cuya oficina coincide con la oficina del USUARIO AUTENTICADO — la oficina NO viaja en la petición (422 prohibido si llega: el filtro dejó el wire) porque el servidor la deriva de la asignación del actor (ADR-33/ADR-29, el mismo patrón del alta que asume la oficina del usuario que registra); un actor sin oficina — estado de cuenta legítimo — recibe una página VACÍA (fail-closed, nunca el directorio sin scope), y el alcance compone con los filtros restantes, que angulan DENTRO de la oficina del actor, jamás a través de ella.
+- [x] DATOS DE RESIDENCIA Y COBRO EN CADA FILA (corrección de usuario, Task 44/SGP-37, IMPLEMENTADA): el listado devuelve la provincia y el municipio de residencia del promovente como proyecciones {id, code, name} y los DATOS de la agencia de cobro — el tipo de agencia con su `payment_form` y la agencia COMPLETA (código, nombre, tipo, provincia y municipio) —, las mismas proyecciones que el detalle del expediente: consumir el directorio no exige una segunda consulta por fila para resolver la geografía o el punto de cobro (spec OpenAPI 1.5.0).
 
 ### 4.6 Módulo CAL — Cálculo de pensión
 

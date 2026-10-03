@@ -44,7 +44,22 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
     public function search(array $filters, int $page, int $perPage): LengthAwarePaginator
     {
         $query = PensionCase::query()
-            ->with(['applicant', 'filedBy'])
+            // Task 44 (SGP-37): the listing rides the SAME promovente
+            // projections the detail surface answers — the residence
+            // geography and the collection point — so a directory row
+            // is never a summary that drifts from the single-resource
+            // PensionCase shape. The agency carries its geography and
+            // type because the full AgencyResource shape answers.
+            ->with([
+                'applicant',
+                'filedBy',
+                'residenceProvince',
+                'residenceMunicipality',
+                'collectionAgencyType',
+                'collectionAgency.province',
+                'collectionAgency.municipality',
+                'collectionAgency.agencyType',
+            ])
             ->orderByDesc('requested_at')
             ->orderByDesc('id');
 

@@ -71,6 +71,11 @@ declare(strict_types=1);
  * por PUT); y cada concepto de ingreso declarado viaja con su PORCIENTO
  * A APLICAR (0-100, dos decimales, obligatorio).
  *
+ * Task 44 (SGP-37, corrección de usuario): el GET /pension-cases
+ * devuelve en cada fila los DATOS de provincia y municipio de
+ * residencia del promovente y de la agencia de cobro — las mismas
+ * proyecciones del detalle, sin segunda consulta por fila.
+ *
  * Ejecutar: php scripts/smoke_case_registration.php
  * (requiere la BD sembrada: php artisan migrate:fresh --seed)
  */
@@ -466,6 +471,37 @@ try {
         'task 42: agencia de otro tipo responde 422',
         $wrongTypeAgency->status() === 422 && is_array($wrongTypeAgency->json('errors.collection_agency_id')),
         detail($wrongTypeAgency),
+    );
+
+    // ---- Task 44: el LISTADO devuelve la residencia y el cobro ----
+    // (SGP-37, corrección de usuario: cada fila del GET /pension-cases
+    // carga provincia y municipio de residencia como {id, code, name},
+    // el tipo de agencia de cobro con su payment_form y la agencia de
+    // cobro COMPLETA — código, nombre, tipo, provincia y municipio)
+    $listRow = (array) ($base('GET', '/pension-cases?applicant_person_id='.$groupApplicant->id)->json('data.0') ?? []);
+    check(
+        'task 44: el listado devuelve provincia y municipio de residencia y los datos de la agencia de cobro',
+        ($listRow['current_address'] ?? '') === 'Calle de la fumiga #3'
+            && (int) ($listRow['residence_province']['id'] ?? 0) === (int) $habana->id
+            && ($listRow['residence_province']['code'] ?? '') === $habana->code
+            && ($listRow['residence_province']['name'] ?? '') === $habana->name
+            && (int) ($listRow['residence_municipality']['id'] ?? 0) === (int) $municipality->id
+            && ($listRow['residence_municipality']['code'] ?? '') === $municipality->code
+            && ($listRow['residence_municipality']['name'] ?? '') === $municipality->name
+            && (int) ($listRow['collection_agency_type']['id'] ?? 0) === $magneticTypeId
+            && ($listRow['collection_agency_type']['payment_form'] ?? '') === 'tarjeta magnetica'
+            && (int) ($listRow['collection_agency']['id'] ?? 0) === $magneticAgencyId
+            && ($listRow['collection_agency']['code'] ?? '') !== ''
+            && ($listRow['collection_agency']['name'] ?? '') !== ''
+            && ($listRow['collection_agency']['type']['code'] ?? '') !== ''
+            && ($listRow['collection_agency']['province']['code'] ?? '') !== ''
+            && ($listRow['collection_agency']['municipality']['code'] ?? '') !== '',
+        'fila del listado: '.json_encode([
+            'residence_province' => $listRow['residence_province'] ?? null,
+            'residence_municipality' => $listRow['residence_municipality'] ?? null,
+            'collection_agency_type' => $listRow['collection_agency_type'] ?? null,
+            'collection_agency' => $listRow['collection_agency'] ?? null,
+        ], JSON_UNESCAPED_UNICODE),
     );
 
     // ---- Task 38: fecha de desvinculación del promovente ----
