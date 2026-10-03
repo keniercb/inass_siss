@@ -1549,3 +1549,20 @@ Stage Summary:
 - Spec OpenAPI 1.4.0 anclada por ApiDocsTest (input del catálogo con payment_form + default, grupo del expediente en POST/PUT y schema, applied_percent en el subregistro, payment-types fuera de la enumeración de tipos); suite 1133/3945 en verde contra MySQL real; Pint/PHPStan 8/deptrac en verde; fumigas de expedientes y ciclo de vida ampliadas TODO OK sobre la BD sgp
 - Entrega: rama feat/SGP-36-model-adjustments con commits (feat + test + smoke + docs + worklog); push/PR/CI/merge a continuación
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 43-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-36 — PR #49, CI y merge a main (los cuatro ajustes de modelo implementados y verificados de punta a punta)
+
+Work Log:
+- Entrega: rama feat/SGP-36-model-adjustments (5 commits por concepto: feat 58673d4 + test b5c7d65 + smoke f00b287 + docs 005d35e + worklog b70b487 sobre e74654b), push explícito por nombre de rama y PR #49 creada por API: https://github.com/keniercb/inass_siss/pull/49
+- Incidente del daemon recurrente: UN volteo de HEAD a main justo después del primer commit — el commit aterrizó íntegro en la rama (ad93211) pero agrupaba todo el trabajo en uno; rehecho con reset --soft + re-commits por concepto con guard de rama (feat/test/smoke/docs/worklog), cero trabajo perdido
+- CI (Quality gate PHP 8.3) SUCCESS sobre b70b487 tras ~8 minutos de sondeo (suite completa + Pint + PHPStan 8 + deptrac en el runner)
+- PR #49 mergeeada a main como 1df4c78 con merge commit; main local sincronizado (reset --hard a origin/main) y regresión final sobre main en verde: Pest 1133 tests / 3945 aserciones contra MySQL real (75 s)
+
+Stage Summary:
+- LOS CUATRO AJUSTES EN MAIN (Task 43/SGP-36, PR #49): eliminación de payment_types (15 catálogos uniformes, payment-types → 404), agency_types.payment_form (enum minúsculas unificado tarjeta magnetica|nomina electronica con DEFAULT tarjeta magnetica servido por todos los endpoints), el grupo de DOMICILIO y COBRO del promovente en el expediente (cuenta bancaria OBLIGATORIA CONDICIONADA a tarjeta magnetica, grupo ENTERO editable por PUT con la exigencia re-evaluada contra el estado RESULTANTE) y el porciento a aplicar del concepto de ingreso (DECIMAL(5,2) obligatorio 0-100 con 2 decimales exactos) — spec OpenAPI 1.4.0 anclada por ApiDocsTest, migraciones 2026_10_03_100000..100300
+- Las TRECE correcciones de usuario del ciclo viven verificadas en main: forma de declaración (32+33), numeración territorial (30), nombre de entidad + búsqueda por nombre (31/34), persona por como referencia (34→35), columnas al patrón inglés (36), promovente + períodos de servicio (37), el lote del SGP-32 (38), el Schema de Entrada del catálogo (39), el ciclo de vida del expediente (40), el alcance territorial del listado (41), la documentación de los cuatro ajustes (42) y su implementación validada (43)
+- Suite 1133/3945 en verde sobre main; Pint/PHPStan 8/deptrac en verde; fumigas de expedientes y ciclo de vida ampliadas TODO OK sobre la BD sgp
+- SIGUIENTE: retomar el plan original — Sprint 6 (S6.1-S6.5): matriz de transiciones como dataset de Pest, POST /pension-cases/{id}/transitions con evidencia exigible, completitud en revisión, denegación con base legal, reapertura admin, historial append-only y búsqueda afinada
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
