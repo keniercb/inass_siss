@@ -1651,3 +1651,20 @@ Stage Summary:
 - SGP-38 CON TIPO ENTERO EN LA DOCUMENTACIÓN (Task 46): `worked_years` pasa de DECIMAL(5,2) a SMALLINT UNSIGNED con la fórmula del usuario redondeada al ENTERO más cercano (mitad hacia arriba; ejemplo del usuario: 71/12 = 5.9167 → `6`), serializado como NÚMERO ENTERO JSON — la implementación sigue PENDIENTE de la validación del usuario («implementa»)
 - SIGUIENTE: con «implementa», la Fase 2 por el plan preparado — TDD rojo (ServicePeriodsTest + PensionCaseSubrecordsApiTest + PensionCaseCreationApiTest + ApiDocsTest 1.6.0), migración `2026_10_04_100000`, implementación, QA completo, fumigas HTTP y docs de cierre (desmarcar → IMPLEMENTADA)
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 46-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del ajuste documental SGP-38 a ENTERO — PR #55, CI y merge a main (worked_years pasa de DECIMAL(5,2) a Integer en los cuatro documentos; implementación pendiente de la validación del usuario)
+
+Work Log:
+- Higiene de credenciales: el token de ~/.git-credentials quedó obsoleto para la API REST (401 — el sandbox enruta git por su propio proxy, por lo que fetch/push/ls-remote seguían funcionando); el PAT provisto por el usuario verificado contra la API (200, usuario keniercb) y usado explícitamente (GITHUB_TOKEN) para TODAS las llamadas REST de la sesión — el daemon revierte el archivo de credenciales, así que las llamadas API no dependen de él
+- Entrega: rama docs/SGP-38-worked-years-integer (2 commits por concepto: docs 74f1f8a con los 12 parches de scripts/patch_docs_task46.py + worklog 5d3d0fc sobre af65372), push explícito por nombre de rama y PR #55 creada por API: https://github.com/keniercb/inass_siss/pull/55
+- CI (Quality gate PHP 8.3) SUCCESS sobre 5d3d0fc tras ~5 minutos de sondeo (scripts de sondeo contra check-runs de la API)
+- PR #55 mergeeada a main como c295a0c con merge commit; main local sincronizado (reset --hard a origin/main) y verificación de las marcas Task 46/SGP-38-ENTERO presentes en los cuatro documentos
+- Los cuatro documentos actualizados copiados al directorio externo /home/z/my-project/download/ para el usuario (symlinks prohibidos en el sandbox: el directorio canónico sigue siendo inass_siss/download/ del repo)
+
+Stage Summary:
+- SGP-38 ENTERO EN MAIN (Task 46, PR #55): worked_years documentado como SMALLINT UNSIGNED con REDONDEAR(meses/M) al entero más cercano (mitad hacia arriba; 71/12 = 5.9167 → 6), serializado como NÚMERO ENTERO JSON (type: integer) — la implementación sigue esperando el «implementa» del usuario
+- Las QUINCE correcciones de usuario del ciclo: CATORCE verificadas en main (tasks 30-44), SGP-38 documentada (45) con el tipo ENTERO ajustado (46) — esperando la validación del usuario para su Fase 2
+- SIGUIENTE: esperar la validación del usuario; con «implementa», la Fase 2 — TDD rojo (ServicePeriodsTest + PensionCaseSubrecordsApiTest + PensionCaseCreationApiTest + ApiDocsTest 1.6.0), migración `2026_10_04_100000`, implementación (ServicePeriods + PensionCaseService + ServiceRecord + repositorio Eloquent + ServiceRecordResource + requests de ambos puntos de entrada + ApiDoc 1.6.0), QA completo, fumigas HTTP ampliadas y docs de cierre (desmarcar → IMPLEMENTADA)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
