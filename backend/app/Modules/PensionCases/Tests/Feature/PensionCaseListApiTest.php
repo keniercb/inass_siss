@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Tests\Feature;
 
+use App\Modules\Catalogs\Domain\PaymentForm;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
@@ -56,7 +59,7 @@ final class PensionCaseListApiTest extends TestCase
 
     private User $reader;
 
-    /** @var array<string, int> */
+    /** @var array<string, int|string> */
     private array $catalog;
 
     protected function setUp(): void
@@ -105,6 +108,21 @@ final class PensionCaseListApiTest extends TestCase
             'address' => 'Calle 100 #0',
             'social_purpose' => 'Servicios técnicos',
         ]);
+        // Task 42: the collection point of the promovente (the
+        // electronic payroll form keeps the bank account optional).
+        $collectionAgencyType = AgencyType::query()->create([
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => PaymentForm::NominaElectronica->value,
+        ]);
+        $collectionAgency = Agency::query()->create([
+            'code' => 'BPA-NE-1',
+            'name' => 'Agencia BPA nómina',
+            'province_id' => $north->id,
+            'municipality_id' => $northMunicipality->id,
+            'agency_type_id' => $collectionAgencyType->id,
+        ]);
+
         $this->catalog = [
             'employer_entity_id' => $entity->id,
             'position_id' => Position::query()->create(['name' => 'Técnico', 'description' => 'Técnico medio'])->id,
@@ -117,6 +135,13 @@ final class PensionCaseListApiTest extends TestCase
                 'description' => 'Régimen general',
                 'months_per_year' => 12,
             ])->id,
+            // Task 42: the promovente residence + collection group
+            // shared by both territorial fixtures.
+            'current_address' => 'Calle 8 #10, Playa',
+            'residence_province_id' => $north->id,
+            'residence_municipality_id' => $northMunicipality->id,
+            'collection_agency_type_id' => $collectionAgencyType->id,
+            'collection_agency_id' => $collectionAgency->id,
         ];
 
         // One case captured per office (direct fixtures: the number

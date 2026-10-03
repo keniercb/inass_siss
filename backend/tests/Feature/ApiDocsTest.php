@@ -221,10 +221,11 @@ describe('API documentation (Swagger)', function () {
         $update = $spec['paths']['/api/v1/catalogs/{type}/{id}']['patch']['requestBody']['content']['application/json']['schema'];
 
         // The spec version is the freshness signal of the served schema:
-        // 1.3.0 is the revision that scopes the case listing to the
-        // authenticated user's office (SGP-35) on top of the 1.2.0
-        // lifecycle endpoints (PUT + DELETE, SGP-34).
-        expect($spec['info']['version'])->toBe('1.3.0')
+        // 1.4.0 is the revision that carries the SGP-36 model adjustments
+        // (payment_types eliminated, the agency-types payment form, the
+        // case residence + collection group and the income applied
+        // percent) on top of the 1.3.0 territorial scope.
+        expect($spec['info']['version'])->toBe('1.4.0')
 
             // Schema de Entrada del alta: the sector travels as an optional
             // integer and the persona fallecida flag as a boolean whose
@@ -250,7 +251,24 @@ describe('API documentation (Swagger)', function () {
             ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('sector')
             ->and($spec['components']['schemas']['CatalogItem']['properties']['sector']['type'])->toBe('integer')
             ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('deceased_person')
-            ->and($spec['components']['schemas']['CatalogItem']['properties']['deceased_person']['type'])->toBe('boolean');
+            ->and($spec['components']['schemas']['CatalogItem']['properties']['deceased_person']['type'])->toBe('boolean')
+
+            // Task 42 (SGP-36): the agency-types payment form rides the
+            // same generic machinery — the store schema documents the
+            // lowercase-unified enum with its default, the PATCH schema
+            // the editable form and the CatalogItem mirror the value.
+            ->and($store['properties'])->toHaveKey('payment_form')
+            ->and($store['properties']['payment_form']['type'])->toBe('string')
+            ->and($store['properties']['payment_form']['default'])->toBe('tarjeta magnetica')
+            ->and($update['properties'])->toHaveKey('payment_form')
+            ->and($update['properties']['payment_form']['type'])->toBe('string')
+            ->and($spec['components']['schemas']['CatalogItem']['properties'])->toHaveKey('payment_form')
+            ->and($spec['components']['schemas']['CatalogItem']['properties']['payment_form']['type'])->toBe('string')
+
+            // Task 42: the payment_types catalog left the generic resource
+            // — the index description no longer enumerates it (15
+            // uniform types).
+            ->and($spec['paths']['/api/v1/catalogs/{type}']['get']['description'])->not->toContain('payment-types');
     });
 
     // Task 40 (user correction, SGP-34): the case aggregate gains its
@@ -306,6 +324,47 @@ describe('API documentation (Swagger)', function () {
             ->and($parameters)->toContain('per_page')
             ->and($spec['paths']['/api/v1/pension-cases']['get']['description'])->toContain('OFICINA DEL USUARIO AUTENTICADO')
             ->and($spec['paths']['/api/v1/pension-cases']['get']['responses'])->toHaveKey('422');
+    });
+
+    // Task 42 (user correction, SGP-36): the case carries the promovente
+    // residence + collection group — the POST demands it, the PUT
+    // documents it as EDITABLE (the user decided it can be modified)
+    // and the PensionCase schema mirrors the six fields — while every
+    // income concept declaration travels with its applied percent
+    // (0-100, two decimals).
+    it('documents the promovente residence and collection group with the applied percent', function () {
+        $spec = $this->getJson('/api/docs')->json();
+
+        $store = $spec['paths']['/api/v1/pension-cases']['post']['requestBody']['content']['application/json']['schema'];
+        $put = $spec['paths']['/api/v1/pension-cases/{id}']['put']['requestBody']['content']['application/json']['schema'];
+
+        expect($store['required'])->toContain('current_address')
+            ->and($store['required'])->toContain('residence_province_id')
+            ->and($store['required'])->toContain('residence_municipality_id')
+            ->and($store['required'])->toContain('collection_agency_type_id')
+            ->and($store['required'])->toContain('collection_agency_id')
+            ->and($store['required'])->not->toContain('bank_account')
+            ->and($store['properties'])->toHaveKey('current_address')
+            ->and($store['properties'])->toHaveKey('residence_province_id')
+            ->and($store['properties'])->toHaveKey('residence_municipality_id')
+            ->and($store['properties'])->toHaveKey('collection_agency_type_id')
+            ->and($store['properties'])->toHaveKey('collection_agency_id')
+            ->and($store['properties'])->toHaveKey('bank_account')
+            ->and($store['properties']['bank_account']['nullable'])->toBe(true)
+            ->and($put['properties'])->toHaveKey('current_address')
+            ->and($put['properties'])->toHaveKey('bank_account')
+            ->and($put['properties']['applicant_person_id']['description'])->toContain('no modificable')
+            ->and($spec['components']['schemas']['PensionCase']['properties'])->toHaveKey('current_address')
+            ->and($spec['components']['schemas']['PensionCase']['properties'])->toHaveKey('residence_province_id')
+            ->and($spec['components']['schemas']['PensionCase']['properties'])->toHaveKey('bank_account')
+            ->and($spec['components']['schemas']['PensionCase']['properties'])->toHaveKey('collection_agency_type')
+            ->and($spec['components']['schemas']['PensionCase']['properties'])->toHaveKey('collection_agency')
+
+            // The applied percent of the income declarations: the
+            // individual endpoint demands it and the row schema mirrors
+            // it.
+            ->and($spec['paths']['/api/v1/pension-cases/{id}/income-concept-records']['post']['requestBody']['content']['application/json']['schema']['required'])->toContain('applied_percent')
+            ->and($spec['components']['schemas']['IncomeConceptRecord']['properties'])->toHaveKey('applied_percent');
     });
 
     it('documents the response envelope and error shapes', function () {

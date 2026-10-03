@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Tests\Feature;
 
+use App\Modules\Catalogs\Domain\PaymentForm;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\IncomeConcept;
@@ -107,6 +110,12 @@ final class PensionCaseCreationApiTest extends TestCase
 
     private int $otherIncomeConceptId;
 
+    private AgencyType $collectionAgencyType;
+
+    private Agency $collectionAgency;
+
+    private int $residenceMunicipalityId;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -122,6 +131,24 @@ final class PensionCaseCreationApiTest extends TestCase
         $this->officeType = OfficeType::query()->create(['code' => 'MUN', 'name' => 'Municipal']);
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $entityType = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
+
+        // Task 42: the collection point of the promovente (the
+        // electronic payroll form keeps the bank account optional
+        // for the classic creation assertions; the conditional demand
+        // lives in its own suite).
+        $this->collectionAgencyType = AgencyType::query()->create([
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => PaymentForm::NominaElectronica->value,
+        ]);
+        $this->collectionAgency = Agency::query()->create([
+            'code' => 'BPA-NE-1',
+            'name' => 'Agencia BPA nómina',
+            'province_id' => $this->province->id,
+            'municipality_id' => $municipality->id,
+            'agency_type_id' => $this->collectionAgencyType->id,
+        ]);
+        $this->residenceMunicipalityId = $municipality->id;
 
         $this->applicant = Person::factory()->create([
             'identity_number' => PersonFactory::identity('M', '1962-03-10'),
@@ -197,6 +224,13 @@ final class PensionCaseCreationApiTest extends TestCase
             // the wire exactly like rebel_army_member.
             'internationalist' => false,
             'last_salary' => '5000.00',
+            // Task 42: promovente residence + collection group —
+            // the payroll form leaves the bank account optional.
+            'current_address' => 'Calle 8 #10 entre 5 y 7, Playa',
+            'residence_province_id' => $this->province->id,
+            'residence_municipality_id' => $this->residenceMunicipalityId,
+            'collection_agency_type_id' => $this->collectionAgencyType->id,
+            'collection_agency_id' => $this->collectionAgency->id,
         ], $overrides);
     }
 
@@ -645,7 +679,19 @@ final class PensionCaseCreationApiTest extends TestCase
         $municipality = Municipality::query()->where('code', '03')->firstOrFail();
         $municipality->delete();
 
-        $this->postJson('/api/v1/pension-cases', $this->payload())
+        // Task 42: the residence municipality of the payload must be
+        // another one that SURVIVES — the residence probe guards its
+        // own reference and this test aims at the office's number
+        // derivation, not at the residence.
+        $survivor = Municipality::query()->create([
+            'province_id' => $this->province->id,
+            'code' => '04',
+            'name' => 'Miramar',
+        ]);
+
+        $this->postJson('/api/v1/pension-cases', $this->payload([
+            'residence_municipality_id' => $survivor->id,
+        ]))
             ->assertStatus(422)
             ->assertJsonValidationErrors(['office_id']);
     }
@@ -736,8 +782,8 @@ final class PensionCaseCreationApiTest extends TestCase
         // atomic creation — everything or nothing.
         $response = $this->postJson('/api/v1/pension-cases', $this->payload([
             'income_concept_records' => [
-                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00'],
-                ['income_concept_id' => $this->otherIncomeConceptId, 'amount' => '80.50'],
+                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00', 'applied_percent' => '100'],
+                ['income_concept_id' => $this->otherIncomeConceptId, 'amount' => '80.50', 'applied_percent' => '50'],
             ],
         ]))
             ->assertStatus(201)
@@ -761,8 +807,8 @@ final class PensionCaseCreationApiTest extends TestCase
     {
         $this->postJson('/api/v1/pension-cases', $this->payload([
             'income_concept_records' => [
-                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00'],
-                ['income_concept_id' => $this->incomeConceptId, 'amount' => '200.00'],
+                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00', 'applied_percent' => '100'],
+                ['income_concept_id' => $this->incomeConceptId, 'amount' => '200.00', 'applied_percent' => '100'],
             ],
         ]))
             ->assertStatus(422)
@@ -775,7 +821,7 @@ final class PensionCaseCreationApiTest extends TestCase
     {
         $this->postJson('/api/v1/pension-cases', $this->payload([
             'income_concept_records' => [
-                ['income_concept_id' => 999999, 'amount' => '150.00'],
+                ['income_concept_id' => 999999, 'amount' => '150.00', 'applied_percent' => '100'],
             ],
         ]))
             ->assertStatus(422)
@@ -797,7 +843,7 @@ final class PensionCaseCreationApiTest extends TestCase
                 ['planned_days' => 300, 'actual_days' => 280, 'cycles_count' => 1],
             ],
             'income_concept_records' => [
-                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00'],
+                ['income_concept_id' => $this->incomeConceptId, 'amount' => '150.00', 'applied_percent' => '100'],
             ],
         ]))
             ->assertStatus(201)

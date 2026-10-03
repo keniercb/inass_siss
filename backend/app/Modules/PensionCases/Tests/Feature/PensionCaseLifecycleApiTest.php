@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Tests\Feature;
 
+use App\Modules\Catalogs\Domain\PaymentForm;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
@@ -84,6 +87,23 @@ final class PensionCaseLifecycleApiTest extends TestCase
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $entityType = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 
+        // Task 42 (user correction, SGP-36): the collection point of
+        // the promovente — the electronic payroll form keeps the bank
+        // account OPTIONAL, so the fixtures stay focused on their own
+        // surface (the conditional demand has its own suite).
+        $collectionAgencyType = AgencyType::query()->create([
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => PaymentForm::NominaElectronica->value,
+        ]);
+        $collectionAgency = Agency::query()->create([
+            'code' => 'BPA-NE-1',
+            'name' => 'Agencia BPA nómina',
+            'province_id' => $province->id,
+            'municipality_id' => $municipality->id,
+            'agency_type_id' => $collectionAgencyType->id,
+        ]);
+
         $applicant = Person::factory()->create([
             'identity_number' => PersonFactory::identity('M', '1962-03-10'),
             'birth_date' => '1962-03-10',
@@ -133,6 +153,12 @@ final class PensionCaseLifecycleApiTest extends TestCase
             'termination_date' => '2025-07-31',
             'filed_by_person_id' => Person::factory()->create()->id,
             'last_salary' => '5000.00',
+            // Task 42: promovente residence + collection group.
+            'current_address' => 'Calle 8 #10 entre 5 y 7, Playa',
+            'residence_province_id' => $province->id,
+            'residence_municipality_id' => $municipality->id,
+            'collection_agency_type_id' => $collectionAgencyType->id,
+            'collection_agency_id' => $collectionAgency->id,
         ]);
 
         return [$applicant, $entity, $case];
@@ -160,6 +186,14 @@ final class PensionCaseLifecycleApiTest extends TestCase
             'rebel_army_member' => false,
             'internationalist' => false,
             'last_salary' => '5000.00',
+            // Task 42: the residence + collection group rides the
+            // re-capture payload (the promovente keeps every id the
+            // seedCase fixture created).
+            'current_address' => $case->current_address,
+            'residence_province_id' => $case->residence_province_id,
+            'residence_municipality_id' => $case->residence_municipality_id,
+            'collection_agency_type_id' => $case->collection_agency_type_id,
+            'collection_agency_id' => $case->collection_agency_id,
         ];
     }
 

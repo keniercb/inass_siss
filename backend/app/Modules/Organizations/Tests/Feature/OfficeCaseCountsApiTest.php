@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Organizations\Tests\Feature;
 
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EducationalLevel;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\EntityType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
@@ -87,7 +89,26 @@ final class OfficeCaseCountsApiTest extends TestCase
         $organization = Organization::query()->create(['code' => 'MTSS', 'name' => 'Ministerio de Trabajo']);
         $entityType = EntityType::query()->create(['code' => 'EMP', 'name' => 'Empresa']);
 
+        // Task 42: the collection point of the promovente (the
+        // electronic payroll form keeps the bank account optional).
+        $collectionAgencyType = AgencyType::query()->create([
+            'code' => 'NE',
+            'name' => 'Agencia de nómina',
+            'payment_form' => 'nomina electronica',
+        ]);
+        $collectionAgency = Agency::query()->create([
+            'code' => 'BPA-NE-1',
+            'name' => 'Agencia BPA nómina',
+            'province_id' => $province->id,
+            'municipality_id' => $municipality->id,
+            'agency_type_id' => $collectionAgencyType->id,
+        ]);
+
         $this->refs = [
+            'residence_province_id' => $province->id,
+            'residence_municipality_id' => $municipality->id,
+            'collection_agency_type_id' => $collectionAgencyType->id,
+            'collection_agency_id' => $collectionAgency->id,
             'employer_entity_id' => Entity::query()->create([
                 'code' => 'ENT-01',
                 'name' => 'Servicios Técnicos del Centro',
@@ -138,6 +159,12 @@ final class OfficeCaseCountsApiTest extends TestCase
             'pension_regime_id' => $this->refs['pension_regime_id'],
             'rebel_army_member' => false,
             'last_salary' => '5000.00',
+            // Task 42: promovente residence + collection group.
+            'current_address' => 'Calle 8 #10 entre 5 y 7, Playa',
+            'residence_province_id' => $this->refs['residence_province_id'],
+            'residence_municipality_id' => $this->refs['residence_municipality_id'],
+            'collection_agency_type_id' => $this->refs['collection_agency_type_id'],
+            'collection_agency_id' => $this->refs['collection_agency_id'],
         ]);
     }
 
