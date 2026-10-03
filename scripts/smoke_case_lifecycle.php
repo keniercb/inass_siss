@@ -135,6 +135,46 @@ try {
     $assign = $base('PATCH', "/users/{$adminId}", ['office_id' => $municipalId]);
     check('regla 0: actor asignado a la oficina municipal', $assign->status() === 200, detail($assign));
 
+    // ---- Task 42: punto de cobro del promovente ----
+    // (magnetic: exige la cuenta; nómina: la deja opcional — el PUT del
+    // grupo y la exigencia re-evaluada contra el estado RESULTANTE se
+    // prueban más abajo)
+    $magneticType = $base('POST', '/catalogs/agency-types', [
+        'code' => 'TM',
+        'name' => 'Agencia de tarjeta',
+        'payment_form' => 'tarjeta magnetica',
+    ]);
+    $magneticTypeId = (int) ($magneticType->json('data.id') ?? 0);
+    check('task 42: tipo de agencia de tarjeta creado', $magneticType->status() === 201 && $magneticTypeId > 0, detail($magneticType));
+
+    $payrollType = $base('POST', '/catalogs/agency-types', [
+        'code' => 'NE',
+        'name' => 'Agencia de nómina',
+        'payment_form' => 'nomina electronica',
+    ]);
+    $payrollTypeId = (int) ($payrollType->json('data.id') ?? 0);
+    check('task 42: tipo de agencia de nómina creado', $payrollType->status() === 201 && $payrollTypeId > 0, detail($payrollType));
+
+    $magneticAgency = $base('POST', '/agencies', [
+        'code' => 'LCTM'.random_int(1000, 9999),
+        'name' => 'Agencia BPA tarjeta',
+        'province_id' => $habana->id,
+        'municipality_id' => $municipality->id,
+        'agency_type_id' => $magneticTypeId,
+    ]);
+    $magneticAgencyId = (int) ($magneticAgency->json('data.id') ?? 0);
+    check('task 42: agencia de tarjeta creada', $magneticAgency->status() === 201 && $magneticAgencyId > 0, detail($magneticAgency));
+
+    $payrollAgency = $base('POST', '/agencies', [
+        'code' => 'LCNE'.random_int(1000, 9999),
+        'name' => 'Agencia BPA nómina',
+        'province_id' => $habana->id,
+        'municipality_id' => $municipality->id,
+        'agency_type_id' => $payrollTypeId,
+    ]);
+    $payrollAgencyId = (int) ($payrollAgency->json('data.id') ?? 0);
+    check('task 42: agencia de nómina creada', $payrollAgency->status() === 201 && $payrollAgencyId > 0, detail($payrollAgency));
+
     $entity = Entity::query()->create([
         'code' => 'LC-'.random_int(1000, 9999),
         'name' => 'Empresa de Fumiga Lifecycle',
@@ -173,6 +213,14 @@ try {
         'popular_council' => 'Consejo Popular Fumiga',
         'termination_date' => '2025-07-31',
         'last_salary' => '5000.00',
+        // Task 42: domicilio y cobro del promovente — con la cuenta
+        // declarada porque el tipo de tarjeta la exige.
+        'current_address' => 'Calle del lifecycle #1',
+        'residence_province_id' => $habana->id,
+        'residence_municipality_id' => $municipality->id,
+        'collection_agency_type_id' => $magneticTypeId,
+        'collection_agency_id' => $magneticAgencyId,
+        'bank_account' => '01234567890123456789012345678',
     ];
 
     // ---- Alta del expediente víctima ----
@@ -203,6 +251,44 @@ try {
         $hasError = is_array($rejected->json("errors.{$field}"));
         check("PUT promovente inmutable: {$field} responde 422", $rejected->status() === 422 && $hasError, detail($rejected));
     }
+
+    // ---- Task 42: el grupo de domicilio y cobro SÍ es editable por PUT ----
+    // (decisión explícita del usuario: pueden modificarse; la exigencia
+    // condicional de la cuenta se re-evalúa contra el estado RESULTANTE)
+    $groupEdited = $base('PUT', "/pension-cases/{$caseId}", [
+        'current_address' => 'Calle 23 #100, Vedado',
+        'collection_agency_type_id' => $payrollTypeId,
+        'collection_agency_id' => $payrollAgencyId,
+        'bank_account' => null,
+    ]);
+    check(
+        'task 42: PUT edita el grupo (dirección, cobro de nómina y cuenta limpia)',
+        $groupEdited->status() === 200
+            && ($groupEdited->json('data.current_address') ?? '') === 'Calle 23 #100, Vedado'
+            && (int) ($groupEdited->json('data.collection_agency_id') ?? 0) === $payrollAgencyId
+            && $groupEdited->json('data.bank_account') === null,
+        detail($groupEdited),
+    );
+
+    $backToMagnetic = $base('PUT', "/pension-cases/{$caseId}", [
+        'collection_agency_type_id' => $magneticTypeId,
+        'collection_agency_id' => $magneticAgencyId,
+    ]);
+    check(
+        'task 42: volver al tipo de tarjeta sin cuenta responde 422 sobre bank_account',
+        $backToMagnetic->status() === 422 && is_array($backToMagnetic->json('errors.bank_account')),
+        detail($backToMagnetic),
+    );
+
+    $withAccountAgain = $base('PUT', "/pension-cases/{$caseId}", [
+        'bank_account' => '98765432109876543210987654321',
+    ]);
+    check(
+        'task 42: PUT re-declara la cuenta y el cobro vuelve a ser coherente',
+        $withAccountAgain->status() === 200
+            && ($withAccountAgain->json('data.bank_account') ?? '') === '98765432109876543210987654321',
+        detail($withAccountAgain),
+    );
 
     // ---- PUT: los campos de ciclo de vida también 422 ----
     foreach ([
