@@ -221,11 +221,12 @@ describe('API documentation (Swagger)', function () {
         $update = $spec['paths']['/api/v1/catalogs/{type}/{id}']['patch']['requestBody']['content']['application/json']['schema'];
 
         // The spec version is the freshness signal of the served schema:
-        // 1.4.0 is the revision that carries the SGP-36 model adjustments
-        // (payment_types eliminated, the agency-types payment form, the
-        // case residence + collection group and the income applied
-        // percent) on top of the 1.3.0 territorial scope.
-        expect($spec['info']['version'])->toBe('1.4.0')
+        // 1.5.0 is the revision that answers the promovente residence +
+        // collection data on every LISTING row (SGP-37) on top of the
+        // 1.4.0 model adjustments (payment_types eliminated, the
+        // agency-types payment form, the case residence + collection
+        // group and the income applied percent).
+        expect($spec['info']['version'])->toBe('1.5.0')
 
             // Schema de Entrada del alta: the sector travels as an optional
             // integer and the persona fallecida flag as a boolean whose
@@ -323,6 +324,10 @@ describe('API documentation (Swagger)', function () {
             ->and($parameters)->toContain('page')
             ->and($parameters)->toContain('per_page')
             ->and($spec['paths']['/api/v1/pension-cases']['get']['description'])->toContain('OFICINA DEL USUARIO AUTENTICADO')
+            // Task 44 (SGP-37): the listing documents the residence +
+            // collection projections each row now carries.
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['description'])->toContain('residence_province')
+            ->and($spec['paths']['/api/v1/pension-cases']['get']['description'])->toContain('payment_form')
             ->and($spec['paths']['/api/v1/pension-cases']['get']['responses'])->toHaveKey('422');
     });
 

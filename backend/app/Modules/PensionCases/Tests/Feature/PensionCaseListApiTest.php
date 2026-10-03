@@ -44,6 +44,15 @@ use Tests\TestCase;
  * page is EMPTY, never the unscoped directory. The scope composes
  * with the remaining wire filters (status, persona, número, rango de
  * fechas): they narrow INSIDE the actor's office, never across it.
+ *
+ * Task 44 (user correction, SGP-37): every row of the listing
+ * answers the promovente RESIDENCE + COLLECTION projections —
+ * residence_province and residence_municipality as {id, code,
+ * name}, the collection agency type carrying its payment form and
+ * the FULL agency shape (code, name, type, geography) — the same
+ * projections the detail/store/PUT surfaces already answer, so the
+ * row is never a summary that drifts from the single-resource
+ * PensionCase shape.
  */
 final class PensionCaseListApiTest extends TestCase
 {
@@ -58,6 +67,14 @@ final class PensionCaseListApiTest extends TestCase
     private Person $eastApplicant;
 
     private User $reader;
+
+    private Province $residenceProvince;
+
+    private Municipality $residenceMunicipality;
+
+    private AgencyType $collectionAgencyType;
+
+    private Agency $collectionAgency;
 
     /** @var array<string, int|string> */
     private array $catalog;
@@ -110,18 +127,22 @@ final class PensionCaseListApiTest extends TestCase
         ]);
         // Task 42: the collection point of the promovente (the
         // electronic payroll form keeps the bank account optional).
-        $collectionAgencyType = AgencyType::query()->create([
+        // Task 44 keeps the fixtures as PROPERTIES: the listing
+        // assertions read them back through the projections.
+        $this->collectionAgencyType = AgencyType::query()->create([
             'code' => 'NE',
             'name' => 'Agencia de nómina',
             'payment_form' => PaymentForm::NominaElectronica->value,
         ]);
-        $collectionAgency = Agency::query()->create([
+        $this->collectionAgency = Agency::query()->create([
             'code' => 'BPA-NE-1',
             'name' => 'Agencia BPA nómina',
             'province_id' => $north->id,
             'municipality_id' => $northMunicipality->id,
-            'agency_type_id' => $collectionAgencyType->id,
+            'agency_type_id' => $this->collectionAgencyType->id,
         ]);
+        $this->residenceProvince = $north;
+        $this->residenceMunicipality = $northMunicipality;
 
         $this->catalog = [
             'employer_entity_id' => $entity->id,
@@ -138,10 +159,10 @@ final class PensionCaseListApiTest extends TestCase
             // Task 42: the promovente residence + collection group
             // shared by both territorial fixtures.
             'current_address' => 'Calle 8 #10, Playa',
-            'residence_province_id' => $north->id,
-            'residence_municipality_id' => $northMunicipality->id,
-            'collection_agency_type_id' => $collectionAgencyType->id,
-            'collection_agency_id' => $collectionAgency->id,
+            'residence_province_id' => $this->residenceProvince->id,
+            'residence_municipality_id' => $this->residenceMunicipality->id,
+            'collection_agency_type_id' => $this->collectionAgencyType->id,
+            'collection_agency_id' => $this->collectionAgency->id,
         ];
 
         // One case captured per office (direct fixtures: the number
@@ -209,6 +230,49 @@ final class PensionCaseListApiTest extends TestCase
             ->assertJsonPath('data.0.office_id', $this->eastOffice->id)
             ->assertJsonPath('data.0.number', '12012690002')
             ->assertJsonPath('meta.total', 1);
+    }
+
+    public function test_each_row_carries_the_residence_and_collection_projections(): void
+    {
+        // Task 44 (user correction, SGP-37): the LISTING answers the
+        // promovente residence + collection data — the same
+        // projections the detail/store/PUT surfaces answer, so a
+        // client reading the directory never needs a second round
+        // trip per row to resolve the geography or the collection
+        // point. The province and municipality of residence travel
+        // as {id, code, name}; the collection agency type carries
+        // its payment form; the agency travels its FULL shape
+        // (code, name, type, province, municipality).
+        $response = $this->getJson('/api/v1/pension-cases')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $row = $response->json('data.0');
+
+        // The residence geography of the promovente (Task 42 group).
+        $this->assertSame($this->residenceProvince->id, $row['residence_province']['id']);
+        $this->assertSame($this->residenceProvince->code, $row['residence_province']['code']);
+        $this->assertSame($this->residenceProvince->name, $row['residence_province']['name']);
+        $this->assertSame($this->residenceMunicipality->id, $row['residence_municipality']['id']);
+        $this->assertSame($this->residenceMunicipality->code, $row['residence_municipality']['code']);
+        $this->assertSame($this->residenceMunicipality->name, $row['residence_municipality']['name']);
+        $this->assertSame('Calle 8 #10, Playa', $row['current_address']);
+
+        // The collection point: the agency type with its payment
+        // form and the FULL agency projection (no summary row).
+        $this->assertSame($this->collectionAgencyType->id, $row['collection_agency_type']['id']);
+        $this->assertSame($this->collectionAgencyType->code, $row['collection_agency_type']['code']);
+        $this->assertSame(PaymentForm::NominaElectronica->value, $row['collection_agency_type']['payment_form']);
+        $this->assertSame($this->collectionAgency->id, $row['collection_agency']['id']);
+        $this->assertSame($this->collectionAgency->code, $row['collection_agency']['code']);
+        $this->assertSame($this->collectionAgency->name, $row['collection_agency']['name']);
+        $this->assertSame($this->collectionAgencyType->code, $row['collection_agency']['type']['code']);
+        $this->assertSame($this->residenceProvince->code, $row['collection_agency']['province']['code']);
+        $this->assertSame($this->residenceMunicipality->code, $row['collection_agency']['municipality']['code']);
+
+        // The bank account stays null: the nomina electronica form
+        // leaves it optional and the fixture never declared one.
+        $this->assertNull($row['bank_account']);
     }
 
     public function test_the_listing_rejects_an_office_id_in_the_query(): void
