@@ -44,6 +44,15 @@ use Illuminate\Foundation\Http\FormRequest;
  * termination_date, an OPTIONAL date with the Y-m-d shape rule only
  * (no semantic probe: the user correction declares it plain
  * optional), exactly like requested_at's shape treatment.
+ *
+ * Task 42 (user correction, SGP-36): the promovente residence and
+ * collection group — current_address, residence geography and
+ * collection point, every field REQUIRED at the wire EXCEPT the bank
+ * account, whose conditional demand depends on the payment form of
+ * the collection agency type (a semantic probe of the service, 422
+ * on bank_account). The nested income rows additionally carry the
+ * REQUIRED applied_percent (range 0-100, at most two decimals — the
+ * RN-005 doctrine: exact decimal string, never float).
  */
 final class StorePensionCaseRequest extends FormRequest
 {
@@ -89,6 +98,16 @@ final class StorePensionCaseRequest extends FormRequest
             // Task 38: fecha de desvinculación — optional wire date,
             // shape rule only (no semantic probe).
             'termination_date' => ['nullable', 'date_format:Y-m-d'],
+            // Task 42: promovente residence + collection group — all
+            // required EXCEPT the bank account: the service demands
+            // it (422 on bank_account) when the payment form of the
+            // collection agency type is 'tarjeta magnetica'.
+            'current_address' => ['required', 'string', 'max:255'],
+            'residence_province_id' => ['required', 'integer', 'min:1'],
+            'residence_municipality_id' => ['required', 'integer', 'min:1'],
+            'collection_agency_type_id' => ['required', 'integer', 'min:1'],
+            'collection_agency_id' => ['required', 'integer', 'min:1'],
+            'bank_account' => ['nullable', 'string', 'max:34'],
             // Task 35: reference to a REGISTERED person — the
             // existence/active probe is semantic (service), like
             // applicant_person_id.
@@ -129,6 +148,14 @@ final class StorePensionCaseRequest extends FormRequest
             'income_concept_records' => ['nullable', 'array', 'max:200'],
             'income_concept_records.*.income_concept_id' => ['required_with:income_concept_records', 'integer', 'min:1'],
             'income_concept_records.*.amount' => ['required_with:income_concept_records', ...$money],
+            // Task 42: percent to apply — exact decimal string with
+            // range 0-100 and at most two decimals (RN-005 doctrine).
+            'income_concept_records.*.applied_percent' => [
+                'required_with:income_concept_records',
+                'numeric',
+                'between:0,100',
+                'regex:/^\d{1,3}(\.\d{1,2})?$/',
+            ],
         ];
     }
 

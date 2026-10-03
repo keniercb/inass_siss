@@ -95,7 +95,7 @@ interface PensionCaseRepositoryInterface
      * repository just inserts the rows it is given (already
      * validated).
      *
-     * @param  list<array{income_concept_id: int, amount: string}>  $rows
+     * @param  list<array{income_concept_id: int, amount: string, applied_percent: string}>  $rows
      */
     public function createIncomeConceptRecords(PensionCase $case, array $rows): void;
 
@@ -117,7 +117,7 @@ interface PensionCaseRepositoryInterface
 
     public function removeWorkCycle(PensionCase $case, int $recordId): bool;
 
-    public function addIncomeConceptRecord(PensionCase $case, int $incomeConceptId, string $amount): IncomeConceptRecord;
+    public function addIncomeConceptRecord(PensionCase $case, int $incomeConceptId, string $amount, string $appliedPercent): IncomeConceptRecord;
 
     public function removeIncomeConceptRecord(PensionCase $case, int $recordId): bool;
 

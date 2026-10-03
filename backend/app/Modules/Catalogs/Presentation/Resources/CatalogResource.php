@@ -35,6 +35,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'applies_base_salary', type: 'boolean', nullable: true, example: true, description: 'Solo income-concepts'),
         new OA\Property(property: 'sector', type: 'integer', nullable: true, example: 2, description: 'Solo pension-regimes (Task 38): sector opcional del régimen de jubilación, devuelto por todos los endpoints'),
         new OA\Property(property: 'deceased_person', type: 'boolean', nullable: false, example: false, description: 'Solo pension-types (Task 38): persona fallecida, booleano con default false, devuelto por todos los endpoints'),
+        new OA\Property(property: 'payment_form', type: 'string', enum: ['tarjeta magnetica', 'nomina electronica'], example: 'tarjeta magnetica', description: 'Solo agency-types (Task 42): forma de pago del cobro, devuelta por todos los endpoints'),
         new OA\Property(property: 'deactivated_at', type: 'string', format: 'date-time', nullable: true, description: 'Borrado lógico (RF-CAT-001)'),
         new OA\Property(property: 'created_at', type: 'string', format: 'date-time', nullable: true),
         new OA\Property(property: 'updated_at', type: 'string', format: 'date-time', nullable: true),

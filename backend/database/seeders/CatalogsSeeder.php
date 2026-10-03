@@ -13,7 +13,6 @@ use App\Modules\Catalogs\Infrastructure\Persistence\Models\LegalBasisType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OccupationalCategory;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\OfficeType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Organization;
-use App\Modules\Catalogs\Infrastructure\Persistence\Models\PaymentType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionRegime;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\PensionType;
 use App\Modules\Catalogs\Infrastructure\Persistence\Models\Position;
@@ -44,12 +43,19 @@ final class CatalogsSeeder extends Seeder
 
     private function seedCodeCatalogs(): void
     {
+        // Task 42 (user correction, SGP-36): the agency types seed
+        // their payment form explicitly (the column default would
+        // answer the same value — this keeps the reference data
+        // honest about the field's existence; official assignment
+        // pending the analista, P-06).
         AgencyType::upsert(
-            self::codeRows([
-                ['AG', 'Agencia'], ['SU', 'Sucursal'], ['PS', 'Punto de servicio'],
-            ]),
+            [
+                ['code' => 'AG', 'name' => 'Agencia', 'payment_form' => 'tarjeta magnetica'],
+                ['code' => 'SU', 'name' => 'Sucursal', 'payment_form' => 'tarjeta magnetica'],
+                ['code' => 'PS', 'name' => 'Punto de servicio', 'payment_form' => 'tarjeta magnetica'],
+            ],
             ['code'],
-            ['name'],
+            ['name', 'payment_form'],
         );
 
         Organization::upsert(
@@ -193,16 +199,6 @@ final class CatalogsSeeder extends Seeder
             ],
             ['code'],
             ['name', 'description', 'months_per_year'],
-        );
-
-        PaymentType::upsert(
-            self::codedRows([
-                ['ABN', 'Abono bancario', 'Abono en cuenta bancaria'],
-                ['CHQ', 'Cheque', 'Pago por cheque'],
-                ['EFE', 'Efectivo', 'Pago en efectivo'],
-            ]),
-            ['code'],
-            ['name', 'description'],
         );
 
         IncomeConcept::upsert(

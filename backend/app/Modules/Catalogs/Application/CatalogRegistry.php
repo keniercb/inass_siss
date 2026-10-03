@@ -31,6 +31,17 @@ use App\Modules\Catalogs\Application\Exceptions\UnknownCatalogException;
  * extraRules machinery, so every endpoint of the generic resource
  * answers with them.
  *
+ * Since the Task 42 correction (SGP-36) the payment_types catalog is
+ * ELIMINATED — fifteen uniform types remain, because the payment form
+ * of the collection now lives in the agency type — and the agency
+ * types carry their own extra column: payment_form, the
+ * lowercase-unified enum 'tarjeta magnetica'|'nomina electronica'
+ * (written exactly as the user fixed it, no tildes) with database
+ * DEFAULT 'tarjeta magnetica' — the deceased_person precedent: an
+ * omitted store payload answers the default, and the value decides
+ * the conditional bank-account demand of the case's collection
+ * group (RF-EXP-001).
+ *
  * The registry lives in the Application layer, not in Presentation,
  * so both the request rules and the service invariants are driven by
  * the same map; it is pure data and never touches the database.
@@ -137,7 +148,10 @@ final class CatalogRegistry
                 codeMax: 4,
                 nameMax: 80,
                 hasDescription: false,
-                extraRules: [],
+                // Task 42 (user correction, SGP-36): payment form of
+                // the collection — lowercase-unified enum, omission
+                // falls to the database DEFAULT.
+                extraRules: ['payment_form' => 'in:tarjeta magnetica,nomina electronica'],
                 dependents: [
                     self::MODELS.'Agency' => 'agency_type_id',
                 ],
@@ -277,17 +291,6 @@ final class CatalogRegistry
                     // returned by every endpoint of the catalog.
                     'sector' => 'nullable|integer',
                 ],
-                dependents: [],
-            ),
-            'payment-types' => new CatalogDefinition(
-                key: 'payment-types',
-                label: 'payment types',
-                model: self::MODELS.'PaymentType',
-                hasCode: true,
-                codeMax: 10,
-                nameMax: 80,
-                hasDescription: true,
-                extraRules: [],
                 dependents: [],
             ),
             'income-concepts' => new CatalogDefinition(

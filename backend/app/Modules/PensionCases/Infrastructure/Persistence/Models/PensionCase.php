@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\PensionCases\Infrastructure\Persistence\Models;
 
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Agency;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\AgencyType;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Municipality;
+use App\Modules\Catalogs\Infrastructure\Persistence\Models\Province;
 use App\Modules\PensionCases\Domain\CaseStatus;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -49,9 +53,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * 38 (user correction, SGP-32) the case also carries the promovente's
  * fecha de desvinculación — termination_date, a plain nullable date
  * with no semantic probe (the user correction declares it optional).
- * Authorship is stamped by the Shared AuditableObserver and every
- * write lands in the append-only trail through the Shared
- * AuditTrailObserver, both registered in the
+ * Since Task 42 (user correction, SGP-36) the case carries the
+ * promovente residence + collection group: current_address, the
+ * residence geography (province + municipality, RN-04 coherent), the
+ * collection point (agency type + agency, the agency of the declared
+ * type) and the bank account — REQUIRED CONDITIONALLY on the payment
+ * form of the collection agency type ('tarjeta magnetica' demands it,
+ * 'nomina electronica' leaves it optional); the group is EDITABLE
+ * through the PUT. Authorship is stamped by the Shared
+ * AuditableObserver and every write lands in the append-only trail
+ * through the Shared AuditTrailObserver, both registered in the
  * PensionCasesServiceProvider.
  *
  * @property int $id
@@ -75,6 +86,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $phone
  * @property string|null $popular_council
  * @property CarbonImmutable|null $termination_date
+ * @property string $current_address
+ * @property int $residence_province_id
+ * @property int $residence_municipality_id
+ * @property int $collection_agency_type_id
+ * @property int $collection_agency_id
+ * @property string|null $bank_account
  * @property int|null $approval_legal_basis_id
  * @property string|null $decision_notes
  * @property int|null $decided_by
@@ -92,6 +109,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Collection<int, IncomeConceptRecord> $incomeConceptRecords
  * @property-read \App\Modules\People\Infrastructure\Persistence\Models\Person|null $applicant
  * @property-read \App\Modules\People\Infrastructure\Persistence\Models\Person|null $filedBy
+ * @property-read Province|null $residenceProvince
+ * @property-read Municipality|null $residenceMunicipality
+ * @property-read AgencyType|null $collectionAgencyType
+ * @property-read Agency|null $collectionAgency
  */
 class PensionCase extends Model
 {
@@ -119,6 +140,13 @@ class PensionCase extends Model
         'phone',
         'popular_council',
         'termination_date',
+        // Task 42: promovente residence + collection group.
+        'current_address',
+        'residence_province_id',
+        'residence_municipality_id',
+        'collection_agency_type_id',
+        'collection_agency_id',
+        'bank_account',
         'approval_legal_basis_id',
         'decision_notes',
         'decided_by',
@@ -154,6 +182,10 @@ class PensionCase extends Model
             'rebel_army_member' => 'boolean',
             'internationalist' => 'boolean',
             'termination_date' => 'immutable_date',
+            'residence_province_id' => 'integer',
+            'residence_municipality_id' => 'integer',
+            'collection_agency_type_id' => 'integer',
+            'collection_agency_id' => 'integer',
             'filed_by_person_id' => 'integer',
             'decided_at' => 'immutable_datetime',
             'computed_amount' => 'decimal:2',
@@ -218,5 +250,43 @@ class PensionCase extends Model
     public function filedBy(): BelongsTo
     {
         return $this->belongsTo(\App\Modules\People\Infrastructure\Persistence\Models\Person::class, 'filed_by_person_id');
+    }
+
+    /**
+     * Task 42: residence geography of the promovente — the municipality
+     * belongs to the province (RN-04, probed by the service).
+     *
+     * @return BelongsTo<Province, $this>
+     */
+    public function residenceProvince(): BelongsTo
+    {
+        return $this->belongsTo(Province::class, 'residence_province_id');
+    }
+
+    /**
+     * @return BelongsTo<Municipality, $this>
+     */
+    public function residenceMunicipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class, 'residence_municipality_id');
+    }
+
+    /**
+     * Task 42: collection point — the agency type carries the payment
+     * form that decides the conditional bank-account demand.
+     *
+     * @return BelongsTo<AgencyType, $this>
+     */
+    public function collectionAgencyType(): BelongsTo
+    {
+        return $this->belongsTo(AgencyType::class, 'collection_agency_type_id');
+    }
+
+    /**
+     * @return BelongsTo<Agency, $this>
+     */
+    public function collectionAgency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class, 'collection_agency_id');
     }
 }

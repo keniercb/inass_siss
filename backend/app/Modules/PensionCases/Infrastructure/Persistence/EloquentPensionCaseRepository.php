@@ -97,6 +97,15 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
                 'incomeConceptRecords',
                 'applicant',
                 'filedBy',
+                // Task 42: the promovente residence + collection
+                // projections (the agency carries its geography and
+                // type so the full AgencyResource shape answers).
+                'residenceProvince',
+                'residenceMunicipality',
+                'collectionAgencyType',
+                'collectionAgency.province',
+                'collectionAgency.municipality',
+                'collectionAgency.agencyType',
             ])
             ->find($id);
     }
@@ -185,6 +194,7 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
             $case->incomeConceptRecords()->create([
                 'income_concept_id' => $row['income_concept_id'],
                 'amount' => $row['amount'],
+                'applied_percent' => $row['applied_percent'],
             ]);
         }
     }
@@ -239,11 +249,12 @@ final class EloquentPensionCaseRepository implements PensionCaseRepositoryInterf
         return $record !== null && (bool) $record->delete();
     }
 
-    public function addIncomeConceptRecord(PensionCase $case, int $incomeConceptId, string $amount): IncomeConceptRecord
+    public function addIncomeConceptRecord(PensionCase $case, int $incomeConceptId, string $amount, string $appliedPercent): IncomeConceptRecord
     {
         return $case->incomeConceptRecords()->create([
             'income_concept_id' => $incomeConceptId,
             'amount' => $amount,
+            'applied_percent' => $appliedPercent,
         ]);
     }
 

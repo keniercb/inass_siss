@@ -188,12 +188,12 @@ final class PensionCaseController
         operationId: 'pensionCasesStore',
         tags: ['Expedientes'],
         summary: 'Apertura de un expediente',
-        description: 'Alta del expediente (RF-EXP-001, reglas de usuario 0-5/ADR-32/33/34): el expediente ASUME la oficina del usuario que lo registra — office_id no se envía en el POST (422 si llega) — y el número se compone PPMMAACCCCC (códigos de provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio rellenado con ceros, once dígitos contiguos). El proponente debe estar vivo y activo (RF-SEG-003: 422) y no puede tener otro expediente abierto (409). La serie salarial admite máximo 15 filas (regla 1); el par de Ejército Rebelde exige la fecha de alta cuando el booleano es true y la rechaza cuando es false (regla 4); los conceptos de ingreso se declaran como subregistros anidados (regla 5). Task 37: la marca internacionalista del promovente es booleana OBLIGATORIA (paralelo del par rebelde) y el par de contacto (phone, popular_council) viaja opcional; los subregistros de servicio exigen end_date OBLIGATORIA, estrictamente posterior a start_date y SIN solapamiento entre filas (422 con nada creado). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; los pares año-expediente y concepto-expediente son únicos (422). Las advertencias viajan junto a data.',
+        description: 'Alta del expediente (RF-EXP-001, reglas de usuario 0-5/ADR-32/33/34): el expediente ASUME la oficina del usuario que lo registra — office_id no se envía en el POST (422 si llega) — y el número se compone PPMMAACCCCC (códigos de provincia y municipio de la oficina registrante, últimos dos dígitos del año en curso y consecutivo por año/provincia/municipio rellenado con ceros, once dígitos contiguos). El proponente debe estar vivo y activo (RF-SEG-003: 422) y no puede tener otro expediente abierto (409). La serie salarial admite máximo 15 filas (regla 1); el par de Ejército Rebelde exige la fecha de alta cuando el booleano es true y la rechaza cuando es false (regla 4); los conceptos de ingreso se declaran como subregistros anidados (regla 5). Task 37: la marca internacionalista del promovente es booleana OBLIGATORIA (paralelo del par rebelde) y el par de contacto (phone, popular_council) viaja opcional; los subregistros de servicio exigen end_date OBLIGATORIA, estrictamente posterior a start_date y SIN solapamiento entre filas (422 con nada creado). Task 42: el domicilio y cobro del promovente viajan en el alta — dirección actual, provincia y municipio de residencia (coherentes, RN-04), tipo de agencia de cobro, agencia de cobro (del tipo declarado) y cuenta bancaria OBLIGATORIA CONDICIONAL a la forma de pago del tipo de agencia (exigida con tarjeta magnetica, opcional con nomina electronica: 422 sobre bank_account) — y cada concepto de ingreso declarado viaja con su porciento a aplicar (0-100, dos decimales). Los subregistros opcionales se crean en la misma transacción: todo o nada (S5.5). El techo del año salarial es el año actual+1; los pares año-expediente y concepto-expediente son únicos (422). Las advertencias viajan junto a data.',
         security: [['sanctumAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['applicant_person_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'internationalist', 'last_salary'],
+                required: ['applicant_person_id', 'employer_entity_id', 'position_id', 'occupational_category_id', 'educational_level_id', 'scientific_category_id', 'pension_type_id', 'pension_regime_id', 'rebel_army_member', 'internationalist', 'current_address', 'residence_province_id', 'residence_municipality_id', 'collection_agency_type_id', 'collection_agency_id', 'last_salary'],
                 properties: [
                     new OA\Property(property: 'applicant_person_id', type: 'integer', example: 7),
                     new OA\Property(property: 'office_id', type: 'integer', nullable: true, example: null, description: 'PROHIBIDO (regla 0): el expediente asume la oficina del usuario autenticado'),
@@ -211,6 +211,12 @@ final class PensionCaseController
                     new OA\Property(property: 'phone', type: 'string', nullable: true, maxLength: 30, example: '+53 5 555 1234', description: 'Teléfono de contacto del promovente (Task 37): texto libre opcional, 30 caracteres como techo; la omisión persiste null'),
                     new OA\Property(property: 'popular_council', type: 'string', nullable: true, maxLength: 120, example: 'Consejo Popular Playa', description: 'Consejo popular del promovente (Task 37): división territorial cubana, texto libre opcional de 120 caracteres como techo; la omisión persiste null'),
                     new OA\Property(property: 'termination_date', type: 'string', format: 'date', nullable: true, example: '2025-07-31', description: 'Fecha de desvinculación del promovente (Task 38, corrección de usuario): opcional, Y-m-d; 422 con formato inválido, la omisión persiste null'),
+                    new OA\Property(property: 'current_address', type: 'string', example: 'Calle 8 #10 entre 5 y 7, Playa', description: 'Dirección actual del promovente (Task 42, corrección de usuario): OBLIGATORIA; 422 si se omite'),
+                    new OA\Property(property: 'residence_province_id', type: 'integer', format: 'int64', example: 11, description: 'Provincia de residencia del promovente (Task 42): OBLIGATORIA, activa; el municipio debe pertenecerle (RN-04, 422)'),
+                    new OA\Property(property: 'residence_municipality_id', type: 'integer', format: 'int64', example: 3, description: 'Municipio de residencia del promovente (Task 42): OBLIGATORIO, activo y de la provincia declarada (422)'),
+                    new OA\Property(property: 'collection_agency_type_id', type: 'integer', format: 'int64', example: 1, description: 'Tipo de agencia de cobro (Task 42): OBLIGATORIO, activo; su payment_form (tarjeta magnetica|nomina electronica) decide la exigencia de la cuenta bancaria'),
+                    new OA\Property(property: 'collection_agency_id', type: 'integer', format: 'int64', example: 7, description: 'Agencia de cobro (Task 42): OBLIGATORIA, activa y del tipo declarado (422)'),
+                    new OA\Property(property: 'bank_account', type: 'string', nullable: true, maxLength: 34, example: '01234567890123456789012345678', description: 'Cuenta bancaria del cobro (Task 42): OBLIGATORIA CONDICIONAL — exigida (422 sobre bank_account) cuando la forma de pago del tipo de agencia de cobro es tarjeta magnetica, opcional con nomina electronica (la omisión persiste null)'),
                     new OA\Property(property: 'last_salary', type: 'string', example: '5000.00', description: 'Último salario, decimal exacto no negativo (RN-005)'),
                     new OA\Property(property: 'requested_at', type: 'string', format: 'date', nullable: true, example: '2026-09-30', description: 'Opcional; por defecto hoy; nunca futura'),
                     new OA\Property(
@@ -262,6 +268,7 @@ final class PensionCaseController
                             properties: [
                                 new OA\Property(property: 'income_concept_id', type: 'integer', example: 3),
                                 new OA\Property(property: 'amount', type: 'string', example: '150.00'),
+                                new OA\Property(property: 'applied_percent', type: 'string', example: '100.00', description: 'Porciento a aplicar (Task 42): OBLIGATORIO por fila — decimal exacto 0-100 con dos decimales (422 si se omite, fuera de rango o con tercera decimal)'),
                             ],
                             type: 'object',
                         ),
@@ -340,7 +347,7 @@ final class PensionCaseController
         operationId: 'pensionCasesUpdate',
         tags: ['Expedientes'],
         summary: 'Edición del expediente (promovente inmutable)',
-        description: 'PUT de edición del expediente (SGP-34, corrección de usuario, RF-EXP-001): edita los campos del expediente propio — el vínculo laboral y la clasificación de la pensión (entidad, cargo, ambos pares de categorías, tipo y régimen), el último salario y la fecha de solicitud — mientras el PROMOVENTE de la pensión queda INMUTABLE: todo campo de la esfera de la persona (applicant_person_id, filed_by_person_id, el par de Ejército Rebelde, el internacionalista, el par de contacto y la fecha de desvinculación) responde 422 prohibido en vez de derivar silenciosamente al promovente que el registro ya conoce. Los campos de ciclo de vida siguen la misma suerte: office_id respeta la regla 0 del alta (el expediente asume la oficina del usuario que registra) y number/status solo se mueven por sus propios canales (la secuencia del alta, la máquina de transiciones de S6). Semántica PATCH: cada campo es opcional, solo las claves declaradas cambian y la omisión de un campo nunca arranca su valor almacenado. Los probes semánticos espejan el alta (entidad y catálogos activos: 422; fecha de solicitud no futura: 422). La edición solo corre mientras el expediente está en submitted (409 fuera, con el estado actual). Las advertencias de la serie salarial viajan junto a data.',
+        description: 'PUT de edición del expediente (SGP-34, corrección de usuario, RF-EXP-001): edita los campos del expediente propio — el vínculo laboral y la clasificación de la pensión (entidad, cargo, ambos pares de categorías, tipo y régimen), el último salario y la fecha de solicitud — mientras el PROMOVENTE de la pensión queda INMUTABLE: todo campo de la esfera de la persona (applicant_person_id, filed_by_person_id, el par de Ejército Rebelde, el internacionalista, el par de contacto y la fecha de desvinculación) responde 422 prohibido en vez de derivar silenciosamente al promovente que el registro ya conoce. Los campos de ciclo de vida siguen la misma suerte: office_id respeta la regla 0 del alta (el expediente asume la oficina del usuario que registra) y number/status solo se mueven por sus propios canales (la secuencia del alta, la máquina de transiciones de S6). Semántica PATCH: cada campo es opcional, solo las claves declaradas cambian y la omisión de un campo nunca arranca su valor almacenado. Los probes semánticos espejan el alta (entidad y catálogos activos: 422; fecha de solicitud no futura: 422). La edición solo corre mientras el expediente está en submitted (409 fuera, con el estado actual). Task 42: el grupo de DOMICILIO y COBRO del promovente — dirección actual, provincia y municipio de residencia, tipo de agencia de cobro, agencia de cobro y cuenta bancaria — SÍ es editable (decisión explícita del usuario: pueden modificarse) con probes espejo del alta y la exigencia condicional de la cuenta re-evaluada contra el estado RESULTANTE (cambiar el tipo de agencia de cobro a uno con forma de pago tarjeta magnetica exige la cuenta si acabó en null). Las advertencias de la serie salarial viajan junto a data.',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -358,6 +365,12 @@ final class PensionCaseController
                     new OA\Property(property: 'pension_regime_id', type: 'integer', example: 1, description: 'Régimen de pensión del catálogo (editable)'),
                     new OA\Property(property: 'last_salary', type: 'string', example: '6200.00', description: 'Último salario, decimal exacto no negativo (RN-005, editable)'),
                     new OA\Property(property: 'requested_at', type: 'string', format: 'date', example: '2026-09-30', description: 'Fecha de solicitud (editable, nunca futura)'),
+                    new OA\Property(property: 'current_address', type: 'string', example: 'Calle 23 #100, Vedado', description: 'Dirección actual del promovente (Task 42, EDITABLE): semántica PATCH'),
+                    new OA\Property(property: 'residence_province_id', type: 'integer', format: 'int64', example: 11, description: 'Provincia de residencia (Task 42, EDITABLE): coherente con el municipio resultante (RN-04)'),
+                    new OA\Property(property: 'residence_municipality_id', type: 'integer', format: 'int64', example: 3, description: 'Municipio de residencia (Task 42, EDITABLE): de la provincia resultante'),
+                    new OA\Property(property: 'collection_agency_type_id', type: 'integer', format: 'int64', example: 1, description: 'Tipo de agencia de cobro (Task 42, EDITABLE): su payment_form decide la exigencia de la cuenta resultante'),
+                    new OA\Property(property: 'collection_agency_id', type: 'integer', format: 'int64', example: 7, description: 'Agencia de cobro (Task 42, EDITABLE): activa y del tipo resultante'),
+                    new OA\Property(property: 'bank_account', type: 'string', nullable: true, maxLength: 34, example: '01234567890123456789012345678', description: 'Cuenta bancaria del cobro (Task 42, EDITABLE): null explícito la LIMPIA; 422 si el estado resultante exige cuenta (tarjeta magnetica) y acabó null'),
                     new OA\Property(property: 'applicant_person_id', type: 'integer', example: 7, description: 'PROHIBIDO (SGP-34): el promovente de la pensión es no modificable — 422 si se envía'),
                     new OA\Property(property: 'filed_by_person_id', type: 'integer', format: 'int64', nullable: true, example: 12, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable por este endpoint — 422 si se envía'),
                     new OA\Property(property: 'rebel_army_member', type: 'boolean', example: false, description: 'PROHIBIDO (SGP-34): esfera de persona, no modificable — 422 si se envía'),
@@ -714,7 +727,7 @@ final class PensionCaseController
         operationId: 'pensionCasesAddIncomeConceptRecord',
         tags: ['Expedientes'],
         summary: 'Alta de un concepto de ingreso',
-        description: 'Declara el valor de un concepto de ingreso del expediente (regla de usuario 5) mientras el expediente está en submitted. El par concepto-expediente es único (422 semántico) y el importe es decimal exacto no negativo (RN-005).',
+        description: 'Declara el valor de un concepto de ingreso del expediente (regla de usuario 5) mientras el expediente está en submitted. El par concepto-expediente es único (422 semántico), el importe es decimal exacto no negativo (RN-005) y — desde la Task 42 (corrección de usuario) — el porciento a aplicar es OBLIGATORIO: decimal exacto en el rango 0-100 con dos decimales (422 si se omite, fuera de rango o con tercera decimal).',
         security: [['sanctumAuth' => []]],
         parameters: [
             new OA\PathParameter(name: 'id', schema: new OA\Schema(type: 'integer', format: 'int64')),
@@ -722,10 +735,11 @@ final class PensionCaseController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['income_concept_id', 'amount'],
+                required: ['income_concept_id', 'amount', 'applied_percent'],
                 properties: [
                     new OA\Property(property: 'income_concept_id', type: 'integer', example: 3, description: 'Concepto del catálogo de conceptos de ingreso'),
                     new OA\Property(property: 'amount', type: 'string', example: '150.00', description: 'Importe exacto con dos decimales (RN-005)'),
+                    new OA\Property(property: 'applied_percent', type: 'string', example: '50.25', description: 'Porciento a aplicar (Task 42, corrección de usuario): OBLIGATORIO — decimal exacto 0-100 con dos decimales'),
                 ],
             ),
         ),
@@ -756,6 +770,7 @@ final class PensionCaseController
                 $id,
                 (int) $validated['income_concept_id'],
                 (string) $validated['amount'],
+                (string) $validated['applied_percent'],
             ),
             $id,
         );
