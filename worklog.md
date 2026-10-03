@@ -1620,3 +1620,20 @@ Stage Summary:
 - La propuesta quedó presentada al usuario con: el JSON de ejemplo de la fila de service_records con el campo nuevo, las fórmulas equivalentes SQL/PHP con el caso numérico verificado (71/12 = 5.92) y la lista EXACTA de artefactos a tocar en la Fase 2 (migración 2026_10_04_100000, ServicePeriods, PensionCaseService, ServiceRecord, repositorio Eloquent, ServiceRecordResource, requests de ambos puntos de entrada, ApiDoc 1.6.0, ApiDocsTest, tests de unidad y feature, fumiga HTTP)
 - PROTOCOLO: NO se escribió código de implementación — la Fase 2 (TDD rojo → migración → implementación → QA completo → fumigas HTTP → docs de cierre → PR → CI → merge) arranca SOLO tras el «implementa» explícito del usuario
 - Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
+---
+Task ID: 45-cierre
+Agent: Super Z (agente principal)
+Task: Cierre del SGP-38 Fase 1 — PR #53, CI y merge a main (la documentación de los años de trabajo del subregistro de servicio queda en main, pendiente de la validación del usuario para implementar)
+
+Work Log:
+- Entrega: rama docs/SGP-38-worked-years (2 commits por concepto: docs fdc5ea0 + worklog 8d0f3c1 sobre 6a5d631), push explícito por nombre de rama y PR #53 creada por API: https://github.com/keniercb/inass_siss/pull/53
+- CI (Quality gate PHP 8.3) SUCCESS sobre 8d0f3c1 tras ~4 minutos de sondeo
+- PR #53 mergeeada a main como 5f9db72 con merge commit; main local sincronizado (reset --hard a origin/main); SIN regresión local de la suite — la Fase 1 es docs-only (cero cambios de código: el CI del runner ejecutó el gate completo y la suite local vigente sigue siendo la 1134/3966 de la Task 44)
+- Los cuatro documentos actualizados copiados al directorio externo /home/z/my-project/download/ para el usuario (el sandbox nuevo prohíbe symlinks: el directorio canónico de los documentos sigue siendo inass_siss/download/ del repo)
+- Incidente menor del entorno: el reset del sandbox dejó /home/z/my-project/download/ como esqueleto (solo README de provisionamiento) y los symlinks están prohibidos — el parche de docs y el validador Mermaid se ejecutaron con la ruta del repo (scripts/patch_docs_task45.py apunta a inass_siss/download/ y validate_mermaid.sh recibió la ruta como argumento), sin tocar ningún script de la casa
+
+Stage Summary:
+- SGP-38 FASE 1 EN MAIN (Task 45, PR #53): los cuatro documentos de desarrollo registran los AÑOS DE TRABAJO del subregistro de servicio como DOCUMENTADA — implementación pendiente de la validación del usuario: `worked_years` DECIMAL(5,2) calculado al alta con la fórmula del usuario (meses de diferencia / M del régimen, 2 posiciones; 71/12 → '5.92'), 422 si el cliente lo envía (campo derivado, jamás descarte silencioso), string '5.92' en 201/detalle/schema OA (spec OpenAPI 1.6.0 al implementar), valor CONGELADO al alta y migración `2026_10_04_100000` con backfill SQL de las filas preexistentes
+- Las QUINCE correcciones de usuario del ciclo: CATORCE verificadas en main (tasks 30-44) y SGP-38 documentada esperando el «implementa» del usuario para su Fase 2
+- SIGUIENTE: esperar la validación del usuario; con «implementa», la Fase 2 — TDD rojo (ServicePeriodsTest + PensionCaseSubrecordsApiTest + PensionCaseCreationApiTest + ApiDocsTest), migración `2026_10_04_100000`, implementación (ServicePeriods + PensionCaseService + ServiceRecord + repositorio Eloquent + ServiceRecordResource + requests de ambos puntos de entrada + ApiDoc 1.6.0), QA completo, fumigas HTTP ampliadas y docs de cierre (desmarcar → IMPLEMENTADA)
+- Higiene: PAT de desarrollo vigente — rotar al cerrar la etapa de desarrollo
